@@ -6,7 +6,7 @@ HERE=$(cd "$(dirname "$0")" && pwd)
 WORK="${TMPDIR:-/tmp}/automaton-units"
 BIN="${FACTORIO_BIN:-$HOME/Library/Application Support/Steam/steamapps/common/Factorio/factorio.app/Contents/MacOS/factorio}"
 rm -rf "$WORK"; mkdir -p "$WORK/data" "$WORK/mods/unitsbench"
-cp "$HERE/mods/mod-list.json" "$WORK/mods/"; cp "$HERE/mods/unitsbench/info.json" "$HERE/mods/unitsbench/data.lua" "$WORK/mods/unitsbench/"
+printf '{"mods":[{"name":"base","enabled":true},{"name":"unitsbench","enabled":true}]}' > "$WORK/mods/mod-list.json"; cp "$HERE/mods/unitsbench/info.json" "$HERE/mods/unitsbench/data.lua" "$WORK/mods/unitsbench/"
 sed "s/__N__/$N/" "$HERE/mods/unitsbench/control.template.lua" > "$WORK/mods/unitsbench/control.lua"
 printf '[path]\nread-data=__PATH__system-read-data__\nwrite-data=%s\n' "$WORK/data" > "$WORK/config.ini"
 "$BIN" --config "$WORK/config.ini" --mod-directory "$WORK/mods" --map-gen-settings "$HERE/map-gen.json" --create "$WORK/map.zip" >/dev/null 2>&1

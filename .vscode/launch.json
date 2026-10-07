@@ -5,7 +5,8 @@
       "type": "factoriomod",
       "request": "launch",
       "name": "Factorio Mod Debug",
-      "preLaunchTask": "npm: build"
+      "preLaunchTask": "npm: build",
+      "modsPath": "~/Library/Application Support/factorio/mods"
     },
     {
       "type": "factoriomod",
@@ -13,7 +14,8 @@
       "name": "Factorio Mod Debug (Settings & Data)",
       "hookSettings": true,
       "hookData": true,
-      "preLaunchTask": "npm: build"
+      "preLaunchTask": "npm: build",
+      "modsPath": "~/Library/Application Support/factorio/mods"
     }
   ]
 }
