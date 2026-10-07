@@ -1,0 +1,5 @@
+.DS_Store
+# собранные пакеты мода
+*.zip
+# лог отладчика FMTK
+dap-trace.log

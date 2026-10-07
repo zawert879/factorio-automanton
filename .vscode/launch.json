@@ -1,0 +1,17 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "factoriomod",
+      "request": "launch",
+      "name": "Factorio Mod Debug"
+    },
+    {
+      "type": "factoriomod",
+      "request": "launch",
+      "name": "Factorio Mod Debug (Settings & Data)",
+      "hookSettings": true,
+      "hookData": true
+    }
+  ]
+}

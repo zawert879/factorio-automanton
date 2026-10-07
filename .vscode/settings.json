@@ -1,0 +1,12 @@
+{
+  "factorio.versions": [
+    {
+      "name": "Steam",
+      "factorioPath": "~/Library/Application Support/Steam/steamapps/common/Factorio/factorio.app/Contents/MacOS/factorio"
+    }
+  ],
+  "Lua.workspace.userThirdParty": [
+    "/Users/zawert/Library/Application Support/Code/User/workspaceStorage/67ebe3941090dbe51049a8d7417e9aa3/justarandomgeek.factoriomod-debug/sumneko-3rd"
+  ],
+  "Lua.workspace.checkThirdParty": "ApplyInMemory"
+}
