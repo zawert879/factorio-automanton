@@ -5,7 +5,8 @@
   "scripts": {
     "build": "tstl",
     "watch": "tstl --watch",
-    "test": "node tools/test/run.mjs"
+    "test": "node tools/test/run.mjs",
+    "test:game": "node tools/test/game.mjs"
   },
   "devDependencies": {
     "lua-types": "2.14.1",

@@ -8,7 +8,7 @@ local exit = os.exit
 -- Окружение как в Factorio: этих модулей и функций там нет.
 coroutine, io, os, loadfile, dofile = nil, nil, nil, nil, nil
 
-local testing = require("tests.lib.testing")
+local testing = require("src.test.testing")
 
 local load_failed = false
 for i = 2, #arg do

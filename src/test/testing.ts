@@ -1,5 +1,5 @@
 // Мини-библиотека тестов: describe / test / expect.
-// Тесты собираются TypeScriptToLua и выполняются в Lua 5.2 — тем же кодом, что пойдёт в игру.
+// Общая для тестов вне игры (tests/, Lua 5.2) и внутриигровых (src/test/, npm run test:game).
 
 export interface TestCase {
   name: string

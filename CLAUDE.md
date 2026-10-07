@@ -28,6 +28,12 @@
   в `build/` и выполняются в Lua 5.2 (`tools/lua/build.sh` собирает его при первом запуске). Окружение как
   в Factorio: нет `coroutine`, `io`, `os`, `loadfile`, `dofile`. Тестами покрываются чистые модули (без API игры).
   Особенность TSTL: `string.length` — в байтах UTF-8 (`"ж".length === 2`).
+- `npm run test:game` — внутриигровые тесты: `src/test/*.test.ts` (каждый файл регистрируется в
+  `src/test/index.ts`) выполняются в Factorio без окна на первом тике, итог — в `script-output`.
+  Включаются только служебным модом `automaton-test`, который создаёт скрипт; в zip мода не попадают.
+  Ошибки скриптов в таком запуске Factorio пишет в stdout, а не в `factorio-current.log`.
+- Необработанный `throw new Error("…")` Factorio показывает как `Unknown key: "…"` (TSTL бросает таблицу,
+  игра читает её как ключ перевода). Для фатальных ошибок в коде мода — `error("текст")`.
 - Проверка без окна, не мешая открытой игре: отдельная папка данных через `--config` и `--mod-directory`
   (пример — `tools/bench/run.sh`).
 

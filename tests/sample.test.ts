@@ -1,5 +1,5 @@
 // Проверка самой библиотеки тестов и особенностей TypeScriptToLua в Lua 5.2.
-import { describe, expect, test } from "./lib/testing"
+import { describe, expect, test } from "../src/test/testing"
 
 describe("библиотека тестов", () => {
   test("toBe сравнивает значения", () => {

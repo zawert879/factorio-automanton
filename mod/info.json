@@ -11,6 +11,9 @@
   "package": {
     "scripts": {
       "compile": "npm run build"
-    }
+    },
+    "ignore": [
+      "test/**"
+    ]
   }
 }
