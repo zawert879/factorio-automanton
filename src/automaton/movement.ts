@@ -87,6 +87,14 @@ export function moveRobot(
   state.lastResult[record.id] = undefined
 }
 
+/** Отменить поездку без итога (машина займётся другим). */
+export function cancelMove(record: RobotRecord): void {
+  const state = storage.movement
+  if (state.orders[record.id] === undefined) return
+  state.orders[record.id] = undefined
+  if (record.entity.valid) stopCommand(record)
+}
+
 export function isMoving(record: RobotRecord): boolean {
   return storage.movement.orders[record.id] !== undefined
 }

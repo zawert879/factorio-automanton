@@ -1,5 +1,6 @@
 // Отладочные команды для разработки и проверки в игре. В мультиплеере — только для админов.
 import { CustomCommandData, LuaEntity, LuaPlayer, MapPosition } from "factorio:runtime"
+import { ActionKind, ActionParams, startAction } from "../automaton/actions"
 import { moveRobot } from "../automaton/movement"
 import { RobotRecord } from "../automaton/registry"
 import { WORKER_MK1 } from "../names"
@@ -53,6 +54,35 @@ export function registerDebugCommands(): void {
           : { position: player.position }
     for (const record of robots) moveRobot(record, target, { notifyPlayer: player.index })
     player.print(["automaton.debug-goto-sent", robots.length])
+  })
+
+  // /am-do <номер> <действие> [параметры]: цель (здание, сущность) — то, что под курсором.
+  //   wait <секунды> | mine <предмет> [число] | take <предмет> [число] | put <предмет> [число]
+  //   pickup [предмет] [число] | drop <предмет> [число] | give <номер машины> <предмет> [число]
+  //   repair | refuel [предмет]
+  commands.add_command("am-do", ["automaton.debug-do-help"], (command) => {
+    const player = adminPlayer(command)
+    if (player === undefined) return
+    const [idArg, kindArg, ...rest] = (command.parameter ?? "").split(" ").filter((arg) => arg !== "")
+    const record = storage.robots.byId[tonumber(idArg) ?? -1]
+    if (record === undefined || !record.entity.valid) {
+      player.print(["automaton.debug-unknown-robot", idArg ?? ""])
+      return
+    }
+    const kind = kindArg as ActionKind
+    const params: ActionParams = {}
+    if (kind === "wait") {
+      params.seconds = tonumber(rest[0]) ?? 1
+    } else if (kind === "give") {
+      params.target = storage.robots.byId[tonumber(rest[0]) ?? -1]?.entity
+      params.item = rest[1]
+      params.count = tonumber(rest[2])
+    } else {
+      params.target = player.selected
+      params.item = rest[0]
+      params.count = tonumber(rest[1])
+    }
+    startAction(record, kind, params, { notifyPlayer: player.index })
   })
 
   // /am-info <номер>: состояние машины — позиция, занятие, груз, топливо, энергия.

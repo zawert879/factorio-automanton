@@ -1,5 +1,6 @@
 // Runtime stage: события, команды, GUI.
 // Данные, которые должны пережить сохранение, лежат в `storage` (тип — в storage.d.ts).
+import { initActions, registerActions } from "./automaton/actions"
 import { registerAppearance } from "./automaton/appearance"
 import { initMovement, registerMovement } from "./automaton/movement"
 import { registerPlacement } from "./automaton/placement"
@@ -11,11 +12,13 @@ script.on_init(() => {
   initDemoStorage()
   initRegistry()
   initMovement()
+  initActions()
 })
 script.on_configuration_changed(() => {
   initDemoStorage()
   initRegistry()
   initMovement()
+  initActions()
   adoptUnregisteredRobots()
 })
 
@@ -24,6 +27,7 @@ registerPlacement()
 registerRegistryEvents()
 registerMovement()
 registerAppearance()
+registerActions()
 registerDebugCommands()
 
 // Проверки, которые включаются только служебными модами (их создают скрипты в tools/test/):
