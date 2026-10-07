@@ -2,6 +2,7 @@
 import type { ActionsState } from "./automaton/actions"
 import type { MovementState } from "./automaton/movement"
 import type { RobotRegistry } from "./automaton/registry"
+import type { LuaRandomGenerator } from "factorio:runtime"
 
 declare global {
   const storage: {
@@ -9,5 +10,7 @@ declare global {
     robots: RobotRegistry
     movement: MovementState
     actions: ActionsState
+    /** Случайные числа игровой логики (одинаковые у всех игроков). */
+    rng: LuaRandomGenerator
   }
 }

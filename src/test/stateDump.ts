@@ -1,9 +1,10 @@
 // Проверка сохранения/загрузки посреди работы (npm run test:desync).
-// Сценарий на карте: машины ставятся, одна гибнет, одну подбирает персонаж, остальные уезжают далеко —
+// Сценарий на карте: машины ставятся, одна копает руду, одна гибнет, одну подбирает персонаж, остальные уезжают далеко —
 // сохранение на тике 300 застаёт их в пути; после него подобранную ставят обратно из предмета и ставят новую. На тике DUMP_TICK — снимок storage в
 // script-output/automaton-state.txt. Состояние сценария нигде не хранится: всё ищется на карте.
 // Подключается из control.ts, только когда включён служебный мод automaton-desync-test.
 import { LuaEntity, LuaInventory, LuaRenderObject } from "factorio:runtime"
+import { startAction } from "../automaton/actions"
 import { moveRobot } from "../automaton/movement"
 import { replacePlacer } from "../automaton/placement"
 import { findRobot, tagFromInventory, tagMinedRobot } from "../automaton/registry"
@@ -30,6 +31,13 @@ const steps: Record<number, () => void> = {
   60: () => {
     for (let i = 0; i < 4; i++) placeAt({ x: 40 + i * 3, y: 40 })
   },
+  // Шахтёр копает до и после сохранения (действие, его таймеры и генератор случайных чисел).
+  70: () => {
+    nauvis().create_entity({ name: "iron-ore", position: { x: 70.5, y: 40.5 }, amount: 1000 })
+    placeAt({ x: 68.5, y: 40.5 })
+    const miner = workers().find((w) => w.position.x > 65)!
+    startAction(findRobot(miner)!, "mine", { item: "iron-ore", count: 50 })
+  },
   120: () => workers()[0].die(),
   200: () => {
     const target = workers()[0]
@@ -42,7 +50,7 @@ const steps: Record<number, () => void> = {
   },
   // Поездки, которые сохранение на тике 300 застанет в пути.
   250: () => {
-    for (const worker of workers()) moveRobot(findRobot(worker)!, { position: { x: 45, y: 90 } })
+    for (const worker of workers()) if (worker.position.x < 65) moveRobot(findRobot(worker)!, { position: { x: 45, y: 90 } })
   },
   400: () => {
     const character = nauvis().find_entities_filtered({ name: "character" })[0]
