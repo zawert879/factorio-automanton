@@ -3,3 +3,6 @@
 *.zip
 # лог отладчика FMTK
 dap-trace.log
+node_modules/
+# Lua собирается из src/ командой npm run build
+mod/**/*.lua

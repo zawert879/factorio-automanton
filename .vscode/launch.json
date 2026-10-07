@@ -4,14 +4,16 @@
     {
       "type": "factoriomod",
       "request": "launch",
-      "name": "Factorio Mod Debug"
+      "name": "Factorio Mod Debug",
+      "preLaunchTask": "npm: build"
     },
     {
       "type": "factoriomod",
       "request": "launch",
       "name": "Factorio Mod Debug (Settings & Data)",
       "hookSettings": true,
-      "hookData": true
+      "hookData": true,
+      "preLaunchTask": "npm: build"
     }
   ]
 }

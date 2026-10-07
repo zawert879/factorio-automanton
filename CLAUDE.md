@@ -13,23 +13,38 @@
 - `docs/language-samples/` — варианты синтаксиса, из которых выбран TypeScript (`3-typescript.md`).
 
 - Целевая версия: Factorio 2.0 (stable), только base, без зависимости от Space Age.
-- Корень репозитория = корень мода. В игру подключён симлинком:
-  `~/Library/Application Support/factorio/mods/automaton` -> этот каталог.
+- Мод пишется на TypeScript (`src/`), TypeScriptToLua собирает Lua в `mod/` — это папка мода, она
+  подключена к игре симлинком `~/Library/Application Support/factorio/mods/automaton` -> `mod/`.
 - Игра (Steam, macOS): `~/Library/Application Support/Steam/steamapps/common/Factorio/factorio.app/Contents/MacOS/factorio`
 - Лог игры: `~/Library/Application Support/factorio/factorio-current.log`
 
+## Сборка
+- `npm run build` — собрать Lua в `mod/`; `npm run watch` — пересобирать при изменениях.
+- F5 в VS Code сначала запускает сборку (`preLaunchTask`), потом игру с отладчиком.
+- Собранный Lua (`mod/**/*.lua`) в git не хранится. Точки останова ставятся в `mod/*.lua`.
+- Версии закреплены: TypeScript 6.0.2 (требует TypeScriptToLua 1.37.1), typed-factorio 3.36.0 —
+  типы Factorio 2.0 (4.x — уже 2.1, не обновлять). `skipLibCheck` нужен: TS 6 падает на типах typed-factorio.
+- Проверка без окна, не мешая открытой игре: отдельная папка данных через `--config` и `--mod-directory`
+  (пример — `tools/bench/run.sh`).
+
 ## Структура
-- `settings.lua` — настройки мода (settings stage)
-- `data.lua` / `data-updates.lua` / `data-final-fixes.lua` — прототипы (data stage)
-- `control.lua` — runtime-логика (события, команды, GUI)
-- `locale/{en,ru}/*.cfg` — строки; добавлять ключи сразу в оба языка
-- `changelog.txt` — строгий формат Factorio (99 дефисов, `Version:`, `Date:`, категории с отступом 2, пункты с отступом 4)
+- `src/settings.ts` — настройки мода (settings stage); `src/data.ts` (+ `data-updates`, `data-final-fixes`) —
+  прототипы (data stage); `src/control.ts` — runtime (события, команды, GUI); модули — рядом, в подпапках.
+- `src/storage.d.ts` — тип `storage`.
+- В `data`/`settings` глобальные `data`, `mods` объявляются в файле через `factorio:common`
+  (в tsconfig подключены только типы runtime).
+- `mod/locale/{en,ru}/*.cfg` — строки; добавлять ключи сразу в оба языка.
+- `mod/changelog.txt` — строгий формат Factorio (99 дефисов, `Version:`, `Date:`, категории с отступом 2,
+  пункты с отступом 4).
 
 ## Соглашения
 - API 2.0: `storage` вместо `global`; справка https://lua-api.factorio.com/latest/
-- Имена прототипов, настроек и GUI-элементов — с префиксом `automaton-`.
+- В `storage` — только простые данные: без функций, классов и метатаблиц.
+- Имена прототипов, настроек и GUI-элементов — с префиксом `automaton-`; в своём TS-коде — camelCase.
 - Инициализацию `storage` делать в `on_init` и повторять в `on_configuration_changed`.
-- Сборка/публикация — через FMTK (VS Code) или `npx factoriomod-debug package`; dotfiles и `CLAUDE.md` в zip не попадают.
+- В коде мода не использовать `async`/генераторы (TypeScriptToLua делает их на корутинах, а их в Factorio нет).
+- Упаковка — через FMTK (VS Code) или `npx factoriomod-debug package` из `mod/`; перед упаковкой FMTK сам
+  запускает `npm run build`.
 
 ## FMTK
 - Расширение закреплено на версии 2.0.14 (последняя ветки 2.0.x). FMTK 2.1.x запускает игру с `--dap`,

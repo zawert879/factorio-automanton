@@ -1,0 +1,24 @@
+{
+  "$schema": "https://raw.githubusercontent.com/TypeScriptToLua/TypeScriptToLua/master/tsconfig-schema.json",
+  "compilerOptions": {
+    "target": "ESNext",
+    "lib": ["ESNext"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "types": ["typed-factorio/runtime", "lua-types/5.2"],
+    "strict": true,
+    "skipLibCheck": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "rootDir": "src",
+    "outDir": "mod"
+  },
+  "tstl": {
+    "luaTarget": "5.2",
+    "luaLibImport": "require",
+    "noImplicitSelf": true,
+    "noImplicitGlobalVariables": true,
+    "noHeader": true
+  },
+  "include": ["src"]
+}

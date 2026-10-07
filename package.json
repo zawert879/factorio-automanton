@@ -1,0 +1,15 @@
+{
+  "name": "automaton",
+  "private": true,
+  "description": "Factorio mod: programmable automatons instead of belts, drills and inserters",
+  "scripts": {
+    "build": "tstl",
+    "watch": "tstl --watch"
+  },
+  "devDependencies": {
+    "lua-types": "2.14.1",
+    "typed-factorio": "3.36.0",
+    "typescript": "6.0.2",
+    "typescript-to-lua": "1.37.1"
+  }
+}

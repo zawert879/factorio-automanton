@@ -9,10 +9,8 @@
     "base >= 2.0.0"
   ],
   "package": {
-    "ignore": [
-      "CLAUDE.md",
-      "docs/**",
-      "tools/**"
-    ]
+    "scripts": {
+      "compile": "npm run build"
+    }
   }
 }
