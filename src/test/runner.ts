@@ -7,7 +7,7 @@ import "./index"
 
 const RESULTS_FILE = "automaton-test-results.json"
 /** Последний тик, до которого тесты обязаны закончиться (npm run test:game гоняет игру дольше). */
-const DEADLINE_TICK = 1000
+const DEADLINE_TICK = 6000
 
 interface TestResult {
   name: string
@@ -39,13 +39,14 @@ function finishCurrent(): void {
   current = undefined
 }
 
-function startNext(tick: number): void {
+function startNext(): void {
   const test = queue.shift()!
   const state = { name: test.name, steps: [] as Step[], failed: false }
   current = state
   const t: TestContext = {
+    // От текущего тика: after() вызывают и из шагов, выполняющихся позже начала теста.
     after: (ticks, fn) => {
-      state.steps.push({ atTick: tick + ticks, fn })
+      state.steps.push({ atTick: game.tick + ticks, fn })
     },
   }
   attempt(() => test.fn(t))
@@ -82,6 +83,6 @@ script.on_nth_tick(1, (event) => {
       writeResults()
       return
     }
-    startNext(tick)
+    startNext()
   }
 })

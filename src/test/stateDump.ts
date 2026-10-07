@@ -1,11 +1,12 @@
 // Проверка сохранения/загрузки посреди работы (npm run test:desync).
-// Сценарий на карте: машины ставятся, одна гибнет, одну подбирает персонаж; после сохранения на тике 300
-// подобранную ставят обратно из предмета и ставят новую. На тике DUMP_TICK — снимок storage в
+// Сценарий на карте: машины ставятся, одна гибнет, одну подбирает персонаж, остальные уезжают далеко —
+// сохранение на тике 300 застаёт их в пути; после него подобранную ставят обратно из предмета и ставят новую. На тике DUMP_TICK — снимок storage в
 // script-output/automaton-state.txt. Состояние сценария нигде не хранится: всё ищется на карте.
 // Подключается из control.ts, только когда включён служебный мод automaton-desync-test.
 import { LuaEntity, LuaRenderObject } from "factorio:runtime"
+import { moveRobot } from "../automaton/movement"
 import { replacePlacer } from "../automaton/placement"
-import { tagFromInventory, tagMinedRobot } from "../automaton/registry"
+import { findRobot, tagFromInventory, tagMinedRobot } from "../automaton/registry"
 import { WORKER_MK1, WORKER_MK1_PLACER } from "../names"
 
 const DUMP_TICK = 600 // как в tools/test/desync.mjs
@@ -38,6 +39,10 @@ const steps: Record<number, () => void> = {
     inventory.insert({ name: WORKER_MK1, count: 1 })
     tagMinedRobot(target, inventory)
     target.destroy()
+  },
+  // Поездки, которые сохранение на тике 300 застанет в пути.
+  250: () => {
+    for (const worker of workers()) moveRobot(findRobot(worker)!, { position: { x: 45, y: 90 } })
   },
   400: () => {
     const character = nauvis().find_entities_filtered({ name: "character" })[0]

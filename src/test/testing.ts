@@ -85,3 +85,16 @@ export function expect<T>(actual: T) {
     },
   }
 }
+
+/**
+ * Только во внутриигровых тестах: проверять condition раз в 30 тиков; как только выполнится — вызвать then.
+ * Не дождались за maxTicks — тест падает.
+ */
+export function waitUntil(t: TestContext, what: string, condition: () => boolean, maxTicks: number, then: () => void): void {
+  if (condition()) {
+    then()
+    return
+  }
+  if (maxTicks <= 0) fail(`не дождались: ${what}`)
+  t.after(30, () => waitUntil(t, what, condition, maxTicks - 30, then))
+}

@@ -2,3 +2,4 @@
 import "./demo.test"
 import "./automaton.test"
 import "./registry.test"
+import "./movement.test"
