@@ -5,7 +5,7 @@ import { PrototypeData } from "factorio:common"
 import {
   Color,
   IconData,
-  ItemPrototype,
+  ItemWithTagsPrototype,
   RecipePrototype,
   RotatedAnimation,
   SimpleEntityWithOwnerPrototype,
@@ -101,8 +101,9 @@ const placer: SimpleEntityWithOwnerPrototype = {
   hidden_in_factoriopedia: true,
 }
 
-const item: ItemPrototype = {
-  type: "item",
+// item-with-tags: подобранная машина уносит в предмет свои id и имя (src/automaton/registry.ts).
+const item: ItemWithTagsPrototype = {
+  type: "item-with-tags",
   name: WORKER_MK1,
   icons: ICONS,
   subgroup: "transport",

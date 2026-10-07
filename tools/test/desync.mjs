@@ -2,6 +2,7 @@
 // Прогон A — DUMP_TICK тиков подряд; прогон B — SAVE_TICK тиков, сохранение, загрузка, доигрывание.
 // В обоих на тике DUMP_TICK мод пишет снимок storage (src/test/stateDump.ts) — снимки должны совпасть.
 // Ловит состояние вне storage (локальные переменные, кэши), изменения storage в on_load и т.п.
+// DESYNC_SHOW=1 — напечатать снимок.
 import { copyFileSync, existsSync, readFileSync, rmSync } from "node:fs"
 import { join } from "node:path"
 import { buildMod, createMap, prepareWork, runFactorio, scriptError } from "./factorio.mjs"
@@ -46,6 +47,8 @@ copyFileSync(env.map, b)
 runUntil(b, SAVE_TICK, "прогон B до сохранения")
 runUntil(b, DUMP_TICK + 1, "прогон B после загрузки")
 const dumpB = takeDump("прогон B")
+
+if (process.env.DESYNC_SHOW) console.log(dumpA)
 
 if (dumpA === dumpB) {
   console.log(`сохранение на тике ${SAVE_TICK} не изменило состояние на тике ${DUMP_TICK} — ок`)

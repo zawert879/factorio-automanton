@@ -1,9 +1,11 @@
 // Установка автоматона: предмет ставит заглушку, а здесь она заменяется на юнит.
 // Срабатывает при любой постройке: руками, строительными роботами, скриптом другого мода.
+// Если машину строят из подобранного предмета, она получает прежние id и имя (тег предмета).
 import { LuaEntity } from "factorio:runtime"
-import { WORKER_MK1, WORKER_MK1_PLACER } from "../names"
+import { ROBOT_TAG, WORKER_MK1, WORKER_MK1_PLACER } from "../names"
+import { registerRobot, RobotTag, tagFromInventory, tagFromStack } from "./registry"
 
-function replacePlacer(placer: LuaEntity): void {
+export function replacePlacer(placer: LuaEntity, tag?: RobotTag): void {
   if (!placer.valid || placer.name !== WORKER_MK1_PLACER) return
   const { surface, position, force } = placer
   placer.destroy()
@@ -13,17 +15,25 @@ function replacePlacer(placer: LuaEntity): void {
     ? surface.create_entity({ name: WORKER_MK1, position, force })
     : undefined
   if (worker === undefined) {
-    surface.spill_item_stack({ position, stack: { name: WORKER_MK1, count: 1 }, force })
+    const spilled = surface.spill_item_stack({ position, stack: { name: WORKER_MK1, count: 1 }, force })
+    if (tag !== undefined) {
+      for (const item of spilled) {
+        if (item.stack?.name !== WORKER_MK1) continue
+        item.stack.set_tag(ROBOT_TAG, tag)
+        item.stack.label = tag.name
+      }
+    }
     return
   }
   // Без команды юнит может отвлечься на что-нибудь; пусть просто стоит.
   worker.commandable!.set_command({ type: defines.command.stop, distraction: defines.distraction.none })
+  registerRobot(worker, tag)
 }
 
 export function registerPlacement(): void {
   const filter = [{ filter: "name" as const, name: WORKER_MK1_PLACER }]
-  script.on_event(defines.events.on_built_entity, (e) => replacePlacer(e.entity), filter)
-  script.on_event(defines.events.on_robot_built_entity, (e) => replacePlacer(e.entity), filter)
+  script.on_event(defines.events.on_built_entity, (e) => replacePlacer(e.entity, tagFromInventory(e.consumed_items)), filter)
+  script.on_event(defines.events.on_robot_built_entity, (e) => replacePlacer(e.entity, tagFromStack(e.stack)), filter)
   script.on_event(defines.events.script_raised_built, (e) => replacePlacer(e.entity), filter)
   script.on_event(defines.events.script_raised_revive, (e) => replacePlacer(e.entity), filter)
 }

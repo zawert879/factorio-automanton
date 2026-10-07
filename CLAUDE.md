@@ -52,7 +52,11 @@
 
 ## Соглашения
 - API 2.0: `storage` вместо `global`; справка https://lua-api.factorio.com/latest/
-- В `storage` — только простые данные: без функций, классов и метатаблиц.
+- В `storage` — только простые данные и ссылки на объекты игры (LuaEntity, LuaRenderObject): без функций,
+  классов и метатаблиц. Типы словарей с необязательными записями — `Record<K, V | undefined>`.
+- `script.on_nth_tick(1)` занят тестовыми модулями (`src/test/runner.ts`, `stateDump.ts`); код мода — `on_tick`.
+- Персонаж без игрока (`mine_entity` из скрипта) не вызывает `on_player_mined_entity`: события подбора
+  тестируются вызовом обработчика напрямую.
 - Имена прототипов, настроек и GUI-элементов — с префиксом `automaton-`; в своём TS-коде — camelCase.
 - Инициализацию `storage` делать в `on_init` и повторять в `on_configuration_changed`.
 - В коде мода не использовать `async`/генераторы (TypeScriptToLua делает их на корутинах, а их в Factorio нет).
