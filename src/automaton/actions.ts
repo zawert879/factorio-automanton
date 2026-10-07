@@ -20,6 +20,8 @@ export type ActionError =
   | "target-full"
   | "no-fuel"
   | "cancelled"
+  /** Ошибка в коде мода при выполнении действия (записана в лог); машина продолжает работать. */
+  | "internal-error"
 
 /** Параметры действия — простые данные и ссылки на объекты игры (лежат в storage). */
 export interface ActionParams {
@@ -113,6 +115,19 @@ function finish(record: RobotRecord, action: ActionState, error: ActionError | u
   }
 }
 
+/**
+ * Вызвать обработчик под защитой: ошибка в коде одного действия не должна ронять мод —
+ * действие завершается с internal-error, подробности — в лог.
+ */
+function guarded(record: RobotRecord, action: ActionState, call: () => StepOutcome): StepOutcome {
+  try {
+    return call()
+  } catch (problem) {
+    log(`automaton: ошибка в действии ${action.kind} машины ${record.name}: ${tostring(problem)}`)
+    return { finish: true, error: "internal-error" }
+  }
+}
+
 function apply(record: RobotRecord, action: ActionState, outcome: StepOutcome, tick: number): void {
   if ("finish" in outcome) {
     finish(record, action, outcome.error, outcome.reason)
@@ -137,7 +152,7 @@ export function startAction(
   const action: ActionState = { kind, params, startTick: tick, nextTick: tick, done: 0, notifyPlayer: options.notifyPlayer }
   storage.actions.current[record.id] = action
   storage.actions.lastResult[record.id] = undefined
-  apply(record, action, handler.start(record, action, tick), tick)
+  apply(record, action, guarded(record, action, () => handler.start(record, action, tick)), tick)
 }
 
 /** Отменить текущее действие (итог — ошибка cancelled с тем, что успело сделаться). */
@@ -159,7 +174,8 @@ function runTimers(tick: number): void {
       state.current[id] = undefined
       continue
     }
-    apply(record, action, handlers[action.kind]!.step(record, action, tick), tick)
+    const handler = handlers[action.kind]!
+    apply(record, action, guarded(record, action, () => handler.step(record, action, tick)), tick)
   }
 }
 

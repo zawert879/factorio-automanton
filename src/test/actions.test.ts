@@ -1,6 +1,15 @@
 // Внутриигровые тесты системы действий: шаги по таймерам, отмена, досягаемость, разворот к цели.
 import { MapPosition } from "factorio:runtime"
-import { cancelAction, currentAction, distanceToEntity, face, lastActionResult, startAction } from "../automaton/actions"
+import {
+  ActionKind,
+  cancelAction,
+  currentAction,
+  distanceToEntity,
+  face,
+  lastActionResult,
+  registerActionHandler,
+  startAction,
+} from "../automaton/actions"
 import { isMoving, moveRobot } from "../automaton/movement"
 import { findRobot, RobotRecord } from "../automaton/registry"
 import { WORKER_MK1, WORKER_MK1_PLACER } from "../names"
@@ -63,6 +72,18 @@ describe("система действий", () => {
     face(robot, { x, y: y + 5 }, "mine")
     expect(robot.direction).toBe(4)
     expect(robot.activity).toBe("mine")
+    robot.entity.destroy()
+  })
+
+  test("ошибка в обработчике действия не роняет мод — итог internal-error", () => {
+    const robot = place({ x: -80, y: 110 })
+    registerActionHandler("test-crash" as ActionKind, {
+      start: () => error("сломанный обработчик"),
+      step: () => ({ finish: true }),
+    })
+    startAction(robot, "test-crash" as ActionKind, {})
+    expect(lastActionResult(robot)?.error).toBe("internal-error")
+    expect(currentAction(robot)).toBe(undefined)
     robot.entity.destroy()
   })
 })
