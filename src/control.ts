@@ -7,9 +7,16 @@ script.on_configuration_changed(() => initDemoStorage())
 
 registerDemo()
 
-// Внутриигровые тесты (npm run test:game): только при включённом служебном моде automaton-test.
-// Имя модуля — через переменную: TSTL не ищет его заранее, а в zip мода тестов нет (package.ignore).
-if (script.active_mods["automaton-test"] !== undefined) {
-  const testRunner = "test.runner"
-  require(testRunner)
+// Проверки, которые включаются только служебными модами (их создают скрипты в tools/test/):
+// automaton-test — внутриигровые тесты (npm run test:game),
+// automaton-desync-test — снимок состояния для проверки сохранения/загрузки (npm run test:desync).
+// Имя модуля — через переменную: TSTL не ищет его заранее, а в zip мода папки test/ нет (package.ignore).
+const testModule =
+  script.active_mods["automaton-test"] !== undefined
+    ? "test.runner"
+    : script.active_mods["automaton-desync-test"] !== undefined
+      ? "test.stateDump"
+      : undefined
+if (testModule !== undefined) {
+  require(testModule)
 }

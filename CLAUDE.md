@@ -24,6 +24,8 @@
 - Собранный Lua (`mod/**/*.lua`) в git не хранится. Точки останова ставятся в `mod/*.lua`.
 - Версии закреплены: TypeScript 6.0.2 (требует TypeScriptToLua 1.37.1), typed-factorio 3.36.0 —
   типы Factorio 2.0 (4.x — уже 2.1, не обновлять). `skipLibCheck` нужен: TS 6 падает на типах typed-factorio.
+- Все виды проверок и причины десинков — `docs/TESTING.md`. После изменений состояния, планировщика или
+  кода программ машин гонять `npm run test:desync` (сохранение/загрузка посреди работы).
 - `npm test [фильтр]` — тесты вне игры: `tests/**/*.test.ts` (библиотека — `tests/lib/testing.ts`) собираются
   в `build/` и выполняются в Lua 5.2 (`tools/lua/build.sh` собирает его при первом запуске). Окружение как
   в Factorio: нет `coroutine`, `io`, `os`, `loadfile`, `dofile`. Тестами покрываются чистые модули (без API игры).
