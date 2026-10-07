@@ -4,7 +4,8 @@
   "description": "Factorio mod: programmable automatons instead of belts, drills and inserters",
   "scripts": {
     "build": "tstl",
-    "watch": "tstl --watch"
+    "watch": "tstl --watch",
+    "test": "node tools/test/run.mjs"
   },
   "devDependencies": {
     "lua-types": "2.14.1",

@@ -6,3 +6,6 @@ dap-trace.log
 node_modules/
 # Lua собирается из src/ командой npm run build
 mod/**/*.lua
+# собранные тесты и локальная сборка Lua 5.2 (tools/lua/build.sh)
+build/
+tools/lua/5.2/
