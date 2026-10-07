@@ -124,4 +124,24 @@ describe("движение", () => {
       })
     })
   })
+
+  test("встречные потоки через проход в 2 клетки: доезжают все", (t) => {
+    arena(300, 0, 80, 30)
+    for (let y = 0; y < 30; y++) {
+      if (y !== 14 && y !== 15) nauvis().create_entity({ name: "stone-wall", position: { x: 340, y }, force: "player" })
+    }
+    const robots: RobotRecord[] = []
+    for (let i = 0; i < 20; i++) {
+      const y = 3.5 + math.floor(i / 5) * 6
+      const left = placeRobot({ x: 305.5 + (i % 5) * 3, y })
+      const right = placeRobot({ x: 360.5 + (i % 5) * 3, y })
+      moveRobot(left, { position: { x: left.entity.position.x + 55, y } })
+      moveRobot(right, { position: { x: right.entity.position.x - 55, y } })
+      robots.push(left, right)
+    }
+    waitUntil(t, "проезда всех", () => robots.every((r) => !isMoving(r)), 3600, () => {
+      expect(robots.filter((r) => lastMoveResult(r) === "arrived").length).toBe(40)
+      cleanup([...robots.map((r) => r.entity), ...nauvis().find_entities_filtered({ name: "stone-wall" })])
+    })
+  })
 })

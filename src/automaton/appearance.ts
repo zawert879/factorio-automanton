@@ -34,7 +34,7 @@ export function registerAppearance(): void {
   onTick((tick) => {
     if (tick % TURN_CHECK_TICKS !== 0) return
     for (const [key, order] of Object.entries(storage.movement.orders)) {
-      if (order?.dispatchedTick === undefined) continue
+      if (order?.phase !== "going" && order?.phase !== "sidestep") continue
       const record = storage.robots.byId[tonumber(key)!]
       if (record === undefined || !record.entity.valid) continue
       setActivity(record, "run", directionOf(record.entity.orientation))

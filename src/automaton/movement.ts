@@ -1,7 +1,14 @@
 // Движение машин: поездка к точке или к зданию. Путь ищет и машину ведёт движок
 // (команда go_to_location юниту, ответ — событие on_ai_command_completed).
-// Новые поездки отдаются движку не больше DISPATCH_PER_TICK за тик — чтобы сотня одновременных
-// приказов не забивала поиск пути. Застрявшие (нет продвижения, вышло время) снимаются с поездки.
+//
+// Фазы поездки: queued (ждёт отправки) → going (едет) → при неудаче sidestep (шаг в сторону) →
+// waiting (пауза) → снова queued. Новые поездки отдаются движку не больше DISPATCH_PER_TICK за тик.
+//
+// Неудачи двух видов:
+// - отказ движка, а машина с места не сдвинулась — скорее всего, цели не достичь: мало повторов;
+// - застряла по дороге (пробка, отказ движка в толпе, нет продвижения) — повторов больше,
+//   а продвижение сбрасывает счётчик.
+// Шаг в сторону у разных машин в разные стороны, пауза разной длины — так расходятся встречные.
 import { LuaEntity, MapPosition, PlayerIndex } from "factorio:runtime"
 import { onTick } from "../events"
 import { directionOf, setActivity } from "./appearance"
@@ -9,16 +16,26 @@ import { RobotRecord } from "./registry"
 
 export type MoveResult = "arrived" | "no-path" | "stuck"
 
+type Phase = "queued" | "going" | "sidestep" | "waiting"
+
 export interface MoveOrder {
   destination?: MapPosition
   destinationEntity?: LuaEntity
   radius: number
-  /** Тик, когда приказ отдан движку; до этого поездка ждёт в очереди. */
+  phase: Phase
+  /** Неудачи подряд: без продвижения (пробка) и отказы поиска пути с места. */
+  stuckRetries: number
+  pathRetries: number
+  /** Тик отправки движку текущей попытки и позиция машины в этот момент. */
   dispatchedTick?: number
+  dispatchedPosition?: MapPosition
   deadlineTick?: number
   /** Где была машина при последней проверке продвижения и когда. */
   checkPosition?: MapPosition
   checkTick?: number
+  /** Шаг в сторону начат / пауза до этого тика. */
+  sidestepTick?: number
+  waitUntilTick?: number
   /** Кому сообщить результат (игрок, отдавший приказ отладочной командой). */
   notifyPlayer?: PlayerIndex
 }
@@ -36,8 +53,13 @@ const DISPATCH_PER_TICK = 20
 const SPEED = 0.1
 /** Время на поиск пути и объезды сверх прямой дороги. */
 const TIME_MARGIN_TICKS = 600
+const CHECK_EVERY_TICKS = 15
 const PROGRESS_CHECK_TICKS = 300
 const MIN_PROGRESS = 1
+const MAX_STUCK_RETRIES = 5
+const MAX_PATH_RETRIES = 2
+const SIDESTEP_DISTANCE = 2.5
+const SIDESTEP_TIMEOUT_TICKS = 120
 
 export function initMovement(): void {
   storage.movement ??= { orders: {}, queue: [], lastResult: {} }
@@ -54,13 +76,13 @@ export function moveRobot(
   options: { radius?: number; notifyPlayer?: PlayerIndex } = {},
 ): void {
   const state = storage.movement
+  const common = { phase: "queued" as Phase, stuckRetries: 0, pathRetries: 0, notifyPlayer: options.notifyPlayer }
   const order: MoveOrder =
     "entity" in target
-      ? { destinationEntity: target.entity, radius: options.radius ?? 2, notifyPlayer: options.notifyPlayer }
-      : { destination: target.position, radius: options.radius ?? 1, notifyPlayer: options.notifyPlayer }
-  // В очередь — если машина ещё не ждёт отправки (едущая получает новый приказ через очередь заново).
-  const previous = state.orders[record.id]
-  if (previous === undefined || previous.dispatchedTick !== undefined) state.queue.push(record.id)
+      ? { ...common, destinationEntity: target.entity, radius: options.radius ?? 2 }
+      : { ...common, destination: target.position, radius: options.radius ?? 1 }
+  // В очередь — если машина ещё не ждёт отправки.
+  if (state.orders[record.id]?.phase !== "queued") state.queue.push(record.id)
   state.orders[record.id] = order
   state.lastResult[record.id] = undefined
 }
@@ -69,8 +91,17 @@ export function isMoving(record: RobotRecord): boolean {
   return storage.movement.orders[record.id] !== undefined
 }
 
+/** Машина сейчас едет (а не ждёт в очереди, не отступает и не стоит на паузе). */
+export function isGoing(record: RobotRecord): boolean {
+  return storage.movement.orders[record.id]?.phase === "going"
+}
+
 export function lastMoveResult(record: RobotRecord): MoveResult | undefined {
   return storage.movement.lastResult[record.id]
+}
+
+function stopCommand(record: RobotRecord): void {
+  record.entity.commandable!.set_command({ type: defines.command.stop, distraction: defines.distraction.none })
 }
 
 function finish(id: number, result: MoveResult): void {
@@ -80,11 +111,44 @@ function finish(id: number, result: MoveResult): void {
   state.lastResult[id] = result
   const record = storage.robots.byId[id]
   if (record === undefined || !record.entity.valid) return
-  record.entity.commandable!.set_command({ type: defines.command.stop, distraction: defines.distraction.none })
+  stopCommand(record)
   setActivity(record, "idle")
   if (order?.notifyPlayer !== undefined) {
     game.get_player(order.notifyPlayer)?.print([`automaton.move-${result}`, record.name])
   }
+}
+
+/** Детерминированный «случайный» номер для машины и попытки — чтобы встречные расходились по-разному. */
+function spread(id: number, attempt: number, range: number): number {
+  return (id * 7919 + attempt * 104729) % range
+}
+
+function onFailure(id: number, record: RobotRecord, order: MoveOrder, tick: number, kind: "no-path" | "stuck"): void {
+  const movedSinceDispatch = distance(record.entity.position, order.dispatchedPosition!)
+  if (kind === "no-path" && movedSinceDispatch < 0.5) order.pathRetries++
+  else order.stuckRetries++
+  if (order.pathRetries > MAX_PATH_RETRIES) return finish(id, "no-path")
+  if (order.stuckRetries > MAX_STUCK_RETRIES) return finish(id, "stuck")
+
+  // Шаг в сторону: направление зависит от машины и номера попытки.
+  const attempt = order.pathRetries + order.stuckRetries
+  const angle = (spread(id, attempt, 8) / 8) * 2 * math.pi
+  const position = record.entity.position
+  const aside = { x: position.x + math.cos(angle) * SIDESTEP_DISTANCE, y: position.y + math.sin(angle) * SIDESTEP_DISTANCE }
+  record.entity.commandable!.set_command({
+    type: defines.command.go_to_location,
+    destination: aside,
+    radius: 1,
+    distraction: defines.distraction.none,
+  })
+  order.phase = "sidestep"
+  order.sidestepTick = tick
+}
+
+function startWaiting(id: number, record: RobotRecord, order: MoveOrder, tick: number): void {
+  setActivity(record, "idle")
+  order.phase = "waiting"
+  order.waitUntilTick = tick + 30 + spread(id, order.pathRetries + order.stuckRetries, 240)
 }
 
 function dispatch(tick: number): void {
@@ -93,8 +157,8 @@ function dispatch(tick: number): void {
   while (sent < DISPATCH_PER_TICK && state.queue.length > 0) {
     const id = state.queue.shift()!
     const order = state.orders[id]
+    if (order === undefined || order.phase !== "queued") continue
     const record = storage.robots.byId[id]
-    if (order === undefined) continue
     if (record === undefined || !record.entity.valid) {
       state.orders[id] = undefined
       continue
@@ -114,51 +178,67 @@ function dispatch(tick: number): void {
       pathfind_flags: { cache: true },
     })
     setActivity(record, "run", directionOf(record.entity.orientation))
+    const position = record.entity.position
+    order.phase = "going"
     order.dispatchedTick = tick
-    order.deadlineTick = tick + math.ceil(distance(record.entity.position, destination) / SPEED) * 2 + TIME_MARGIN_TICKS
-    order.checkPosition = record.entity.position
+    order.dispatchedPosition = position
+    order.deadlineTick = tick + math.ceil(distance(position, destination) / SPEED) * 2 + TIME_MARGIN_TICKS
+    order.checkPosition = position
     order.checkTick = tick
     sent++
   }
 }
 
-/** Раз в секунду: снять с поездки тех, кто давно не продвигается или не успел к сроку. */
-function checkProgress(tick: number): void {
+/** Проверки по таймерам: продвижение и срок у едущих, конец шага в сторону и паузы. */
+function checkOrders(tick: number): void {
   const state = storage.movement
   for (const [key, order] of Object.entries(state.orders)) {
-    if (order === undefined || order.dispatchedTick === undefined) continue
+    if (order === undefined || order.phase === "queued") continue
     const id = tonumber(key)!
     const record = storage.robots.byId[id]
     if (record === undefined || !record.entity.valid) {
       state.orders[id] = undefined
       continue
     }
-    if (tick >= order.deadlineTick!) {
-      finish(id, "stuck")
-    } else if (tick - order.checkTick! >= PROGRESS_CHECK_TICKS) {
-      if (distance(record.entity.position, order.checkPosition!) < MIN_PROGRESS) {
-        finish(id, "stuck")
-      } else {
+    if (order.phase === "going") {
+      if (distance(record.entity.position, order.checkPosition!) >= MIN_PROGRESS) {
         order.checkPosition = record.entity.position
         order.checkTick = tick
+        order.stuckRetries = 0
+      } else if (tick - order.checkTick! >= PROGRESS_CHECK_TICKS || tick >= order.deadlineTick!) {
+        onFailure(id, record, order, tick, "stuck")
+      }
+    } else if (order.phase === "sidestep") {
+      if (tick - order.sidestepTick! >= SIDESTEP_TIMEOUT_TICKS) startWaiting(id, record, order, tick)
+    } else if (order.phase === "waiting") {
+      if (tick >= order.waitUntilTick!) {
+        order.phase = "queued"
+        state.queue.push(id)
       }
     }
   }
 }
 
-function onCommandCompleted(unitNumber: number, result: defines.behavior_result): void {
-  // deleted — команду заменили новой (новая поездка); её ответ придёт отдельно.
+function onCommandCompleted(unitNumber: number, result: defines.behavior_result, tick: number): void {
+  // deleted — команду заменили новой (новая попытка или новая поездка); её ответ придёт отдельно.
   if (result === defines.behavior_result.deleted) return
   const id = storage.robots.idByUnit[unitNumber]
-  if (id === undefined || storage.movement.orders[id]?.dispatchedTick === undefined) return
-  finish(id, result === defines.behavior_result.success ? "arrived" : "no-path")
+  if (id === undefined) return
+  const order = storage.movement.orders[id]
+  const record = storage.robots.byId[id]
+  if (order === undefined || record === undefined) return
+  if (order.phase === "sidestep") {
+    startWaiting(id, record, order, tick)
+  } else if (order.phase === "going") {
+    if (result === defines.behavior_result.success) finish(id, "arrived")
+    else onFailure(id, record, order, tick, "no-path")
+  }
 }
 
 export function registerMovement(): void {
   onTick((tick) => {
     if (storage.movement.queue.length > 0) dispatch(tick)
-    if (tick % 60 === 0) checkProgress(tick)
+    if (tick % CHECK_EVERY_TICKS === 0) checkOrders(tick)
   })
-  script.on_event(defines.events.on_ai_command_completed, (e) => onCommandCompleted(e.unit_number, e.result))
+  script.on_event(defines.events.on_ai_command_completed, (e) => onCommandCompleted(e.unit_number, e.result, e.tick))
 }
-
