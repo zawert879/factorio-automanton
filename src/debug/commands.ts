@@ -1,6 +1,7 @@
 // Отладочные команды для разработки и проверки в игре. В мультиплеере — только для админов.
 import { CustomCommandData, LuaEntity, LuaPlayer, MapPosition } from "factorio:runtime"
 import { ActionKind, ActionParams, startAction } from "../automaton/actions"
+import { entityFluid, entityFuel, entityInput, entityOutput, entityProgress, entityRecipe, entityStatus } from "../automaton/inspect"
 import { moveRobot } from "../automaton/movement"
 import { RobotRecord } from "../automaton/registry"
 import { WORKER_MK1 } from "../names"
@@ -83,6 +84,23 @@ export function registerDebugCommands(): void {
       params.count = tonumber(rest[1])
     }
     startAction(record, kind, params, { notifyPlayer: player.index })
+  })
+
+  // /am-look: состояние здания под курсором — так его будут видеть программы машин.
+  commands.add_command("am-look", ["automaton.debug-look-help"], (command) => {
+    const player = adminPlayer(command)
+    if (player === undefined) return
+    const entity = player.selected
+    if (entity === undefined) {
+      player.print(["automaton.debug-look-help"])
+      return
+    }
+    const contents = (inventory: ReturnType<typeof entityInput>) => serpent.line(inventory?.get_contents() ?? [])
+    player.print(
+      `${entity.name}: status ${entityStatus(entity)}, recipe ${entityRecipe(entity) ?? "-"}, ` +
+        `progress ${math.floor(entityProgress(entity) * 100)}%, fluid ${entityFluid(entity)}, ` +
+        `input ${contents(entityInput(entity))}, output ${contents(entityOutput(entity))}, fuel ${contents(entityFuel(entity))}`,
+    )
   })
 
   // /am-info <номер>: состояние машины — позиция, занятие, груз, топливо, энергия.
