@@ -58,3 +58,19 @@ describe("автоматон: установка", () => {
     for (const e of spilled) e.destroy()
   })
 })
+
+describe("автоматон: подбор", () => {
+  test("персонаж подбирает машину обратно в инвентарь", () => {
+    const surface = game.get_surface("nauvis")!
+    const position = surface.find_non_colliding_position(WORKER_MK1, { x: -20, y: -20 }, 30, 0.5)!
+    surface.create_entity({ name: WORKER_MK1_PLACER, position, force: "player", raise_built: true })
+    const worker = surface.find_entities_filtered({ name: WORKER_MK1, position, radius: 1 })[0]
+    const characterPosition = surface.find_non_colliding_position("character", position, 10, 0.5)!
+    const character = surface.create_entity({ name: "character", position: characterPosition, force: "player" })!
+
+    expect(character.mine_entity(worker)).toBe(true)
+    expect(worker.valid).toBe(false)
+    expect(character.get_item_count(WORKER_MK1)).toBe(1)
+    character.destroy()
+  })
+})
