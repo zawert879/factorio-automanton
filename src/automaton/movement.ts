@@ -12,9 +12,10 @@
 import { LuaEntity, MapPosition, PlayerIndex } from "factorio:runtime"
 import { onTick } from "../events"
 import { directionOf, setActivity } from "./appearance"
+import { hasEnergy, MOVE_JOULES_PER_TILE, spend } from "./energy"
 import { RobotRecord } from "./registry"
 
-export type MoveResult = "arrived" | "no-path" | "stuck"
+export type MoveResult = "arrived" | "no-path" | "stuck" | "no-fuel"
 
 type Phase = "queued" | "going" | "sidestep" | "waiting"
 
@@ -33,6 +34,8 @@ export interface MoveOrder {
   /** Где была машина при последней проверке продвижения и когда. */
   checkPosition?: MapPosition
   checkTick?: number
+  /** Откуда считать пройденный путь для расхода энергии. */
+  energyPosition?: MapPosition
   /** Шаг в сторону начат / пауза до этого тика. */
   sidestepTick?: number
   waitUntilTick?: number
@@ -176,6 +179,10 @@ function dispatch(tick: number): void {
       finish(id, "no-path")
       continue
     }
+    if (!hasEnergy(record)) {
+      finish(id, "no-fuel")
+      continue
+    }
     const destination = target?.position ?? order.destination!
     record.entity.commandable!.set_command({
       type: defines.command.go_to_location,
@@ -193,6 +200,7 @@ function dispatch(tick: number): void {
     order.deadlineTick = tick + math.ceil(distance(position, destination) / SPEED) * 2 + TIME_MARGIN_TICKS
     order.checkPosition = position
     order.checkTick = tick
+    order.energyPosition ??= position
     sent++
   }
 }
@@ -207,6 +215,15 @@ function checkOrders(tick: number): void {
     if (record === undefined || !record.entity.valid) {
       state.orders[id] = undefined
       continue
+    }
+    // Пройденный путь (и при шаге в сторону) — расход энергии; не хватило — машина встаёт.
+    if ((order.phase === "going" || order.phase === "sidestep") && order.energyPosition !== undefined) {
+      const position = record.entity.position
+      if (!spend(record, distance(position, order.energyPosition) * MOVE_JOULES_PER_TILE)) {
+        finish(id, "no-fuel")
+        continue
+      }
+      order.energyPosition = position
     }
     if (order.phase === "going") {
       if (distance(record.entity.position, order.checkPosition!) >= MIN_PROGRESS) {

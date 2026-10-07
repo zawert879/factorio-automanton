@@ -8,6 +8,7 @@
 // Частичный результат — успех с причиной (target-full, cargo-full); ошибка — когда нельзя ничего.
 import { LuaEntity, LuaInventory } from "factorio:runtime"
 import { ActionState, distanceToEntity, face, registerActionHandler, StepOutcome } from "./actions"
+import { HANDLING_JOULES, spend } from "./energy"
 import { RobotRecord } from "./registry"
 
 export const REACH = 10
@@ -135,7 +136,12 @@ function transferHandler(transfer: (record: RobotRecord, action: ActionState) =>
       return { after: TRANSFER_TICKS }
     },
     // За время перекладки цель могли уничтожить или машину увести — проверить снова.
-    step: (record: RobotRecord, action: ActionState): StepOutcome => checkTarget(record, action) ?? transfer(record, action),
+    step: (record: RobotRecord, action: ActionState): StepOutcome => {
+      const problem = checkTarget(record, action)
+      if (problem !== undefined) return problem
+      if (!spend(record, HANDLING_JOULES)) return { finish: true, error: "no-fuel" }
+      return transfer(record, action)
+    },
   }
 }
 

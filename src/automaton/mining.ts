@@ -4,6 +4,7 @@
 // переходит на соседнюю в пределах досягаемости. Жидкие ресурсы и ресурсы, требующие жидкости, — этап 7.
 import { LuaEntity } from "factorio:runtime"
 import { ActionState, distanceToEntity, face, registerActionHandler, StepOutcome } from "./actions"
+import { MINING_WATTS, spend } from "./energy"
 import { RobotRecord } from "./registry"
 
 /** Досягаемость до месторождения (как у персонажа) и скорость добычи машины Mk1. */
@@ -93,7 +94,12 @@ registerActionHandler("mine", {
   step: (record, action) => {
     const resource = action.params.target
     // За время шага клетку могли истощить или машину увести.
-    if (resource?.valid && distanceToEntity(record.entity.position, resource) <= MINE_REACH) mineUnit(record, action, resource)
+    if (resource?.valid && distanceToEntity(record.entity.position, resource) <= MINE_REACH) {
+      if (!spend(record, (unitTicks(resource) / 60) * MINING_WATTS)) {
+        return action.done > 0 ? { finish: true, reason: "no-fuel" } : { finish: true, error: "no-fuel" }
+      }
+      mineUnit(record, action, resource)
+    }
     return nextUnit(record, action)
   },
 })
