@@ -1,11 +1,15 @@
 // Runtime stage: события, команды, GUI.
 // Данные, которые должны пережить сохранение, лежат в `storage` (тип — в storage.d.ts).
+import { registerPlacement } from "./automaton/placement"
+import { registerDebugCommands } from "./debug/commands"
 import { initDemoStorage, registerDemo } from "./demo"
 
 script.on_init(() => initDemoStorage())
 script.on_configuration_changed(() => initDemoStorage())
 
 registerDemo()
+registerPlacement()
+registerDebugCommands()
 
 // Проверки, которые включаются только служебными модами (их создают скрипты в tools/test/):
 // automaton-test — внутриигровые тесты (npm run test:game),

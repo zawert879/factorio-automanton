@@ -19,9 +19,16 @@ for i = 2, #arg do
   end
 end
 
+-- Вне игры тиков нет: after() доступен только во внутриигровых тестах (npm run test:game).
+local context = {
+  after = function()
+    error("t.after() работает только во внутриигровых тестах (src/test/, npm run test:game)", 0)
+  end,
+}
+
 local passed, failed = 0, 0
 for _, case in ipairs(testing.registeredTests()) do
-  local ok, err = pcall(case.fn)
+  local ok, err = pcall(case.fn, context)
   if ok then
     passed = passed + 1
   else

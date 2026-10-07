@@ -42,7 +42,8 @@
 ## Структура
 - `src/settings.ts` — настройки мода (settings stage); `src/data.ts` (+ `data-updates`, `data-final-fixes`) —
   прототипы (data stage); `src/control.ts` — runtime (события, команды, GUI); модули — рядом, в подпапках.
-- `src/storage.d.ts` — тип `storage`.
+- `src/storage.d.ts` — тип `storage`; `src/names.ts` — имена прототипов (общие для data и control).
+- `src/debug/commands.ts` — отладочные команды (`/am-give [число]` — выдать машины); в мультиплеере только админам.
 - В `data`/`settings` глобальные `data`, `mods` объявляются в файле через `factorio:common`
   (в tsconfig подключены только типы runtime).
 - `mod/locale/{en,ru}/*.cfg` — строки; добавлять ключи сразу в оба языка.

@@ -1,4 +1,5 @@
 // npm run test:game: прогнать внутриигровые тесты (src/test/*.test.ts) в Factorio без окна.
+// 1100 тиков — с запасом к пределу DEADLINE_TICK = 1000 в src/test/runner.ts.
 // Служебный мод automaton-test включает их в control.ts; итог — script-output/automaton-test-results.json.
 import { existsSync, readFileSync } from "node:fs"
 import { join } from "node:path"
@@ -9,7 +10,7 @@ const env = prepareWork("automaton-test-game", "automaton-test")
 const resultsFile = join(env.data, "script-output", "automaton-test-results.json")
 
 const create = createMap(env)
-const bench = create.status === 0 ? runFactorio([...env.common, "--benchmark", env.map, "--benchmark-ticks", "5"]) : create
+const bench = create.status === 0 ? runFactorio([...env.common, "--benchmark", env.map, "--benchmark-ticks", "1100"]) : create
 
 if (!existsSync(resultsFile)) {
   console.error(`Игра не выдала результатов тестов (код ${bench.status}):\n${scriptError(bench.stdout)}`)

@@ -1,9 +1,14 @@
 // Мини-библиотека тестов: describe / test / expect.
 // Общая для тестов вне игры (tests/, Lua 5.2) и внутриигровых (src/test/, npm run test:game).
 
+export interface TestContext {
+  /** Только во внутриигровых тестах: продолжить тест через `ticks` тиков. */
+  after(this: void, ticks: number, fn: (this: void) => void): void
+}
+
 export interface TestCase {
   name: string
-  fn: () => void
+  fn: (this: void, t: TestContext) => void
 }
 
 const cases: TestCase[] = []
@@ -18,7 +23,7 @@ export function describe(name: string, body: () => void): void {
   }
 }
 
-export function test(name: string, fn: () => void): void {
+export function test(name: string, fn: (this: void, t: TestContext) => void): void {
   cases.push({ name: [...scope, name].join(" › "), fn })
 }
 
