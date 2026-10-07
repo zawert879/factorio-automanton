@@ -21,6 +21,9 @@ export interface RobotRecord {
   fuel: LuaInventory
   /** Запас энергии, Дж: тратится на путь и действия, пополняется сжиганием топлива. */
   energy: number
+  /** Значок проблемы и облачко с текстом над машиной (src/automaton/status.ts). */
+  problem?: LuaRenderObject
+  bubble?: LuaRenderObject
 }
 
 export interface RobotRegistry {

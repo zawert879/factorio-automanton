@@ -3,6 +3,7 @@ import { CustomCommandData, LuaEntity, LuaPlayer, MapPosition } from "factorio:r
 import { ActionKind, ActionParams, startAction } from "../automaton/actions"
 import { entityFluid, entityFuel, entityInput, entityOutput, entityProgress, entityRecipe, entityStatus } from "../automaton/inspect"
 import { moveRobot } from "../automaton/movement"
+import { say } from "../automaton/status"
 import { RobotRecord } from "../automaton/registry"
 import { WORKER_MK1 } from "../names"
 
@@ -101,6 +102,19 @@ export function registerDebugCommands(): void {
         `progress ${math.floor(entityProgress(entity) * 100)}%, fluid ${entityFluid(entity)}, ` +
         `input ${contents(entityInput(entity))}, output ${contents(entityOutput(entity))}, fuel ${contents(entityFuel(entity))}`,
     )
+  })
+
+  // /am-say <номер> <текст>: облачко с текстом над машиной.
+  commands.add_command("am-say", ["automaton.debug-say-help"], (command) => {
+    const player = adminPlayer(command)
+    if (player === undefined) return
+    const [idArg, ...words] = (command.parameter ?? "").split(" ")
+    const record = storage.robots.byId[tonumber(idArg) ?? -1]
+    if (record === undefined || !record.entity.valid) {
+      player.print(["automaton.debug-unknown-robot", idArg ?? ""])
+      return
+    }
+    say(record, words.join(" "))
   })
 
   // /am-info <номер>: состояние машины — позиция, занятие, груз, топливо, энергия.

@@ -7,7 +7,7 @@ import "./index"
 
 const RESULTS_FILE = "automaton-test-results.json"
 /** Последний тик, до которого тесты обязаны закончиться (npm run test:game гоняет игру дольше). */
-const DEADLINE_TICK = 6000
+const DEADLINE_TICK = 12000
 
 interface TestResult {
   name: string

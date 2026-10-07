@@ -4,6 +4,7 @@
 import { MapPosition } from "factorio:runtime"
 import { setActivity } from "../automaton/appearance"
 import { moveRobot } from "../automaton/movement"
+import { say, showProblem } from "../automaton/status"
 import { findRobot, RobotRecord } from "../automaton/registry"
 import { Activity, BODY_DIRECTIONS, WORKER_MK1, WORKER_MK1_PLACER } from "../names"
 
@@ -68,9 +69,14 @@ script.on_nth_tick(1, (event) => {
     nauvis().create_entity({ name: "assembling-machine-1", position: { x: CENTER.x + 2.5, y: CENTER.y + 4.5 }, force: "player" })
     place({ x: CENTER.x + 2.5, y: CENTER.y + 2.6 })
     place({ x: CENTER.x + 2.5, y: CENTER.y + 6.4 })
+    // Статус: значки проблем и облачко.
+    const problems = ["fuel", "no-path", "full", "warning", "danger"] as const
+    for (let i = 0; i < problems.length; i++) showProblem(place({ x: CENTER.x - 10.5 + i * 3, y: CENTER.y + 9 }), problems[i])
+    say(place({ x: CENTER.x + 6.5, y: CENTER.y + 9 }), "Привет! Иду за рудой", 10)
   }
   if (tick === 150) shot("a")
   if (tick === 155) shot("building", { x: CENTER.x + 2.5, y: CENTER.y + 4.5 }, 4)
+  if (tick === 158) shot("status", { x: CENTER.x + 1, y: CENTER.y + 8 }, 3)
   if (tick === 160) shot("b")
   // Крупно: бегущие на восток (AM-17) и на север (AM-18).
   if (tick === 170) {

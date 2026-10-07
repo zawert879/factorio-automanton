@@ -14,6 +14,7 @@ import { onTick } from "../events"
 import { directionOf, setActivity } from "./appearance"
 import { hasEnergy, MOVE_JOULES_PER_TILE, spend } from "./energy"
 import { RobotRecord } from "./registry"
+import { problemFor, showProblem } from "./status"
 
 export type MoveResult = "arrived" | "no-path" | "stuck" | "no-fuel"
 
@@ -88,6 +89,7 @@ export function moveRobot(
   if (state.orders[record.id]?.phase !== "queued") state.queue.push(record.id)
   state.orders[record.id] = order
   state.lastResult[record.id] = undefined
+  showProblem(record, undefined)
 }
 
 /** Отменить поездку без итога (машина займётся другим). */
@@ -124,6 +126,7 @@ function finish(id: number, result: MoveResult): void {
   if (record === undefined || !record.entity.valid) return
   stopCommand(record)
   setActivity(record, "idle")
+  showProblem(record, result === "arrived" ? undefined : problemFor(result))
   if (order?.notifyPlayer !== undefined) {
     game.get_player(order.notifyPlayer)?.print([`automaton.move-${result}`, record.name])
   }

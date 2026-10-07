@@ -8,6 +8,7 @@ import { onTick } from "../events"
 import { directionOf, setActivity } from "./appearance"
 import { cancelMove } from "./movement"
 import { RobotRecord } from "./registry"
+import { problemFor, showProblem } from "./status"
 
 export type ActionKind = "wait" | "mine" | "take" | "put" | "pickup" | "drop" | "give" | "repair" | "refuel"
 
@@ -102,7 +103,11 @@ function finish(record: RobotRecord, action: ActionState, error: ActionError | u
   state.current[record.id] = undefined
   const result: ActionResult = { kind: action.kind, ok: error === undefined, count: action.done, error, reason }
   state.lastResult[record.id] = result
-  if (record.entity.valid) setActivity(record, "idle")
+  if (record.entity.valid) {
+    setActivity(record, "idle")
+    // Неудача — значок; успех снимает значок, кроме «кончилось топливо» посреди работы.
+    showProblem(record, problemFor(error ?? (reason === "no-fuel" ? reason : undefined)))
+  }
   if (action.notifyPlayer !== undefined) {
     const kind: LocalisedString = [`automaton-action.${action.kind}`]
     const message: LocalisedString =
@@ -152,6 +157,7 @@ export function startAction(
   const action: ActionState = { kind, params, startTick: tick, nextTick: tick, done: 0, notifyPlayer: options.notifyPlayer }
   storage.actions.current[record.id] = action
   storage.actions.lastResult[record.id] = undefined
+  showProblem(record, undefined)
   apply(record, action, guarded(record, action, () => handler.start(record, action, tick)), tick)
 }
 
