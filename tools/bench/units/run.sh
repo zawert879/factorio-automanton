@@ -1,13 +1,15 @@
 #!/bin/sh
-# Бенчмарк N физических юнитов с поиском пути: ./run.sh 5000
+# Бенчмарк N физических юнитов с поиском пути: ./run.sh 5000 [random|shuttle|waypoints] [true|false]
 set -e
 N="${1:-5000}"
+ROUTE="${2:-random}"
+CACHE="${3:-false}"
 HERE=$(cd "$(dirname "$0")" && pwd)
 WORK="${TMPDIR:-/tmp}/automaton-units"
 BIN="${FACTORIO_BIN:-$HOME/Library/Application Support/Steam/steamapps/common/Factorio/factorio.app/Contents/MacOS/factorio}"
 rm -rf "$WORK"; mkdir -p "$WORK/data" "$WORK/mods/unitsbench"
 printf '{"mods":[{"name":"base","enabled":true},{"name":"unitsbench","enabled":true}]}' > "$WORK/mods/mod-list.json"; cp "$HERE/mods/unitsbench/info.json" "$HERE/mods/unitsbench/data.lua" "$WORK/mods/unitsbench/"
-sed "s/__N__/$N/" "$HERE/mods/unitsbench/control.template.lua" > "$WORK/mods/unitsbench/control.lua"
+sed -e "s/__N__/$N/" -e "s/__ROUTE__/$ROUTE/" -e "s/__CACHE__/$CACHE/" "$HERE/mods/unitsbench/control.template.lua" > "$WORK/mods/unitsbench/control.lua"
 printf '[path]\nread-data=__PATH__system-read-data__\nwrite-data=%s\n' "$WORK/data" > "$WORK/config.ini"
 "$BIN" --config "$WORK/config.ini" --mod-directory "$WORK/mods" --map-gen-settings "$HERE/map-gen.json" --create "$WORK/map.zip" >/dev/null 2>&1
 grep -h "UNITS placed" "$WORK/data/factorio-current.log" | sed -E 's/^.*control.lua:[0-9]+: //'
