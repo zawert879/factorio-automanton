@@ -40,12 +40,17 @@ export interface ActionState {
   notifyPlayer?: PlayerIndex
 }
 
+/**
+ * Итог действия. error — сделать ничего нельзя (далеко, нет цели, груз полон с самого начала…);
+ * reason — сделано меньше просимого, но это успех (груз заполнился, месторождение кончилось…).
+ */
 export interface ActionResult {
   kind: ActionKind
   ok: boolean
-  /** Сколько сделано — и при успехе, и при ошибке (частичный результат). */
+  /** Сколько сделано — и при успехе, и при ошибке. */
   count: number
   error?: ActionError
+  reason?: ActionError
 }
 
 export interface ActionsState {
@@ -55,14 +60,14 @@ export interface ActionsState {
   timers: Record<number, number[] | undefined>
 }
 
-/** Шаг действия: «ещё через столько тиков» или итог. */
-export type StepOutcome = { after: number } | { finish: true; error?: ActionError }
+/** Шаг действия: «ещё через столько тиков» или итог (ошибка либо причина неполного успеха). */
+export type StepOutcome = { after: number } | { finish: true; error?: ActionError; reason?: ActionError }
 
 export interface ActionHandler {
   /** Проверить и начать. Возвращает первый шаг (через сколько тиков) или ошибку. */
-  start(record: RobotRecord, action: ActionState, tick: number): StepOutcome
+  start: (this: void, record: RobotRecord, action: ActionState, tick: number) => StepOutcome
   /** Очередной шаг (назначенный тик наступил). */
-  step(record: RobotRecord, action: ActionState, tick: number): StepOutcome
+  step: (this: void, record: RobotRecord, action: ActionState, tick: number) => StepOutcome
 }
 
 const handlers: Partial<Record<ActionKind, ActionHandler>> = {}
@@ -90,25 +95,27 @@ function schedule(id: number, tick: number): void {
   else list.push(id)
 }
 
-function finish(record: RobotRecord, action: ActionState, error: ActionError | undefined): void {
+function finish(record: RobotRecord, action: ActionState, error: ActionError | undefined, reason?: ActionError): void {
   const state = storage.actions
   state.current[record.id] = undefined
-  const result: ActionResult = { kind: action.kind, ok: error === undefined, count: action.done, error }
+  const result: ActionResult = { kind: action.kind, ok: error === undefined, count: action.done, error, reason }
   state.lastResult[record.id] = result
   if (record.entity.valid) setActivity(record, "idle")
   if (action.notifyPlayer !== undefined) {
     const kind: LocalisedString = [`automaton-action.${action.kind}`]
     const message: LocalisedString =
-      error === undefined
-        ? ["automaton.action-done", record.name, kind, action.done]
-        : ["automaton.action-failed", record.name, kind, [`automaton-error.${error}`], action.done]
+      error !== undefined
+        ? ["automaton.action-failed", record.name, kind, [`automaton-error.${error}`], action.done]
+        : reason !== undefined
+          ? ["automaton.action-done-reason", record.name, kind, action.done, [`automaton-error.${reason}`]]
+          : ["automaton.action-done", record.name, kind, action.done]
     game.get_player(action.notifyPlayer)?.print(message)
   }
 }
 
 function apply(record: RobotRecord, action: ActionState, outcome: StepOutcome, tick: number): void {
   if ("finish" in outcome) {
-    finish(record, action, outcome.error)
+    finish(record, action, outcome.error, outcome.reason)
   } else {
     action.nextTick = tick + math.max(1, outcome.after)
     schedule(record.id, action.nextTick)

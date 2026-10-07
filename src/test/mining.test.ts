@@ -55,7 +55,9 @@ describe("добыча", () => {
     const robot = place({ x: -191.5, y: 40.5 })
     startAction(robot, "mine", { item: "copper-ore", count: 5 })
     waitUntil(t, "конца добычи", () => currentAction(robot) === undefined, 1500, () => {
-      expect(lastActionResult(robot)?.error).toBe("no-resource")
+      // Часть сделана — это успех с причиной остановки, а не ошибка.
+      expect(lastActionResult(robot)?.ok).toBe(true)
+      expect(lastActionResult(robot)?.reason).toBe("no-resource")
       expect(lastActionResult(robot)?.count).toBe(2)
       expect(robot.cargo.get_item_count("copper-ore")).toBe(2)
       expect(nauvis().find_entities_filtered({ name: "copper-ore", area: [[-200, 30], [-180, 50]] }).length).toBe(0)

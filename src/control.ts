@@ -3,6 +3,7 @@
 import { initActions, registerActions } from "./automaton/actions"
 import { registerAppearance } from "./automaton/appearance"
 import { initMining } from "./automaton/mining"
+import "./automaton/transfer"
 import { initMovement, registerMovement } from "./automaton/movement"
 import { registerPlacement } from "./automaton/placement"
 import { adoptUnregisteredRobots, initRegistry, registerRegistryEvents } from "./automaton/registry"

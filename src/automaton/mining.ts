@@ -55,13 +55,16 @@ function resourceFor(record: RobotRecord, action: ActionState): LuaEntity | unde
 function nextUnit(record: RobotRecord, action: ActionState): StepOutcome {
   if (action.params.count !== undefined && action.done >= action.params.count) return { finish: true }
   const resource = resourceFor(record, action)
+  // Если что-то уже добыто — это успех с причиной остановки; если ничего — ошибка.
+  const stop = (why: "no-resource" | "cargo-full" | "out-of-reach"): StepOutcome =>
+    action.done > 0 ? { finish: true, reason: why } : { finish: true, error: why }
   if (resource === undefined) {
     // Указанной цели нет рядом — «далеко»; не нашлось ничего — «нечего добывать».
     const target = action.params.target
-    return { finish: true, error: target?.valid && target.type === "resource" ? "out-of-reach" : "no-resource" }
+    return stop(target?.valid && target.type === "resource" ? "out-of-reach" : "no-resource")
   }
   const sample = action.params.item ?? resource.prototype.mineable_properties.products?.[0]?.name
-  if (sample !== undefined && !record.cargo.can_insert({ name: sample, count: 1 })) return { finish: true, error: "cargo-full" }
+  if (sample !== undefined && !record.cargo.can_insert({ name: sample, count: 1 })) return stop("cargo-full")
   action.params.target = resource
   face(record, resource.position, "mine")
   return { after: unitTicks(resource) }
