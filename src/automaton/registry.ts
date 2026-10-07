@@ -1,6 +1,7 @@
 // Реестр машин: id, имя, сущность. id и имя переживают подбор — хранятся в теге предмета.
 import { LuaEntity, LuaInventory, LuaItemStack, LuaRenderObject, Tags } from "factorio:runtime"
-import { ROBOT_TAG, WORKER_MK1 } from "../names"
+import { Activity, ROBOT_TAG, WORKER_MK1 } from "../names"
+import { directionOf, drawBody } from "./appearance"
 
 export interface RobotRecord {
   id: number
@@ -8,6 +9,11 @@ export interface RobotRecord {
   entity: LuaEntity
   /** Подпись с именем над машиной (видна в режиме Alt). */
   label: LuaRenderObject
+  /** Тело — анимация поверх прозрачного юнита (src/automaton/appearance.ts). */
+  body: LuaRenderObject
+  activity: Activity
+  /** Направление анимации тела: 0 — север, по часовой стрелке через 45°. */
+  direction: number
 }
 
 export interface RobotRegistry {
@@ -50,7 +56,9 @@ export function registerRobot(entity: LuaEntity, tag?: RobotTag): RobotRecord {
     alignment: "center",
     only_in_alt_mode: true,
   })
-  const record: RobotRecord = { id, name, entity, label }
+  const direction = directionOf(entity.orientation)
+  const body = drawBody(entity, "idle", direction)
+  const record: RobotRecord = { id, name, entity, label, body, activity: "idle", direction }
   registry.byId[id] = record
   registry.idByUnit[entity.unit_number!] = id
   script.register_on_object_destroyed(entity)
@@ -65,6 +73,7 @@ function forgetUnit(unitNumber: number): void {
   const record = registry.byId[id]
   if (record !== undefined) {
     if (record.label.valid) record.label.destroy()
+    if (record.body?.valid) record.body.destroy()
     delete registry.byId[id]
   }
 }
@@ -109,6 +118,13 @@ export function tagMinedRobot(entity: LuaEntity, buffer: LuaInventory): void {
 
 /** Машины, которых нет в реестре (поставлены до появления реестра), — поставить на учёт. */
 export function adoptUnregisteredRobots(): void {
+  // Записи из версий мода без тела машины — дорисовать тело.
+  for (const record of Object.values(storage.robots.byId)) {
+    if (record === undefined || !record.entity.valid || record.body?.valid) continue
+    record.activity = "idle"
+    record.direction = directionOf(record.entity.orientation)
+    record.body = drawBody(record.entity, "idle", record.direction)
+  }
   for (const [, surface] of game.surfaces) {
     for (const entity of surface.find_entities_filtered({ name: WORKER_MK1 })) {
       if (findRobot(entity) === undefined) registerRobot(entity)

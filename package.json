@@ -7,7 +7,8 @@
     "watch": "tstl --watch",
     "test": "node tools/test/run.mjs",
     "test:game": "node tools/test/game.mjs",
-    "test:desync": "node tools/test/desync.mjs"
+    "test:desync": "node tools/test/desync.mjs",
+    "shot": "node tools/visual/shot.mjs"
   },
   "devDependencies": {
     "lua-types": "2.14.1",

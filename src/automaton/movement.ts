@@ -4,6 +4,7 @@
 // приказов не забивала поиск пути. Застрявшие (нет продвижения, вышло время) снимаются с поездки.
 import { LuaEntity, MapPosition, PlayerIndex } from "factorio:runtime"
 import { onTick } from "../events"
+import { directionOf, setActivity } from "./appearance"
 import { RobotRecord } from "./registry"
 
 export type MoveResult = "arrived" | "no-path" | "stuck"
@@ -80,6 +81,7 @@ function finish(id: number, result: MoveResult): void {
   const record = storage.robots.byId[id]
   if (record === undefined || !record.entity.valid) return
   record.entity.commandable!.set_command({ type: defines.command.stop, distraction: defines.distraction.none })
+  setActivity(record, "idle")
   if (order?.notifyPlayer !== undefined) {
     game.get_player(order.notifyPlayer)?.print([`automaton.move-${result}`, record.name])
   }
@@ -111,6 +113,7 @@ function dispatch(tick: number): void {
       distraction: defines.distraction.none,
       pathfind_flags: { cache: true },
     })
+    setActivity(record, "run", directionOf(record.entity.orientation))
     order.dispatchedTick = tick
     order.deadlineTick = tick + math.ceil(distance(record.entity.position, destination) / SPEED) * 2 + TIME_MARGIN_TICKS
     order.checkPosition = record.entity.position

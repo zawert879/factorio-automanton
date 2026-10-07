@@ -1,5 +1,6 @@
 // Runtime stage: события, команды, GUI.
 // Данные, которые должны пережить сохранение, лежат в `storage` (тип — в storage.d.ts).
+import { registerAppearance } from "./automaton/appearance"
 import { initMovement, registerMovement } from "./automaton/movement"
 import { registerPlacement } from "./automaton/placement"
 import { adoptUnregisteredRobots, initRegistry, registerRegistryEvents } from "./automaton/registry"
@@ -22,18 +23,22 @@ registerDemo()
 registerPlacement()
 registerRegistryEvents()
 registerMovement()
+registerAppearance()
 registerDebugCommands()
 
 // Проверки, которые включаются только служебными модами (их создают скрипты в tools/test/):
 // automaton-test — внутриигровые тесты (npm run test:game),
-// automaton-desync-test — снимок состояния для проверки сохранения/загрузки (npm run test:desync).
+// automaton-desync-test — снимок состояния для проверки сохранения/загрузки (npm run test:desync),
+// automaton-visual — сцена для снимков экрана (npm run shot).
 // Имя модуля — через переменную: TSTL не ищет его заранее, а в zip мода папки test/ нет (package.ignore).
 const testModule =
   script.active_mods["automaton-test"] !== undefined
     ? "test.runner"
     : script.active_mods["automaton-desync-test"] !== undefined
       ? "test.stateDump"
-      : undefined
+      : script.active_mods["automaton-visual"] !== undefined
+        ? "test.visual"
+        : undefined
 if (testModule !== undefined) {
   require(testModule)
 }

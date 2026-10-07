@@ -1,8 +1,9 @@
-// Прототипы рабочего автоматона Mk1: юнит, предмет, временный рецепт и заглушка для установки.
+// Прототипы рабочего автоматона Mk1: юнит, анимации тела, предмет, временный рецепт и заглушка для установки.
 // Юнит нельзя поставить из инвентаря напрямую, поэтому предмет ставит заглушку
 // (simple-entity-with-owner), которую control заменяет на юнит (src/automaton/placement.ts).
 import { PrototypeData } from "factorio:common"
 import {
+  AnimationPrototype,
   Color,
   IconData,
   ItemWithTagsPrototype,
@@ -11,46 +12,91 @@ import {
   SimpleEntityWithOwnerPrototype,
   UnitPrototype,
 } from "factorio:prototype"
-import * as util from "util"
-import { WORKER_MK1, WORKER_MK1_PLACER } from "../names"
+import { ACTIVITIES, Activity, BODY_DIRECTIONS, bodyAnimationName, WORKER_MK1, WORKER_MK1_PLACER } from "../names"
 
 declare const data: PrototypeData
 
 const SCALE = 0.8
-const STEEL: Color = { r: 0.72, g: 0.78, b: 0.86 }
-const AMBER: Color = { r: 1, g: 0.62, b: 0.12 }
+const STEEL: Color = { r: 0.62, g: 0.72, b: 0.88 }
+// Акцент — бирюзовый: оранжевый совпадал с цветом игрока по умолчанию, машины путались с игроками.
+const ACCENT: Color = { r: 0.15, g: 0.85, b: 0.9 }
 
 const ICONS: IconData[] = [{ icon: "__core__/graphics/icons/entity/character.png", icon_size: 64, tint: STEEL }]
 
-interface AnimationLayer {
+/** Слой анимации персонажа, как он лежит в data.raw (нужные нам поля). */
+interface SourceLayer {
+  filename?: string
+  stripes?: Array<{ filename: string; width_in_frames: number; height_in_frames: number; x?: number; y?: number }>
+  width: number
+  height: number
+  frame_count: number
   scale?: number
   shift?: [number, number] | { x: number; y: number }
-  tint?: Color
   apply_runtime_tint?: boolean
   draw_as_shadow?: boolean
 }
 
-/** Анимация персонажа, перекрашенная в сталь с янтарным акцентом и уменьшенная. */
-function steelAnimation(source: RotatedAnimation): RotatedAnimation {
-  const animation = util.table.deepcopy(source) as { layers: AnimationLayer[] }
-  for (const layer of animation.layers) {
-    layer.scale = (layer.scale ?? 1) * SCALE
-    if (layer.shift !== undefined) {
-      const [x, y] = Array.isArray(layer.shift) ? layer.shift : [layer.shift.x, layer.shift.y]
-      layer.shift = [x * SCALE, y * SCALE]
+/**
+ * Анимация одного направления из анимации персонажа (8 направлений — 8 строк листа, а «полосы» —
+ * несколько файлов по ширине). Перекрашена в сталь с янтарным акцентом и уменьшена.
+ */
+function bodyAnimation(name: string, source: RotatedAnimation, direction: number, speed: number): AnimationPrototype {
+  const layers = (source as unknown as { layers: SourceLayer[] }).layers.map((layer) => {
+    const [x, y] = Array.isArray(layer.shift) ? layer.shift : [layer.shift?.x ?? 0, layer.shift?.y ?? 0]
+    const common = {
+      width: layer.width,
+      height: layer.height,
+      frame_count: layer.frame_count,
+      scale: (layer.scale ?? 1) * SCALE,
+      shift: [x * SCALE, y * SCALE] as [number, number],
+      animation_speed: speed,
+      draw_as_shadow: layer.draw_as_shadow,
+      tint: layer.draw_as_shadow ? undefined : layer.apply_runtime_tint ? ACCENT : STEEL,
     }
-    if (layer.draw_as_shadow) continue
-    if (layer.apply_runtime_tint) {
-      layer.apply_runtime_tint = false
-      layer.tint = AMBER
-    } else {
-      layer.tint = STEEL
+    if (layer.stripes !== undefined) {
+      const stripes = layer.stripes.map((stripe) => ({
+        filename: stripe.filename,
+        width_in_frames: stripe.width_in_frames,
+        height_in_frames: 1,
+        x: stripe.x ?? 0,
+        y: (stripe.y ?? 0) + direction * layer.height,
+      }))
+      return { ...common, stripes }
     }
-  }
-  return animation as unknown as RotatedAnimation
+    return { ...common, filename: layer.filename!, line_length: layer.frame_count, y: direction * layer.height }
+  })
+  return { type: "animation", name, layers } as AnimationPrototype
 }
 
 const characterAnimations = data.raw.character.character!.animations[0]
+
+/** Анимации тела: состояние → (анимация персонажа, скорость кадров за тик). */
+const BODY_SOURCES: Record<Activity, [RotatedAnimation, number]> = {
+  idle: [characterAnimations.idle!, 0.15],
+  // Машина проходит 0.1 клетки за тик, кадр бега персонажа — ~0.1 клетки: около кадра за тик.
+  run: [characterAnimations.running!, 1],
+  mine: [characterAnimations.mining_with_tool!, 0.9],
+}
+
+const bodyAnimations: AnimationPrototype[] = []
+for (const activity of ACTIVITIES) {
+  const [source, speed] = BODY_SOURCES[activity]
+  for (let direction = 0; direction < BODY_DIRECTIONS; direction++) {
+    bodyAnimations.push(bodyAnimation(bodyAnimationName(activity, direction), source, direction, speed))
+  }
+}
+
+/**
+ * Собственный спрайт юнита — прозрачный: у юнита только анимация бега по пройденному пути,
+ * простоя нет. Тело рисуется накладкой (src/automaton/appearance.ts) по состоянию и направлению.
+ */
+const INVISIBLE: RotatedAnimation = {
+  filename: "__core__/graphics/empty.png",
+  width: 1,
+  height: 1,
+  frame_count: 1,
+  direction_count: 1,
+}
 
 const worker: UnitPrototype = {
   type: "unit",
@@ -68,8 +114,8 @@ const worker: UnitPrototype = {
     [0.35, 0.2],
   ],
   movement_speed: 0.1,
-  distance_per_frame: 0.13 * SCALE,
-  run_animation: steelAnimation(characterAnimations.running!),
+  distance_per_frame: 1,
+  run_animation: INVISIBLE,
   // Юниту обязательно нужна атака; рабочему она ни к чему — нулевой урон, бой не начинается
   // (команды отдаются с distraction = none).
   attack_parameters: {
@@ -78,7 +124,7 @@ const worker: UnitPrototype = {
     cooldown: 60,
     ammo_category: "melee",
     ammo_type: { action: { type: "direct", action_delivery: { type: "instant" } } },
-    animation: steelAnimation(characterAnimations.idle!),
+    animation: INVISIBLE,
   },
   vision_distance: 10,
   distraction_cooldown: 300,
@@ -125,4 +171,4 @@ const recipe: RecipePrototype = {
   results: [{ type: "item", name: WORKER_MK1, amount: 1 }],
 }
 
-data.extend([worker, placer, item, recipe])
+data.extend([worker, placer, item, recipe, ...bodyAnimations])
