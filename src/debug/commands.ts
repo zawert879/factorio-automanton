@@ -54,4 +54,21 @@ export function registerDebugCommands(): void {
     for (const record of robots) moveRobot(record, target, { notifyPlayer: player.index })
     player.print(["automaton.debug-goto-sent", robots.length])
   })
+
+  // /am-info <номер>: состояние машины — позиция, занятие, груз, топливо, энергия.
+  commands.add_command("am-info", ["automaton.debug-info-help"], (command) => {
+    const player = adminPlayer(command)
+    if (player === undefined) return
+    const record = storage.robots.byId[tonumber(command.parameter) ?? -1]
+    if (record === undefined || !record.entity.valid) {
+      player.print(["automaton.debug-unknown-robot", command.parameter ?? ""])
+      return
+    }
+    const { x, y } = record.entity.position
+    player.print(
+      `${record.name}: (${math.floor(x)}, ${math.floor(y)}), ${record.activity}, ` +
+        `energy ${math.floor(record.energy / 1000)} kJ, fuel ${serpent.line(record.fuel.get_contents())}, ` +
+        `cargo ${serpent.line(record.cargo.get_contents())}`,
+    )
+  })
 }

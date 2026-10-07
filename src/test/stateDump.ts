@@ -3,7 +3,7 @@
 // сохранение на тике 300 застаёт их в пути; после него подобранную ставят обратно из предмета и ставят новую. На тике DUMP_TICK — снимок storage в
 // script-output/automaton-state.txt. Состояние сценария нигде не хранится: всё ищется на карте.
 // Подключается из control.ts, только когда включён служебный мод automaton-desync-test.
-import { LuaEntity, LuaRenderObject } from "factorio:runtime"
+import { LuaEntity, LuaInventory, LuaRenderObject } from "factorio:runtime"
 import { moveRobot } from "../automaton/movement"
 import { replacePlacer } from "../automaton/placement"
 import { findRobot, tagFromInventory, tagMinedRobot } from "../automaton/registry"
@@ -64,6 +64,7 @@ function stable(value: unknown): unknown {
       return `<LuaEntity ${e.name} #${e.unit_number} (${e.position.x}, ${e.position.y})>`
     }
     if (object.object_name === "LuaRenderObject") return `<LuaRenderObject #${(value as LuaRenderObject).id}>`
+    if (object.object_name === "LuaInventory") return `<LuaInventory ${serpent.line((value as LuaInventory).get_contents())}>`
     return `<${object.object_name}>`
   }
   if (type(value) !== "table") return value
