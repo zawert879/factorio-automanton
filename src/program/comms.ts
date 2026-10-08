@@ -20,6 +20,8 @@ export interface Mail {
   replyTo?: number
   /** Это запрос: отправитель ждёт ответа с этим номером. */
   request?: number
+  /** Данные общие для нескольких получателей (broadcast): копируются при чтении. */
+  shared?: boolean
 }
 
 export interface CommsState {

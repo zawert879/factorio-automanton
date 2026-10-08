@@ -1,5 +1,5 @@
 // Карта (4.9): marker, zone, find, map.tag. Время и мир (4.7): wait, waitUntil, exit, restart, time, world.
-import { BoundingBox } from "factorio:runtime"
+import { BoundingBox, LuaEntity } from "factorio:runtime"
 import { controlFlow, defineHostObject, host, hostBlocking, hostGetters, hostMethods, program, Val } from "../../lang/runtime/core"
 import { lib } from "../../lang/runtime/library"
 import { truthy } from "../../lang/runtime/values"
@@ -66,13 +66,22 @@ host.find = (what: Val, where: Val) => {
   if (type(what) === "string") filter.name = what as string
   else if (type(what) === "table" && type(what.type) === "string") filter.type = what.type
   else actionError("invalid-target", 'find needs a name or { type: "…" }')
+  // Кэш зоны (13.3): тот же запрос, пока в зоне ничего не строили и не сносили, и все здания живы.
+  const key = `${robot.entity.force_index}|${filter.name ?? ""}|${filter.type ?? ""}`
+  const cached = zone.found?.[key] as Val[] | undefined
+  if (cached !== undefined && cached.every((h) => (h.__e as LuaEntity).valid)) return programArray([...cached])
   const found = zone.surface.find_entities_filtered(filter as never)
-  const result: Val[] = []
+  const entities: LuaEntity[] = []
   for (const entity of found) {
     if (entity.type === "unit" || entity.type === "character" || MARKER_ENTITIES.includes(entity.name) || modelOf(entity.name) !== undefined) continue
-    result.push(entityHandle(entity))
+    entities.push(entity)
   }
-  return programArray(result)
+  // Порядок — по номеру здания: не зависит от того, в каком порядке их отдал движок.
+  table.sort(entities, (a, b) => (a.unit_number ?? 0) < (b.unit_number ?? 0))
+  const result = entities.map((e) => entityHandle(e))
+  zone.found ??= {}
+  zone.found[key] = result
+  return programArray([...result])
 }
 
 defineHostObject("map")

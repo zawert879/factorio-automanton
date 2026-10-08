@@ -15,6 +15,7 @@ import { registerModels } from "./automaton/models"
 import { registerPlacement } from "./automaton/placement"
 import { adoptUnregisteredRobots, initRegistry, registerRegistryEvents } from "./automaton/registry"
 import { registerDebugCommands } from "./debug/commands"
+import { initSchema, migrate } from "./migrations"
 import { initDemoStorage, registerDemo } from "./demo"
 import { onEvent } from "./events"
 import { registerGuiEvents } from "./gui/common"
@@ -30,6 +31,7 @@ import { initScheduler, registerScheduler } from "./program/scheduler"
 import { initPrograms } from "./program/store"
 import { initComms, registerComms } from "./program/comms"
 import { initBoard, registerBoard } from "./program/board"
+import { registerCache } from "./program/cache"
 import { initMarkers, registerMarkers } from "./world/markers"
 import { initDisplays, registerDisplays } from "./world/displays"
 import { initStart, registerStart } from "./world/start"
@@ -55,9 +57,13 @@ function initStorage(): void {
   initStart()
 }
 
-script.on_init(() => initStorage())
+script.on_init(() => {
+  initStorage()
+  initSchema()
+})
 script.on_configuration_changed(() => {
   initStorage()
+  migrate()
   adoptUnregisteredRobots()
 })
 
@@ -87,6 +93,7 @@ registerProgramsWindow()
 registerStart()
 registerComms()
 registerBoard()
+registerCache()
 // Здание исчезло — его обёртка у программ остаётся (valid === false), но из общего списка уходит.
 onEvent(defines.events.on_object_destroyed, (e) => {
   if (e.type === defines.target_type.entity) forgetEntityHandle(e.useful_id)
@@ -97,7 +104,8 @@ onEvent(defines.events.on_object_destroyed, (e) => {
 // automaton-desync-test — снимок состояния для проверки сохранения/загрузки (npm run test:desync),
 // automaton-visual — сцена для снимков экрана (npm run shot),
 // automaton-bench — бенчмарк языка в Lua Factorio (npm run bench:game),
-// automaton-bench-flyers — нагрузочный тест летающих (npm run bench:flyers).
+// automaton-bench-flyers — нагрузочный тест летающих (npm run bench:flyers),
+// automaton-bench-machines — стресс-тест машин с программами (npm run bench:machines).
 // Имя модуля — через переменную: TSTL не ищет его заранее, а в zip мода папки test/ нет (package.ignore).
 const testModule =
   script.active_mods["automaton-test"] !== undefined
@@ -110,7 +118,9 @@ const testModule =
           ? "test.benchGame"
           : script.active_mods["automaton-bench-flyers"] !== undefined
             ? "test.flyersBench"
-            : undefined
+            : script.active_mods["automaton-bench-machines"] !== undefined
+              ? "test.machinesBench"
+              : undefined
 if (testModule !== undefined) {
   require(testModule)
 }

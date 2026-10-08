@@ -63,7 +63,14 @@ function newMail(topic: string, data: Val, extra?: Partial<Mail>): Mail {
 defineHostObject("message")
 hostGetters.message.from = (o: Val) => robotHandle((o.__mail as Mail).from)
 hostGetters.message.topic = (o: Val) => (o.__mail as Mail).topic
-hostGetters.message.data = (o: Val) => (o.__mail as Mail).data
+// Данные письма общие у всех получателей broadcast: своя копия — только когда программа их читает
+// (большинство писем при рассылке на сотни машин не читают — переполненный ящик их выбрасывает).
+hostGetters.message.data = (o: Val) => {
+  const mail = o.__mail as Mail
+  if (!mail.shared) return mail.data
+  o.__data ??= copyValue(mail.data)
+  return o.__data
+}
 hostGetters.message.sentAt = (o: Val) => (o.__mail as Mail).sentAt
 hostMethods.message.reply = (o: Val, _k: Val, data: Val) => {
   const mail = o.__mail as Mail
@@ -86,11 +93,14 @@ host.send = (to: Val, topic: Val, data: Val) => {
 host.broadcast = (topic: Val, data: Val) => {
   const name = topicOf(topic)
   const me = currentRobot()
+  const force = me.entity.force_index
   const packed = packData(data)
-  for (const [id, record] of pairs(storage.robots.byId)) {
-    // Себе не шлём; у каждого получателя — своя копия данных.
-    if (id === me.id || !record.entity.valid || record.entity.force !== me.entity.force || !subscribed(id, name)) continue
-    post(id, newMail(name, copyValue(packed)))
+  // Только подписанные на тему; себе не шлём. Данные — одна копия на всех (копируется при чтении).
+  for (const [id, topics] of pairs(storage.comms.subscriptions)) {
+    if (id === me.id || !topics[name]) continue
+    const record = storage.robots.byId[id]
+    if (record === undefined || !record.entity.valid || record.entity.force_index !== force) continue
+    post(id, newMail(name, packed, { shared: true }))
   }
 }
 

@@ -20,6 +20,8 @@ import type { LuaRandomGenerator } from "factorio:runtime"
 
 declare global {
   const storage: {
+    /** Версия схемы storage (src/migrations.ts). */
+    schemaVersion?: number
     commandUses: number
     robots: RobotRegistry
     movement: MovementState

@@ -8,6 +8,8 @@ import { MARKER_ENTITIES, ROBOT_ENTITIES, ROBOT_PLACERS } from "../../names"
 import { actionError, currentRobot } from "../context"
 import { entityHandle, robotHandle } from "../handles"
 import { programArray, programPosition } from "../values"
+import { findCached } from "../cache"
+import { RobotRecord } from "../../automaton/registry"
 
 /** Энергия взгляда радиусом 10 клеток. */
 const SCAN_JOULES = 2_000
@@ -61,10 +63,19 @@ function names(value: Val): string | string[] | undefined {
 const scan = defineHostObject("scan")
 void scan
 
+/** Запрос зрения через кэш тика (13.3): ключ — все параметры запроса. */
+function seen(robot: RobotRecord, kind: string, radius: number, filter: Record<string, unknown>): LuaEntity[] {
+  const position = robot.entity.position
+  const parts = [kind, position.x, position.y, radius]
+  for (const [k, v] of pairs(filter)) parts.push(`${k}=${type(v) === "table" ? (v as string[]).join(",") : tostring(v)}`)
+  table.sort(parts as string[], (a, b) => tostring(a) < tostring(b))
+  return findCached(robot.entity.surface, parts.join("|"), { ...filter, position, radius } as never)
+}
+
 hostMethods.scan.robots = (_o: Val, _k: Val, radius: Val) => {
   const robot = currentRobot()
   const r = look(radius)
-  const found = robot.entity.surface.find_entities_filtered({ position: robot.entity.position, radius: r, name: ROBOT_ENTITIES as string[], force: robot.entity.force })
+  const found = seen(robot, "robots", r, { name: ROBOT_ENTITIES as string[], force: robot.entity.force_index })
   const others: LuaEntity[] = []
   for (const entity of found) if (entity !== robot.entity && storage.robots.idByUnit[entity.unit_number!] !== undefined) others.push(entity)
   return programArray(byDistance(others, (e) => e.position).map((e) => robotHandle(storage.robots.idByUnit[e.unit_number!]!)))
@@ -74,13 +85,12 @@ hostMethods.scan.entities = (_o: Val, _k: Val, filter: Val) => {
   const robot = currentRobot()
   const f = type(filter) === "table" ? filter : {}
   const r = look(f.radius)
-  const found = robot.entity.surface.find_entities_filtered({
-    position: robot.entity.position,
-    radius: r,
-    force: robot.entity.force,
-    name: names(f.name),
-    type: names(f.type),
-  })
+  const filters: Record<string, unknown> = { force: robot.entity.force_index }
+  const name = names(f.name)
+  const kind = names(f.type)
+  if (name !== undefined) filters.name = name
+  if (kind !== undefined) filters.type = kind
+  const found = seen(robot, "entities", r, filters)
   const buildings: LuaEntity[] = []
   for (const entity of found) {
     if (SKIPPED_TYPES[entity.type] || MARKER_ENTITIES.includes(entity.name) || ROBOT_PLACERS.includes(entity.name)) continue
@@ -91,7 +101,7 @@ hostMethods.scan.entities = (_o: Val, _k: Val, filter: Val) => {
 
 hostMethods.scan.items = (_o: Val, _k: Val, radius: Val) => {
   const robot = currentRobot()
-  const found = robot.entity.surface.find_entities_filtered({ position: robot.entity.position, radius: look(radius), type: "item-entity" })
+  const found = seen(robot, "items", look(radius), { type: "item-entity" })
   const items = byDistance(found, (e) => e.position)
   return programArray(items.map((e) => ({ item: e.stack!.name, count: e.stack!.count, position: programPosition(e.position) })))
 }
@@ -99,7 +109,7 @@ hostMethods.scan.items = (_o: Val, _k: Val, radius: Val) => {
 hostMethods.scan.resources = (_o: Val, _k: Val, radius: Val) => {
   const robot = currentRobot()
   const center = robot.entity.position
-  const found = robot.entity.surface.find_entities_filtered({ position: center, radius: look(radius), type: "resource" })
+  const found = seen(robot, "resources", look(radius), { type: "resource" })
   const patches = new LuaMap<string, { amount: number; tiles: number; x: number; y: number; nearest: MapPosition; d: number }>()
   const order: string[] = []
   for (const entity of found) {

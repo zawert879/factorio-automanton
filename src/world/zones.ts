@@ -12,6 +12,8 @@ export interface ZoneRecord {
   area: BoundingBox
   box: LuaRenderObject
   label: LuaRenderObject
+  /** Кэш find по зоне: запрос → обёртки зданий (src/program/cache.ts). */
+  found?: Record<string, unknown[] | undefined>
 }
 
 export interface ZonesState {
