@@ -125,7 +125,9 @@ while (true) {
     if (player !== undefined) {
       openPrograms(player, storage.programs.nextId - 1, undefined)
       const window = guiOf(player).programs!
-      window.code.text = window.code.text + "\nprint(undefinedName)\nlet x = 1 == 2\n"
+      let lines = ""
+      for (let i = 1; i <= 30; i++) lines += `\nprint("строка ${i + 7}")`
+      window.code.text = window.code.text + lines + "\nlet x = 1 == 2\n"
       publishFromWindow(player)
     }
   }

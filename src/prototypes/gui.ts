@@ -20,7 +20,27 @@ const consoleFont: FontPrototype = { type: "font", name: "automaton-console", fr
 data.extend([open, codeFont, consoleFont])
 
 const styles = data.raw["gui-style"]!.default as Record<string, unknown>
+// Редактор кода: размер задаётся по экрану игрока; отступы фиксированы — номера строк рядом
+// (такое же поле, только для чтения) совпадают с кодом построчно.
 styles.automaton_code = {
+  type: "textbox_style",
+  font: "automaton-code",
+  top_padding: 4,
+  bottom_padding: 4,
+  left_padding: 6,
+  right_padding: 6,
+  minimal_width: 400,
+  minimal_height: 200,
+}
+styles.automaton_line_numbers = {
+  type: "textbox_style",
+  parent: "automaton_code",
+  width: 64,
+  minimal_width: 64,
+  font_color: { r: 0.18, g: 0.18, b: 0.18 },
+  disabled_font_color: { r: 0.18, g: 0.18, b: 0.18 },
+}
+styles.automaton_types = {
   type: "textbox_style",
   font: "automaton-code",
   width: 760,

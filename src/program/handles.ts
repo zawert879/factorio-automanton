@@ -246,6 +246,8 @@ export interface ResolvedTarget {
 
 /** Позиция или здание цели: Position, Entity, Robot (в поле зрения), Marker, Zone. */
 export function resolveTarget(value: Val): ResolvedTarget {
+  // Частая ошибка: scan.entities(...)[0] или find(...)[0] ничего не нашли.
+  if (value === undefined) actionError("invalid-target", "the target is undefined (scan or find found nothing?)")
   const position = readPosition(value)
   if (position !== undefined) return { position }
   if (type(value) === "table" && value.__t === "host") {

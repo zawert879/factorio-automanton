@@ -1,6 +1,7 @@
 // Сохраняемое состояние мода. Только простые данные и ссылки на объекты игры: без функций и метатаблиц.
 import type { ActionsState } from "./automaton/actions"
 import type { GuiState } from "./gui/common"
+import type { Draft } from "./gui/programs"
 import type { MovementState } from "./automaton/movement"
 import type { RobotRegistry } from "./automaton/registry"
 import type { HandlesState } from "./program/handles"
@@ -33,5 +34,7 @@ declare global {
     naming?: Record<number, NamingTarget | undefined>
     /** Открытые окна мода: по номеру игрока. */
     gui?: Record<number, GuiState | undefined>
+    /** Неопубликованный текст в редакторе: по номеру игрока. */
+    drafts?: Record<number, Draft | undefined>
   }
 }
