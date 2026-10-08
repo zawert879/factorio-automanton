@@ -75,6 +75,13 @@ export interface ActionHandler {
 
 const handlers: Partial<Record<ActionKind, ActionHandler>> = {}
 
+const finishListeners: Array<(this: void, record: RobotRecord, result: ActionResult) => void> = []
+
+/** Действие закончилось (успешно, с ошибкой или отменено). */
+export function onActionFinished(listener: (this: void, record: RobotRecord, result: ActionResult) => void): void {
+  finishListeners.push(listener)
+}
+
 export function registerActionHandler(kind: ActionKind, handler: ActionHandler): void {
   handlers[kind] = handler
 }
@@ -103,6 +110,7 @@ function finish(record: RobotRecord, action: ActionState, error: ActionError | u
   state.current[record.id] = undefined
   const result: ActionResult = { kind: action.kind, ok: error === undefined, count: action.done, error, reason }
   state.lastResult[record.id] = result
+  for (const listener of finishListeners) listener(record, result)
   if (record.entity.valid) {
     setActivity(record, "idle")
     // Неудача — значок; успех снимает значок, кроме «кончилось топливо» посреди работы.

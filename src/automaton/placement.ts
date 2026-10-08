@@ -2,6 +2,7 @@
 // Срабатывает при любой постройке: руками, строительными роботами, скриптом другого мода.
 // Если машину строят из подобранного предмета, она получает прежние id и имя (тег предмета).
 import { LuaEntity } from "factorio:runtime"
+import { onEvent } from "../events"
 import { ROBOT_TAG, WORKER_MK1, WORKER_MK1_PLACER } from "../names"
 import { registerRobot, RobotTag, tagFromInventory, tagFromStack } from "./registry"
 
@@ -31,9 +32,17 @@ export function replacePlacer(placer: LuaEntity, tag?: RobotTag): void {
 }
 
 export function registerPlacement(): void {
-  const filter = [{ filter: "name" as const, name: WORKER_MK1_PLACER }]
-  script.on_event(defines.events.on_built_entity, (e) => replacePlacer(e.entity, tagFromInventory(e.consumed_items)), filter)
-  script.on_event(defines.events.on_robot_built_entity, (e) => replacePlacer(e.entity, tagFromStack(e.stack)), filter)
-  script.on_event(defines.events.script_raised_built, (e) => replacePlacer(e.entity), filter)
-  script.on_event(defines.events.script_raised_revive, (e) => replacePlacer(e.entity), filter)
+  const isPlacer = (entity: LuaEntity) => entity.valid && entity.name === WORKER_MK1_PLACER
+  onEvent(defines.events.on_built_entity, (e) => {
+    if (isPlacer(e.entity)) replacePlacer(e.entity, tagFromInventory(e.consumed_items))
+  })
+  onEvent(defines.events.on_robot_built_entity, (e) => {
+    if (isPlacer(e.entity)) replacePlacer(e.entity, tagFromStack(e.stack))
+  })
+  onEvent(defines.events.script_raised_built, (e) => {
+    if (isPlacer(e.entity)) replacePlacer(e.entity)
+  })
+  onEvent(defines.events.script_raised_revive, (e) => {
+    if (isPlacer(e.entity)) replacePlacer(e.entity)
+  })
 }

@@ -16,7 +16,7 @@ export const BRK = 2
 
 /** Состояние исполнения текущей машины (машины исполняются по одной). */
 export const Q = {
-  /** Выделено единиц памяти за отрезок. */
+  /** Выделено единиц памяти за отрезок (сбрасывается в начале отрезка). */
   a: 0,
   /** Предел выделений на отрезок. */
   am: math.huge,
@@ -197,6 +197,11 @@ export function defineHostObject(this: void, name: string): Val {
   hostGetters[name] = hostGetters[name] ?? {}
   hostSetters[name] = hostSetters[name] ?? {}
   return o
+}
+
+/** Завершить программу (exit) или начать заново (restart): маркер, который catch не перехватывает. */
+export function controlFlow(this: void, kind: "exit" | "restart"): never {
+  error({ __control: kind } as unknown as string, 0)
 }
 
 /** Объекты игры (не таблицы): чтение, запись, методы, описание. Заполняет игровой слой. */

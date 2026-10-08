@@ -10,7 +10,7 @@
 //   а продвижение сбрасывает счётчик.
 // Шаг в сторону у разных машин в разные стороны, пауза разной длины — так расходятся встречные.
 import { LuaEntity, MapPosition, PlayerIndex } from "factorio:runtime"
-import { onTick } from "../events"
+import { onEvent, onTick } from "../events"
 import { directionOf, setActivity } from "./appearance"
 import { hasEnergy, MOVE_JOULES_PER_TILE, spend } from "./energy"
 import { RobotRecord } from "./registry"
@@ -92,12 +92,20 @@ export function moveRobot(
   showProblem(record, undefined)
 }
 
+const cancelListeners: Array<(this: void, record: RobotRecord) => void> = []
+
+/** Поездку отменили (новый приказ, действие, остановка программы). */
+export function onMoveCancelled(listener: (this: void, record: RobotRecord) => void): void {
+  cancelListeners.push(listener)
+}
+
 /** Отменить поездку без итога (машина займётся другим). */
 export function cancelMove(record: RobotRecord): void {
   const state = storage.movement
   if (state.orders[record.id] === undefined) return
   state.orders[record.id] = undefined
   if (record.entity.valid) stopCommand(record)
+  for (const listener of cancelListeners) listener(record)
 }
 
 export function isMoving(record: RobotRecord): boolean {
@@ -117,6 +125,13 @@ function stopCommand(record: RobotRecord): void {
   record.entity.commandable!.set_command({ type: defines.command.stop, distraction: defines.distraction.none })
 }
 
+const finishListeners: Array<(this: void, record: RobotRecord, result: MoveResult) => void> = []
+
+/** Поездка закончилась (не вызывается при отмене — cancelMove). */
+export function onMoveFinished(listener: (this: void, record: RobotRecord, result: MoveResult) => void): void {
+  finishListeners.push(listener)
+}
+
 function finish(id: number, result: MoveResult): void {
   const state = storage.movement
   const order = state.orders[id]
@@ -124,6 +139,7 @@ function finish(id: number, result: MoveResult): void {
   state.lastResult[id] = result
   const record = storage.robots.byId[id]
   if (record === undefined || !record.entity.valid) return
+  for (const listener of finishListeners) listener(record, result)
   stopCommand(record)
   setActivity(record, "idle")
   showProblem(record, result === "arrived" ? undefined : problemFor(result))
@@ -268,5 +284,5 @@ export function registerMovement(): void {
     if (storage.movement.queue.length > 0) dispatch(tick)
     if (tick % CHECK_EVERY_TICKS === 0) checkOrders(tick)
   })
-  script.on_event(defines.events.on_ai_command_completed, (e) => onCommandCompleted(e.unit_number, e.result, e.tick))
+  onEvent(defines.events.on_ai_command_completed, (e) => onCommandCompleted(e.unit_number, e.result, e.tick))
 }

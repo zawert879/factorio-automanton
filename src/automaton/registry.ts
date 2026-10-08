@@ -1,6 +1,7 @@
 // Реестр машин: id, имя, сущность, груз, топливо и запас энергии.
 // id, имя и запас энергии переживают подбор — хранятся в теге предмета; груз и топливо при подборе
 // переходят игроку, при гибели высыпаются на землю.
+import { onEvent } from "../events"
 import { LuaEntity, LuaInventory, LuaItemStack, LuaRenderObject, LuaSurface, MapPosition, Tags } from "factorio:runtime"
 import { Activity, ROBOT_TAG, WORKER_MK1 } from "../names"
 import { directionOf, drawBody } from "./appearance"
@@ -88,14 +89,16 @@ export function registerRobot(entity: LuaEntity, tag?: RobotTag): RobotRecord {
   registry.byId[id] = record
   registry.idByUnit[entity.unit_number!] = id
   script.register_on_object_destroyed(entity)
+  for (const listener of registeredListeners) listener(record)
   return record
 }
 
-function forgetUnit(unitNumber: number): void {
+function forgetUnit(unitNumber: number, reason: "mined" | "destroyed"): void {
   const registry = storage.robots
   const id = registry.idByUnit[unitNumber]
   if (id === undefined) return
   delete registry.idByUnit[unitNumber]
+  for (const listener of removedListeners) listener(id, reason)
   const record = registry.byId[id]
   if (record !== undefined) {
     if (record.label.valid) record.label.destroy()
@@ -163,7 +166,7 @@ export function tagMinedRobot(entity: LuaEntity, buffer: LuaInventory): void {
     stack.label = record.name
   }
   releaseItems(record, buffer)
-  forgetUnit(entity.unit_number!)
+  forgetUnit(entity.unit_number!, "mined")
 }
 
 /** Машина погибла: груз и топливо — на землю. */
@@ -194,12 +197,33 @@ export function adoptUnregisteredRobots(): void {
 }
 
 export function registerRegistryEvents(): void {
-  const filter = [{ filter: "name" as const, name: WORKER_MK1 }]
-  script.on_event(defines.events.on_player_mined_entity, (e) => tagMinedRobot(e.entity, e.buffer), filter)
-  script.on_event(defines.events.on_robot_mined_entity, (e) => tagMinedRobot(e.entity, e.buffer), filter)
-  script.on_event(defines.events.on_entity_died, (e) => onDied(e.entity), filter)
-  // Любое другое исчезновение (смерть, скрипт другого мода) — по регистрации на уничтожение.
-  script.on_event(defines.events.on_object_destroyed, (e) => {
-    if (e.type === defines.target_type.entity) forgetUnit(e.useful_id)
+  const isWorker = (entity: LuaEntity) => entity.valid && entity.name === WORKER_MK1
+  onEvent(defines.events.on_player_mined_entity, (e) => {
+    if (isWorker(e.entity)) tagMinedRobot(e.entity, e.buffer)
   })
+  onEvent(defines.events.on_robot_mined_entity, (e) => {
+    if (isWorker(e.entity)) tagMinedRobot(e.entity, e.buffer)
+  })
+  onEvent(defines.events.on_entity_died, (e) => {
+    if (isWorker(e.entity)) onDied(e.entity)
+  })
+  // Любое другое исчезновение (смерть, скрипт другого мода) — по регистрации на уничтожение.
+  onEvent(defines.events.on_object_destroyed, (e) => {
+    if (e.type === defines.target_type.entity) forgetUnit(e.useful_id, "destroyed")
+  })
+}
+
+// ---------- Подписки других модулей ----------
+
+const registeredListeners: Array<(this: void, record: RobotRecord) => void> = []
+const removedListeners: Array<(this: void, id: number, reason: "mined" | "destroyed") => void> = []
+
+/** Машину поставили на учёт (в том числе снова — из подобранного предмета с прежним id). */
+export function onRobotRegistered(listener: (this: void, record: RobotRecord) => void): void {
+  registeredListeners.push(listener)
+}
+
+/** Машину сняли с учёта: подобрали (mined) или уничтожили (destroyed). */
+export function onRobotRemoved(listener: (this: void, id: number, reason: "mined" | "destroyed") => void): void {
+  removedListeners.push(listener)
 }

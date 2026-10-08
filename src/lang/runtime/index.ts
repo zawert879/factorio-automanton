@@ -249,8 +249,10 @@ export function runSlice(this: void, program: Program, machine: Machine, quantum
   enter(program)
   program.setBudget(quantum)
   Q.w = undefined
-  Q.am = Q.a + LIMITS.allocations
-  const allocatedBefore = Q.a
+  // Счётчик выделений — свой у каждого отрезка: разность глобального счётчика округлялась бы
+  // по-разному у игроков с разной историей сессии (рассинхронизация, найдена test:desync).
+  Q.a = 0
+  Q.am = LIMITS.allocations
   let line: number | undefined
   const main = program.P[1]
   const [ok, r, f] = xpcall(
@@ -260,6 +262,13 @@ export function runSlice(this: void, program: Program, machine: Machine, quantum
       return e
     },
   )
+  if (!ok && type(r) === "table" && (r as Val).__control !== undefined) {
+    // exit() — программа закончилась; restart() — начнётся заново со следующего отрезка.
+    machine.frame = undefined
+    machine.waiting = undefined
+    machine.status = (r as Val).__control === "restart" ? "ready" : "done"
+    return
+  }
   if (!ok) {
     machine.status = "error"
     machine.error = describeError(r, line)
@@ -275,7 +284,7 @@ export function runSlice(this: void, program: Program, machine: Machine, quantum
     }
     const left = program.budget()
     if (left < 0) machine.debt = -left
-    checkMemory(machine, Q.a - allocatedBefore)
+    checkMemory(machine, Q.a)
     return
   }
   machine.frame = undefined

@@ -2,6 +2,10 @@
 export const WORKER_MK1 = "automaton-worker-mk1"
 export const WORKER_MK1_PLACER = "automaton-worker-mk1-placer"
 export const ROBOT_TAG = "automaton"
+/** Метка — сущность с именем, к которой программы обращаются marker("имя"). */
+export const MARKER = "automaton-marker"
+/** «Программатор» — инструмент выделения зон: zone("имя"). */
+export const PROGRAMMER = "automaton-programmer"
 
 /** Что делает машина — от этого зависит анимация её тела. */
 export type Activity = "idle" | "run" | "mine"

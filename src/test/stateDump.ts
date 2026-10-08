@@ -9,6 +9,23 @@ import { moveRobot } from "../automaton/movement"
 import { replacePlacer } from "../automaton/placement"
 import { findRobot, tagFromInventory, tagMinedRobot } from "../automaton/registry"
 import { WORKER_MK1, WORKER_MK1_PLACER } from "../names"
+import { assignProgram } from "../program/machines"
+import { publishProgram } from "../program/store"
+
+/** Программа держит в кадрах всё сразу: класс, Map, замыкание, try/finally через паузу, случайные числа. */
+const BUSY_PROGRAM = `class Counter { n = 0; inc() { this.n++; return this.n } }
+const c = new Counter()
+const seen = new Map<string, number>()
+let total = 0
+const bump = (x: number) => { total += x }
+while (true) {
+  const r = Math.floor(Math.random() * 100)
+  seen.set("k" + (c.inc() % 5), r)
+  try { bump(r); wait(0.1) } finally { total += 1 }
+  if (c.n % 10 === 0) print(total, [...seen.keys()].join(","))
+}`
+
+const MINER_PROGRAM = `while (true) { mine("iron-ore", 3); wait(0.5) }`
 
 const DUMP_TICK = 600 // как в tools/test/desync.mjs
 
@@ -38,6 +55,19 @@ const steps: Record<number, () => void> = {
     const miner = workers().find((w) => w.position.x > 65)!
     startAction(findRobot(miner)!, "mine", { item: "iron-ore", count: 50 })
   },
+  // Программы (этап 4): исполняются до и после сохранения на тике 300.
+  80: () => {
+    placeAt({ x: 90, y: 40 })
+    nauvis().create_entity({ name: "iron-ore", position: { x: 100.5, y: 60.5 }, amount: 1000 })
+    placeAt({ x: 98.5, y: 60.5 })
+    const busy = publishProgram("занятая", BUSY_PROGRAM)
+    const miner = publishProgram("шахтёр", MINER_PROGRAM)
+    if (!busy.ok || !miner.ok) error("программы сценария не компилируются")
+    for (const worker of workers()) {
+      if (worker.position.x > 85 && worker.position.y < 50) assignProgram(findRobot(worker)!, busy.program)
+      if (worker.position.x > 95 && worker.position.y > 55) assignProgram(findRobot(worker)!, miner.program)
+    }
+  },
   120: () => workers()[0].die(),
   200: () => {
     const target = workers()[0]
@@ -62,8 +92,11 @@ const steps: Record<number, () => void> = {
   450: () => placeAt({ x: 50, y: 50 }),
 }
 
-/** Объекты игры serpent печатает с адресами памяти — заменяем их стабильным описанием. */
-function stable(value: unknown): unknown {
+/**
+ * Объекты игры serpent печатает с адресами памяти — заменяем их стабильным описанием.
+ * Общие таблицы и циклы (класс → окружение методов → класс) печатаются один раз, дальше — «<ссылка>».
+ */
+function stable(value: unknown, seen: LuaSet<object> = new LuaSet()): unknown {
   if (type(value) === "userdata") {
     const object = value as { valid: boolean; object_name: string }
     if (!object.valid) return `<${object.object_name}: недействителен>`
@@ -76,8 +109,10 @@ function stable(value: unknown): unknown {
     return `<${object.object_name}>`
   }
   if (type(value) !== "table") return value
+  if (seen.has(value as object)) return "<ссылка>"
+  seen.add(value as object)
   const copy: Record<string, unknown> = {}
-  for (const [key, item] of Object.entries(value as Record<string, unknown>)) copy[key] = stable(item)
+  for (const [key, item] of Object.entries(value as Record<string, unknown>)) copy[key] = stable(item, seen)
   return copy
 }
 

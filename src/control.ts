@@ -10,20 +10,34 @@ import { registerPlacement } from "./automaton/placement"
 import { adoptUnregisteredRobots, initRegistry, registerRegistryEvents } from "./automaton/registry"
 import { registerDebugCommands } from "./debug/commands"
 import { initDemoStorage, registerDemo } from "./demo"
+import { onEvent } from "./events"
+import { registerActionApi } from "./program/api"
+import { registerProgramCommands } from "./program/commands"
+import { forgetEntityHandle, initHandles } from "./program/handles"
+import { initMachines, registerMachines } from "./program/machines"
+import { initScheduler, registerScheduler } from "./program/scheduler"
+import { initPrograms } from "./program/store"
+import { initMarkers, registerMarkers } from "./world/markers"
+import { registerNaming } from "./world/naming"
+import { initZones, registerZones } from "./world/zones"
 
-script.on_init(() => {
+function initStorage(): void {
   initDemoStorage()
   initRegistry()
   initMovement()
   initActions()
   initMining()
-})
+  initPrograms()
+  initMachines()
+  initScheduler()
+  initHandles()
+  initMarkers()
+  initZones()
+}
+
+script.on_init(() => initStorage())
 script.on_configuration_changed(() => {
-  initDemoStorage()
-  initRegistry()
-  initMovement()
-  initActions()
-  initMining()
+  initStorage()
   adoptUnregisteredRobots()
 })
 
@@ -34,6 +48,17 @@ registerMovement()
 registerAppearance()
 registerActions()
 registerDebugCommands()
+registerMarkers()
+registerZones()
+registerNaming()
+registerMachines()
+registerScheduler()
+registerActionApi()
+registerProgramCommands()
+// Здание исчезло — его обёртка у программ остаётся (valid === false), но из общего списка уходит.
+onEvent(defines.events.on_object_destroyed, (e) => {
+  if (e.type === defines.target_type.entity) forgetEntityHandle(e.useful_id)
+})
 
 // Проверки, которые включаются только служебными модами (их создают скрипты в tools/test/):
 // automaton-test — внутриигровые тесты (npm run test:game),

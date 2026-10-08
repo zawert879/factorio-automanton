@@ -473,6 +473,8 @@ export function luaError(this: void, message: string): Val {
 /** catch (e): значение, брошенное throw, или Error из ошибки Lua. */
 export function caught(this: void, e: Val): Val {
   const t = type(e)
+  // exit() и restart() — не исключения программы: catch их не перехватывает (finally выполняется).
+  if (t === "table" && e.__control !== undefined) error(e, 0)
   if (t === "table") return e.__wrap ? e.__thrown : e
   if (t === "string") return luaError(e)
   return e
