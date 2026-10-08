@@ -119,6 +119,24 @@ publish("погода", "дождь")`)
     })
   })
 
+  test("публикация многим подписчикам стоит отправителю квант: перерасход — долг, машина пропускает тики", (t) => {
+    const speaker = robotNamed("громкоговоритель")
+    const fans: RobotRecord[] = []
+    for (let i = 0; i < 120; i++) fans.push(robotNamed(`слушатель-${i}`))
+    // Подписки — напрямую, без 120 программ.
+    for (const fan of fans) storage.comms.followers[speaker.id] = { ...(storage.comms.followers[speaker.id] ?? {}), [fan.id]: { "": true } }
+    const m = start(speaker, `const t0 = time.tick
+publish("новость", 1)
+for (let i = 0; i < 3; i++) {}
+print(time.tick - t0)`)
+    waitUntil(t, "конца программы", finished(m), 120, () => {
+      // 120 писем при кванте Mk1 50: долг ~70 инструкций — следующий виток только через тики.
+      expect(tonumber(output(m))! >= 2).toBe(true)
+      storage.comms.followers[speaker.id] = undefined
+      cleanup(speaker, ...fans)
+    })
+  })
+
   test("отписка и перезапуск: свои подписки снимаются, подписки на машину остаются", (t) => {
     const source = robotNamed("источник")
     const fan = robotNamed("поклонник")

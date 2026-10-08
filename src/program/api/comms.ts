@@ -1,7 +1,7 @@
 // Связь (9.1, 9.2): send, publish, subscribe, unsubscribe, receive, tryReceive, request, robot, inbox;
 // сообщение — объект message (from, topic, data, sentAt, reply). Доставка, ящики и подписки — src/program/comms.ts.
 import { LuaForce } from "factorio:runtime"
-import { charge, defineHostObject, host, hostBlocking, hostGetters, hostMethods, Val } from "../../lang/runtime/core"
+import { charge, defineHostObject, host, hostBlocking, hostGetters, hostMethods, spend, Val } from "../../lang/runtime/core"
 import { measure } from "../../lang/runtime"
 import { RobotRecord } from "../../automaton/registry"
 import { follow, INBOX_SIZE, Mail, matches, nextMailId, post, setMessageWrapper, takeFromInbox, unfollow } from "../comms"
@@ -102,7 +102,9 @@ host.publish = (topic: Val, data: Val) => {
     if (!topics[""] && !topics[name]) continue
     const record = storage.robots.byId[id]
     if (record === undefined || !record.entity.valid || record.entity.force_index !== force) continue
-    charge(1)
+    // Каждое письмо — инструкция кванта отправителя: рассылка тысяче подписчиков уходит сразу,
+    // а перерасход отправитель отрабатывает долгом (пропускает тики).
+    spend(1)
     post(id, newMail(name, packed, { shared: true }))
   }
 }
