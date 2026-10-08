@@ -12,7 +12,8 @@
     "bench:lang": "node tools/test/run.mjs --build-only && tools/lua/5.2/bin/lua tools/bench/lang.lua build",
     "bench:game": "node tools/bench/game.mjs",
     "prebuild": "node tools/dts/generate.mjs",
-    "dts": "node tools/dts/generate.mjs --check"
+    "dts": "node tools/dts/generate.mjs --check",
+    "test:sync": "node tools/test/sync.mjs"
   },
   "devDependencies": {
     "lua-types": "2.14.1",

@@ -1,5 +1,6 @@
 // Генератор automaton.d.ts (5.5): объявления API из docs/API.md (блоки ```ts с declare / type / interface).
-// Пишет mod/automaton.d.ts (для игроков, VS Code) и src/gui/dts.generated.ts (окно «Типы для VS Code»).
+// Пишет mod/automaton.d.ts (для игроков, VS Code) и src/gui/dts.generated.ts (окно «Типы для VS Code»,
+// папка для VS Code: типы, tsconfig, утилита синхронизации mod/tools/automaton-sync.mjs, задача VS Code).
 // С флагом --check проверяет tsc --strict, что программы-примеры из API.md с этими типами компилируются.
 import { execFileSync } from "node:child_process"
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
@@ -14,18 +15,28 @@ const declarations = blocks.filter((b) => /\bdeclare\b/.test(b) || b.startsWith(
 const examples = blocks.filter((b) => !declarations.includes(b))
 
 const header = `// Типы API автоматонов (мод Automaton для Factorio) — для редактора VS Code.
-// Как писать программы в VS Code:
+// Проще всего: в игре окно «Программы команды» → «Папка для VS Code» — мод запишет готовую папку
+// (программы, этот файл, tsconfig.json, синхронизацию с игрой). Вручную:
 //   1. Создайте папку, положите в неё этот файл и tsconfig.json:
-//      { "compilerOptions": { "strict": true, "target": "es2020", "lib": ["es2020"], "noEmit": true } }
+//      { "compilerOptions": { "strict": true, "target": "es2020", "lib": ["es2020"], "noEmit": true, "moduleDetection": "force" } }
 //   2. Пишите программу в файле .ts рядом — VS Code подскажет функции и найдёт ошибки.
 //   3. Скопируйте текст программы в окно «Программы команды» в игре и нажмите «Опубликовать».
 // Справка по языку и API — docs/API.md и docs/LANGUAGE.md.
 `
+const tsconfig = JSON.stringify(
+  { compilerOptions: { strict: true, target: "es2020", lib: ["es2020"], noEmit: true, moduleDetection: "force", types: [] } },
+  null,
+  2,
+)
+const tool = readFileSync(join(root, "mod", "tools", "automaton-sync.mjs"), "utf8")
 const dts = header + "\n" + declarations.join("\n")
 writeFileSync(join(root, "mod", "automaton.d.ts"), dts)
 writeFileSync(
   join(root, "src", "gui", "dts.generated.ts"),
-  "// Создаётся tools/dts/generate.mjs из docs/API.md — не править руками.\n" + `export const DTS = ${JSON.stringify(dts)}\n`,
+  "// Создаётся tools/dts/generate.mjs из docs/API.md — не править руками.\n" +
+    `export const DTS = ${JSON.stringify(dts)}\n` +
+    `export const TSCONFIG = ${JSON.stringify(tsconfig)}\n` +
+    `export const SYNC_TOOL = ${JSON.stringify(tool)}\n`,
 )
 
 if (process.argv.includes("--check")) {
@@ -33,11 +44,9 @@ if (process.argv.includes("--check")) {
   rmSync(dir, { recursive: true, force: true })
   mkdirSync(dir, { recursive: true })
   writeFileSync(join(dir, "automaton.d.ts"), dts)
-  examples.forEach((source, i) => writeFileSync(join(dir, `example${i + 1}.ts`), source + "\nexport {}\n"))
-  writeFileSync(
-    join(dir, "tsconfig.json"),
-    JSON.stringify({ compilerOptions: { strict: true, target: "es2020", lib: ["es2020"], noEmit: true, types: [] }, include: ["*.ts"] }),
-  )
+  // Каждый пример — отдельный файл; moduleDetection: force делает их модулями (одинаковые имена не мешают).
+  examples.forEach((source, i) => writeFileSync(join(dir, `example${i + 1}.ts`), source))
+  writeFileSync(join(dir, "tsconfig.json"), JSON.stringify({ ...JSON.parse(tsconfig), include: ["*.ts"] }))
   try {
     execFileSync(join(root, "node_modules", ".bin", "tsc"), ["-p", join(dir, "tsconfig.json")], { stdio: "pipe" })
     console.log(`automaton.d.ts: ${examples.length} примеров из API.md проходят tsc --strict`)

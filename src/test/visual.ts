@@ -12,6 +12,7 @@ import { openMachine } from "../gui/machine"
 import { openPrograms, publishFromWindow, showTypes } from "../gui/programs"
 import { assignProgram } from "../program/machines"
 import { publishProgram } from "../program/store"
+import { writeVsCodeFolder } from "../program/sync"
 
 const CENTER = { x: 300, y: 300 }
 
@@ -137,6 +138,10 @@ while (true) {
     if (player !== undefined) showTypes(player)
   }
   if (tick === 225) guiShot("types-window")
+  if (tick === 230) {
+    const player = game.get_player(1 as PlayerIndex)
+    if (player !== undefined) writeVsCodeFolder(player)
+  }
   if (tick === 240) {
     helpers.write_file("automaton-visual/done.txt", "done", false)
     script.on_nth_tick(1, undefined)

@@ -23,6 +23,7 @@ import { Diagnostic } from "../lang/lexer"
 import { ulen } from "../lang/runtime/strings"
 import { assignProgram } from "../program/machines"
 import { deleteProgram, notePublish, programsOf, publish, publishDenied } from "../program/store"
+import { writeVsCodeFolder } from "../program/sync"
 import { guiOf, onGuiChange, onGuiClick, onGuiSelection, titlebar } from "./common"
 import { DTS } from "./dts.generated"
 
@@ -134,6 +135,7 @@ export function openPrograms(player: LuaPlayer, programId?: number, robotId?: nu
   const versions = buttons.add({ type: "drop-down", items: [], tags: { action: "programs-version" } })
   versions.style.width = 200
   button(buttons, ["automaton-gui.types"], "programs-types")
+  button(buttons, ["automaton-gui.vscode-folder"], "programs-vscode")
 
   player.opened = frame
   const window: ProgramsWindow = {
@@ -342,6 +344,16 @@ export function registerProgramsWindow(): void {
   })
   onGuiClick("programs-publish", (player) => publishFromWindow(player))
   onGuiClick("programs-types", (player) => showTypes(player))
+  onGuiClick("programs-vscode", (player) => {
+    const window = windowOf(player)
+    if (window === undefined) return
+    const dir = writeVsCodeFolder(player)
+    window.errors.clear()
+    const label = window.errors.add({ type: "label", caption: ["automaton-gui.vscode-folder-written", dir] })
+    label.style.single_line = false
+    label.style.maximal_width = 900
+    label.style.font_color = { r: 0.5, g: 1, b: 0.5 }
+  })
 }
 
 /** Кнопка «Опубликовать»: права, компиляция, ошибки или новая версия. */

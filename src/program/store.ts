@@ -115,6 +115,8 @@ export function publish(request: PublishRequest): PublishResult {
   const sameName = findProgram(name, force)
   if (program !== undefined && sameName !== undefined && sameName !== program) return failure("program-name-taken", [name])
   if (program === undefined && programsOf(force).length >= MAX_PROGRAMS_PER_FORCE) return failure("too-many-programs", [MAX_PROGRAMS_PER_FORCE])
+  // Тот же текст — не новая версия (машины не перезапускаются): так повторная публикация из VS Code безвредна.
+  if (program !== undefined && program.name === name && program.source === request.source && !program.quarantined) return { ok: true, program }
   // Ошибка в самом компиляторе не должна ронять мод: она становится ошибкой публикации.
   const [ok, result] = pcall(compile, request.source)
   if (!ok) return failure("internal-error", [tostring(result)])
