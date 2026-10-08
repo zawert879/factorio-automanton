@@ -3,6 +3,7 @@
 // 2) общий бюджет инструкций раздаётся готовым машинам по кругу, у каждой — квант своей модели.
 // Ждущие действия машины бюджет не тратят: их будит конец действия или поездки (подписки ниже).
 // Машина, ушедшая в минус по кванту (синхронные колбэки), пропускает тики, пока не отработает долг.
+import { formatLine } from "../lang/modules"
 import { ActionResult, onActionFinished } from "../automaton/actions"
 import { MoveResult, onMoveCancelled, onMoveFinished } from "../automaton/movement"
 import { robotMemory, robotQuantum } from "../automaton/models"
@@ -90,11 +91,13 @@ function reportError(record: MachineRecord, robot: RobotRecord): void {
   const e = record.machine.error
   if (e === undefined) return
   const text = `${e.name}: ${e.message}`
-  appendConsole(record, `Ошибка${e.line !== undefined ? ` (строка ${e.line})` : ""}: ${text}`)
+  const program = record.programId === undefined ? undefined : storage.programs.byId[record.programId]
+  // Строка в модуле — с его именем: «lib/Помощники:12».
+  const line = e.line === undefined ? undefined : formatLine(e.line, program?.modules)
+  appendConsole(record, `Ошибка${line !== undefined ? ` (строка ${line})` : ""}: ${text}`)
   if (!robot.entity.valid) return
   showProblem(robot, problemFor("internal-error"))
-  alertRobot(robot, "error", e.line !== undefined ? `${e.line}: ${text}` : text)
-  const program = record.programId === undefined ? undefined : storage.programs.byId[record.programId]
+  alertRobot(robot, "error", line !== undefined ? `${line}: ${text}` : text)
   if (program !== undefined && e.code !== undefined && LIMIT_CODES[e.code] && noteLimitError(program)) {
     alertRobot(robot, "quarantine", program.name)
   }

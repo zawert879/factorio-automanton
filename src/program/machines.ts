@@ -100,6 +100,12 @@ export function restartMachine(record: MachineRecord): void {
     appendConsole(record, `— ${program.name}: программа в карантине`)
     return
   }
+  if (program.library) {
+    // Библиотека (только объявления): запускать нечего — она для других программ.
+    record.machine = { status: "done" }
+    appendConsole(record, `— ${program.name}: это библиотека — её импортируют другие программы, запустить её нельзя`)
+    return
+  }
   record.version = program.version
   record.machine = newMachine()
   appendConsole(record, `— ${program.name} v${program.version}`)

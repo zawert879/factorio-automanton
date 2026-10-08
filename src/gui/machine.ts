@@ -1,5 +1,6 @@
 // Окно машины (5.1–5.3, 5.7): открывается кликом по машине. Программа и управление (запуск, стоп, пауза,
 // шаг), состояние и текущая строка, ошибка, консоль, груз и топливо, настройки: имя, дом, параметры (args).
+import { formatLine } from "../lang/modules"
 import {
   ButtonGuiElement,
   DropDownGuiElement,
@@ -25,7 +26,7 @@ import { modelOf } from "../names"
 import { robotState } from "../program/handles"
 import { assignProgram, machineOf, restartMachine, stopMachine, wake } from "../program/machines"
 import { stepMachine } from "../program/scheduler"
-import { loadedProgram, programsOf } from "../program/store"
+import { loadedProgram, ProgramRecord, programsOf } from "../program/store"
 import { formatValue } from "../program/api/output"
 import { guiOf, titlebar, onGuiClick, onGuiConfirm, onGuiSelection } from "./common"
 import { closePrograms, openPrograms } from "./programs"
@@ -170,9 +171,14 @@ function argsText(args: unknown): string {
   return ok && json !== undefined ? (json as string) : "{}"
 }
 
+/** Программы, которые можно запустить на машине: без библиотек. */
+function runnablePrograms(force: string): ProgramRecord[] {
+  return programsOf(force).filter((p) => !p.library)
+}
+
 /** Список программ команды в выпадающем списке (первый пункт — «нет»). */
 function fillPrograms(window: MachineWindow, robot: RobotRecord): void {
-  const programs = programsOf(robot.entity.force.name)
+  const programs = runnablePrograms(robot.entity.force.name)
   const current = machineOf(robot.id).programId
   window.program.items = [["automaton-gui.no-program"], ...programs.map((p) => p.name)]
   let index = 1
@@ -214,11 +220,11 @@ export function refreshMachine(window: MachineWindow): void {
   ]
   const loaded = program !== undefined ? loadedProgram(program) : undefined
   const line = loaded !== undefined && typeof loaded !== "string" ? pausedLine(loaded, record.machine) : undefined
-  window.line.caption = line === undefined ? "—" : tostring(line)
+  window.line.caption = line === undefined ? "—" : formatLine(line, program?.modules)
   window.version.caption =
     program === undefined ? "—" : record.version === program.version ? `v${program.version}` : ["automaton-gui.old-version", record.version, program.version]
   const e = record.machine.status === "error" ? record.machine.error : undefined
-  window.error.caption = e === undefined ? "" : `${e.line !== undefined ? `${e.line}: ` : ""}${e.name}: ${e.message}`
+  window.error.caption = e === undefined ? "" : `${e.line !== undefined ? `${formatLine(e.line, program?.modules)}: ` : ""}${e.name}: ${e.message}`
   window.error.visible = e !== undefined
 
   // Консоль — перерисовать, только если изменилась.
@@ -286,7 +292,7 @@ export function registerMachineWindow(): void {
   onGuiSelection("machine-program", (player, element) => {
     const found = windowRobot(player)
     if (found === undefined) return
-    const programs = programsOf(found.robot.entity.force.name)
+    const programs = runnablePrograms(found.robot.entity.force.name)
     const selected = (element as DropDownGuiElement).selected_index
     const program = selected >= 2 ? programs[selected - 2] : undefined
     assignProgram(found.robot, program)

@@ -23,9 +23,11 @@ function robotArg(p: LuaPlayer, arg: string | undefined) {
   return robot
 }
 
-/** Ошибки компиляции одной строкой на ошибку: «строка:столбец код (параметры)». */
-export function describeDiagnostics(diagnostics: { code: string; params: (string | number)[]; line: number; column: number }[]): string[] {
-  return diagnostics.map((d) => `${d.line}:${d.column} ${d.code}${d.params.length > 0 ? ` (${d.params.join(", ")})` : ""}`)
+/** Ошибки компиляции одной строкой на ошибку: «[модуль:]строка:столбец код (параметры)». */
+export function describeDiagnostics(diagnostics: { code: string; params: (string | number)[]; line: number; column: number; module?: string }[]): string[] {
+  return diagnostics.map(
+    (d) => `${d.module !== undefined ? `${d.module}:` : ""}${d.line}:${d.column} ${d.code}${d.params.length > 0 ? ` (${d.params.join(", ")})` : ""}`,
+  )
 }
 
 export function registerProgramCommands(): void {
@@ -38,6 +40,10 @@ export function registerProgramCommands(): void {
     const program = findProgram(nameParts.join(" "))
     if (program === undefined) {
       p.print(["automaton.unknown-program", nameParts.join(" ")])
+      return
+    }
+    if (program.library) {
+      p.print(["automaton.library-not-runnable", program.name])
       return
     }
     assignProgram(robot, program)
@@ -96,7 +102,7 @@ export function registerProgramCommands(): void {
     run: (robotId: number, programName: string) => {
       const robot = storage.robots.byId[robotId]
       const program = findProgram(programName)
-      if (robot === undefined || program === undefined) return false
+      if (robot === undefined || program === undefined || program.library) return false
       assignProgram(robot, program)
       return true
     },

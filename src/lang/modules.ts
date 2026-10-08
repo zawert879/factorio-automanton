@@ -7,7 +7,7 @@
 // Номера строк модуля сдвинуты на номер модуля × LINE_BASE: таблица строк Lua, точки остановки и
 // строки ошибок времени выполнения остаются числами, а по числу видно, в каком модуле строка.
 import * as A from "./ast"
-import { Diagnostic } from "./lexer"
+import { Diagnostic, tokenize } from "./lexer"
 import { parse } from "./parser"
 
 export const LINE_BASE = 1000000
@@ -85,6 +85,44 @@ export function resolveModulePath(from: string, spec: string): { name: string } 
   if (name.endsWith(".ts") || name.endsWith(".js")) name = name.substring(0, name.length - 3)
   if (name === "") return { error: "import-outside" }
   return { name }
+}
+
+/** Путь импорта от модуля from к модулю to: "./x", "../lib/x" (обратное к resolveModulePath). */
+export function relativeModulePath(from: string, to: string): string {
+  const fromDir = from === "" ? [] : from.split("/")
+  fromDir.pop()
+  const target = to.split("/")
+  let common = 0
+  while (common < fromDir.length && common < target.length - 1 && fromDir[common] === target[common]) common++
+  const ups = fromDir.length - common
+  const rest = target.slice(common).join("/")
+  return ups === 0 ? `./${rest}` : `${string.rep("../", ups)}${rest}`
+}
+
+/**
+ * Заменить пути импорта в исходнике (import … from "x", import "x", export … from "x"): rewrite
+ * получает путь и возвращает новый (или undefined — не менять). Остальной текст не трогается.
+ */
+export function rewriteImportPaths(source: string, rewrite: (this: void, spec: string) => string | undefined): string {
+  const { tokens } = tokenize(source)
+  const parts: string[] = []
+  let last = 0
+  for (let i = 1; i < tokens.length; i++) {
+    const token = tokens[i]
+    if (token.kind !== "string") continue
+    const before = tokens[i - 1]
+    const isPath = (before.kind === "identifier" && before.value === "from") || (before.kind === "keyword" && before.value === "import")
+    if (!isPath) continue
+    const replacement = rewrite(token.value)
+    if (replacement === undefined || replacement === token.value) continue
+    const start = token.start.offset!
+    const quote = source.substring(start, start + 1)
+    parts.push(source.substring(last, start), quote + replacement.split(quote).join("\\" + quote) + quote)
+    last = token.end.offset!
+  }
+  if (parts.length === 0) return source
+  parts.push(source.substring(last))
+  return parts.join("")
 }
 
 /** Номер строки → модуль (имя, если не сама программа) и строка в нём. */

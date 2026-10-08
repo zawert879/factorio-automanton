@@ -107,7 +107,7 @@ function indexOf(s: string, search: string, from: number): number {
 }
 
 // Регистр: латиница и кириллица (основной блок и Ѐ–Џ, ѐ–џ).
-function mapCase(s: string, upper: boolean): string {
+export function mapCase(s: string, upper: boolean): string {
   if (isAscii(s)) return upper ? string.upper(s) : string.lower(s)
   const parts: string[] = []
   for (const c of chars(s)) {

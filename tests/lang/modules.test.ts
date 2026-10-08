@@ -1,7 +1,7 @@
 // Модули (этап 17): import / export между программами команды — исполнение, типы, ошибки.
 import { describe, expect, test } from "../../src/test/testing"
 import { compile } from "../../src/lang/codegen"
-import { formatLine, LINE_BASE, resolveModulePath } from "../../src/lang/modules"
+import { formatLine, LINE_BASE, relativeModulePath, resolveModulePath, rewriteImportPaths } from "../../src/lang/modules"
 import { outputOf, run } from "./harness"
 
 function compileWith(source: string, modules: Record<string, string>, name = "main") {
@@ -29,6 +29,23 @@ describe("модули: пути", () => {
     expect(resolveModulePath("Логистика/Перевозчик", "../lib/Помощники")).toEqual({ name: "lib/Помощники" })
     expect(resolveModulePath("a/b/c", "./d/e")).toEqual({ name: "a/b/d/e" })
     expect(resolveModulePath("a/b", "./c.ts")).toEqual({ name: "a/c" })
+  })
+  test("путь от модуля к модулю — обратное к разрешению", () => {
+    const cases: [string, string][] = [
+      ["main", "lib"],
+      ["Логистика/Перевозчик", "lib/Помощники"],
+      ["a/b/c", "a/b/d/e"],
+      ["a/b", "x"],
+      ["x", "a/b/c"],
+    ]
+    for (const [from, to] of cases) expect(resolveModulePath(from, relativeModulePath(from, to))).toEqual({ name: to })
+    expect(relativeModulePath("Логистика/Перевозчик", "lib/Помощники")).toBe("../lib/Помощники")
+    expect(relativeModulePath("a/b", "a/c")).toBe("./c")
+  })
+  test("замена путей импорта в тексте", () => {
+    const source = `// from "./old" в комментарии\nimport { a } from "./old"\nimport './old'\nexport * from "./other"\nconst s = "./old"`
+    const rewritten = rewriteImportPaths(source, (spec) => (spec === "./old" ? "../lib/Новое" : undefined))
+    expect(rewritten).toBe(`// from "./old" в комментарии\nimport { a } from "../lib/Новое"\nimport '../lib/Новое'\nexport * from "./other"\nconst s = "./old"`)
   })
   test("неотносительный путь и выход за корень — ошибка", () => {
     expect(resolveModulePath("main", "lib")).toEqual({ error: "import-not-relative" })

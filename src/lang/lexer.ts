@@ -21,6 +21,8 @@ export type TokenKind =
 export interface Position {
   line: number
   column: number
+  /** Смещение в байтах от начала исходника (у позиций токенов; конец — после токена). */
+  offset?: number
 }
 
 export interface Token {
@@ -161,7 +163,7 @@ export function tokenize(source: string, lineBase = 0): LexResult {
   }
 
   function here(): Position {
-    return { line, column }
+    return { line, column, offset: i }
   }
 
   function report(code: string, params: (string | number)[], position: Position): void {

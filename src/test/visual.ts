@@ -12,7 +12,7 @@ import { guiOf } from "../gui/common"
 import { openMachine } from "../gui/machine"
 import { openPrograms, publishFromWindow, showTypes } from "../gui/programs"
 import { assignProgram } from "../program/machines"
-import { publishProgram } from "../program/store"
+import { publish, publishProgram } from "../program/store"
 import { writeVsCodeFolder } from "../program/sync"
 
 const CENTER = { x: 300, y: 300 }
@@ -174,6 +174,9 @@ for (let x = 10; x < 86; x++) c.pixel(x, 54, x % 2 === 0 ? "green" : "red")`,
   if (tick === 210) {
     const player = game.get_player(1 as PlayerIndex)
     if (player !== undefined) {
+      // Дерево папок (этап 17): библиотека в папке и программа, которая её импортирует.
+      publish({ name: "lib/Счёт", source: `export function twice(x: number): number {\n  return x * 2\n}` })
+      publish({ name: "Добыча/Удвоитель", source: `import { twice } from "../lib/Счёт"\nprint(twice(2))` })
       openPrograms(player, storage.programs.nextId - 1, undefined)
       const window = guiOf(player).programs!
       let lines = ""

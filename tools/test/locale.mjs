@@ -3,7 +3,8 @@
 import { readdirSync, readFileSync } from "node:fs"
 import { join } from "node:path"
 
-function parseCfg(path) {
+/** Ключи файла; повторный ключ в разделе игра не загрузит (Duplicate key) — в duplicates. */
+function parseCfg(path, duplicates = []) {
   const keys = new Set()
   let section = ""
   for (const raw of readFileSync(path, "utf8").split("\n")) {
@@ -15,7 +16,10 @@ function parseCfg(path) {
       continue
     }
     const eq = line.indexOf("=")
-    if (eq > 0) keys.add(`${section}.${line.slice(0, eq)}`)
+    if (eq <= 0) continue
+    const key = `${section}.${line.slice(0, eq)}`
+    if (keys.has(key)) duplicates.push(`${path.split("/locale/")[1]}: ${key}`)
+    keys.add(key)
   }
   return keys
 }
@@ -35,10 +39,12 @@ export function checkLocale(root) {
   const files = readdirSync(join(root, "mod", "locale", "ru")).filter((f) => f.endsWith(".cfg"))
   const ru = new Set()
   const en = new Set()
+  const duplicates = []
   for (const file of files) {
-    for (const k of parseCfg(join(root, "mod", "locale", "ru", file))) ru.add(k)
-    for (const k of parseCfg(join(root, "mod", "locale", "en", file))) en.add(k)
+    for (const k of parseCfg(join(root, "mod", "locale", "ru", file), duplicates)) ru.add(k)
+    for (const k of parseCfg(join(root, "mod", "locale", "en", file), duplicates)) en.add(k)
   }
+  for (const d of duplicates) problems.push(`ключ повторяется (игра не загрузит мод): ${d}`)
   for (const k of ru) if (!en.has(k)) problems.push(`нет в en: ${k}`)
   for (const k of en) if (!ru.has(k)) problems.push(`нет в ru: ${k}`)
 

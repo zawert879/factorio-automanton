@@ -3,9 +3,15 @@
 // с ошибками не публикуется. Компилируют все игроки одинаково (lockstep), готовый Lua от игрока не принимается.
 // Права и лимиты (5.8): кто может публиковать (настройка карты), частота публикаций, число программ команды,
 // карантин программ, которые раз за разом упираются в лимиты.
+//
+// Модули (этап 17, DESIGN.md «Модули»): имя программы — путь с папками; программа собирается вместе
+// с программами команды, которые импортирует. Новая версия модуля пересобирает зависимые программы
+// (не собралась — остаётся прежняя сборка и предупреждение stale). Используемую библиотеку удалить
+// нельзя; переименование правит пути импорта в зависимых.
 import { LuaPlayer } from "factorio:runtime"
-import { compile, MAX_SOURCE_BYTES } from "../lang/codegen"
+import { compile, CompileResult, MAX_SOURCE_BYTES } from "../lang/codegen"
 import { Diagnostic } from "../lang/lexer"
+import { relativeModulePath, resolveModulePath, rewriteImportPaths } from "../lang/modules"
 import { loadProgram, Program } from "../lang/runtime"
 
 export interface ProgramVersion {
@@ -13,6 +19,15 @@ export interface ProgramVersion {
   source: string
   tick: number
   author?: string
+  /** Версия собрана заново из-за новой версии этого модуля (текст программы тот же или с исправленным импортом). */
+  rebuiltFor?: string
+}
+
+/** Новая версия модуля не собралась с программой: машины работают на прежней сборке. */
+export interface StaleBuild {
+  module: string
+  version: number
+  diagnostics: Diagnostic[]
 }
 
 export interface ProgramRecord {
@@ -35,6 +50,13 @@ export interface ProgramRecord {
   limitErrors: number[]
   /** Программа остановлена за постоянные ошибки лимитов; снимается новой публикацией. */
   quarantined?: boolean
+  /** Модули сборки по номеру (0 — сама программа): строки ошибок вида «lib/Помощники:12». */
+  modules: string[]
+  /** Модули, которые программа импортирует (прямо и через другие), — полные имена. */
+  dependencies: string[]
+  /** Библиотека (только объявления и export): машине не назначается. */
+  library: boolean
+  stale?: StaleBuild
 }
 
 export interface ProgramsState {
@@ -45,6 +67,8 @@ export interface ProgramsState {
 }
 
 export const MAX_PROGRAMS_PER_FORCE = 200
+/** Длина полного имени программы (с папками). */
+export const MAX_NAME_LENGTH = 100
 export const HISTORY_VERSIONS = 10
 export const PUBLISH_INTERVAL_TICKS = 60
 /** Карантин: столько ошибок лимитов за окно — программа останавливается. */
@@ -59,7 +83,27 @@ export function initPrograms(): void {
     program.history ??= []
     program.limitErrors ??= []
     program.pauses ??= {}
+    program.modules ??= [program.name]
+    program.dependencies ??= []
+    program.library ??= false
   }
+}
+
+/**
+ * Полное имя программы: папки через «/», пробелы вокруг частей убираются. undefined — имя не годится
+ * (пусто, пустая папка, «.» или «..», обратная косая черта, кавычка, слишком длинное).
+ */
+export function normalizeProgramName(raw: string): string | undefined {
+  const segments = raw.split("/").map((segment) => segment.trim())
+  if (segments.some((segment) => segment === "" || segment === "." || segment === "..")) return undefined
+  const name = segments.join("/")
+  if (name.length > MAX_NAME_LENGTH || name.includes("\\") || name.includes('"')) return undefined
+  return name
+}
+
+/** Программы команды, которые импортируют модуль (прямо или через другие). */
+export function dependentsOf(name: string, force: string): ProgramRecord[] {
+  return programsOf(force).filter((p) => p.name !== name && p.dependencies.includes(name))
 }
 
 export function findProgram(name: string, force = "player"): ProgramRecord | undefined {
@@ -77,7 +121,16 @@ export function programsOf(force: string): ProgramRecord[] {
   return list
 }
 
-export type PublishResult = { ok: true; program: ProgramRecord } | { ok: false; diagnostics: Diagnostic[] }
+export type PublishResult =
+  | {
+      ok: true
+      program: ProgramRecord
+      /** Пересобраны зависимые программы (новые версии). */
+      rebuilt?: string[]
+      /** Зависимые, которые с новой версией не собрались (работает прежняя сборка). */
+      stale?: string[]
+    }
+  | { ok: false; diagnostics: Diagnostic[] }
 
 const publishedListeners: Array<(this: void, program: ProgramRecord) => void> = []
 const removedListeners: Array<(this: void, program: ProgramRecord) => void> = []
@@ -105,11 +158,81 @@ export interface PublishRequest {
   id?: number
 }
 
+/** Скомпилировать программу команды (модули — программы команды; overlay — ещё не сохранённые тексты). */
+function compileFor(name: string, source: string, force: string, overlay?: Map<string, string>): CompileResult {
+  const resolve = (module: string) => {
+    const pending = overlay?.get(module)
+    if (pending !== undefined) return { name: module, source: pending }
+    const found = findProgram(module, force)
+    return found === undefined ? undefined : { name: found.name, source: found.source }
+  }
+  // Ошибка в самом компиляторе не должна ронять мод: она становится ошибкой публикации.
+  const [ok, result] = pcall(compile, source, { name, resolve })
+  if (!ok) return { ok: false, lua: "", lines: [], keys: {}, pauses: {}, diagnostics: [{ code: "internal-error", params: [tostring(result)], line: 1, column: 1 }] }
+  return result as CompileResult
+}
+
+/** Записать новую сборку: новая версия программы, машины с ней перезапускаются. */
+function applyBuild(program: ProgramRecord, compiled: CompileResult, source: string, author: string | undefined, rebuiltFor?: string): void {
+  program.source = source
+  program.version++
+  program.lua = compiled.lua
+  program.lines = compiled.lines
+  program.keys = compiled.keys
+  program.pauses = compiled.pauses
+  program.modules = compiled.modules ?? [program.name]
+  program.dependencies = (compiled.modules ?? []).slice(1)
+  program.library = compiled.library === true
+  program.updatedTick = game.tick
+  program.author = author
+  program.quarantined = undefined
+  program.stale = undefined
+  program.limitErrors = []
+  program.history.push({ version: program.version, source, tick: game.tick, author, rebuiltFor })
+  while (program.history.length > HISTORY_VERSIONS) program.history.shift()
+  for (const listener of publishedListeners) listener(program)
+}
+
+/**
+ * Пересобрать программы, которые зависят от модуля (новая версия или новое имя). При переименовании
+ * пути импорта старого имени в их тексте заменяются на путь к новому.
+ */
+function rebuildDependents(module: ProgramRecord, oldName: string | undefined, author: string | undefined): { rebuilt: string[]; stale: string[] } {
+  const affected = programsOf(module.force).filter(
+    (p) => p !== module && (p.dependencies.includes(module.name) || (oldName !== undefined && p.dependencies.includes(oldName))),
+  )
+  // Сначала все новые тексты (зависимые могут импортировать друг друга), потом сборка.
+  const overlay = new Map<string, string>()
+  if (oldName !== undefined) {
+    for (const p of affected) {
+      const source = rewriteImportPaths(p.source, (spec) => {
+        const target = resolveModulePath(p.name, spec)
+        return "name" in target && target.name === oldName ? relativeModulePath(p.name, module.name) : undefined
+      })
+      if (source !== p.source) overlay.set(p.name, source)
+    }
+  }
+  const rebuilt: string[] = []
+  const stale: string[] = []
+  for (const p of affected) {
+    const source = overlay.get(p.name) ?? p.source
+    const compiled = compileFor(p.name, source, p.force, overlay)
+    if (compiled.ok) {
+      applyBuild(p, compiled, source, author, module.name)
+      rebuilt.push(p.name)
+    } else {
+      p.stale = { module: module.name, version: module.version, diagnostics: compiled.diagnostics }
+      stale.push(p.name)
+    }
+  }
+  return { rebuilt, stale }
+}
+
 /** Опубликовать программу: новую или новую версию существующей (по id или по имени в команде). */
 export function publish(request: PublishRequest): PublishResult {
   const force = request.force ?? "player"
-  const name = request.name.trim()
-  if (name === "" || name.length > 60) return failure("bad-program-name")
+  const name = normalizeProgramName(request.name)
+  if (name === undefined) return failure("bad-program-name", [MAX_NAME_LENGTH])
   if (request.source.length > MAX_SOURCE_BYTES) return failure("program-too-large", [MAX_SOURCE_BYTES])
   let program = request.id !== undefined ? storage.programs.byId[request.id] : findProgram(name, force)
   const sameName = findProgram(name, force)
@@ -117,10 +240,18 @@ export function publish(request: PublishRequest): PublishResult {
   if (program === undefined && programsOf(force).length >= MAX_PROGRAMS_PER_FORCE) return failure("too-many-programs", [MAX_PROGRAMS_PER_FORCE])
   // Тот же текст — не новая версия (машины не перезапускаются): так повторная публикация из VS Code безвредна.
   if (program !== undefined && program.name === name && program.source === request.source && !program.quarantined) return { ok: true, program }
-  // Ошибка в самом компиляторе не должна ронять мод: она становится ошибкой публикации.
-  const [ok, result] = pcall(compile, request.source)
-  if (!ok) return failure("internal-error", [tostring(result)])
-  const compiled = result as ReturnType<typeof compile>
+  const oldName = program !== undefined && program.name !== name ? program.name : undefined
+  let source = request.source
+  if (oldName !== undefined) {
+    // Переезд в другую папку: свои относительные импорты, которые сломались бы, ведут туда же, что и раньше.
+    source = rewriteImportPaths(source, (spec) => {
+      const before = resolveModulePath(oldName, spec)
+      if (!("name" in before) || findProgram(before.name, force) === undefined) return undefined
+      const after = resolveModulePath(name, spec)
+      return "name" in after && findProgram(after.name, force) !== undefined ? undefined : relativeModulePath(name, before.name)
+    })
+  }
+  const compiled = compileFor(name, source, force)
   if (!compiled.ok) return { ok: false, diagnostics: compiled.diagnostics }
   if (program === undefined) {
     const id = storage.programs.nextId++
@@ -137,24 +268,16 @@ export function publish(request: PublishRequest): PublishResult {
       updatedTick: game.tick,
       history: [],
       limitErrors: [],
+      modules: [name],
+      dependencies: [],
+      library: false,
     }
     storage.programs.byId[id] = program
   }
   program.name = name
-  program.source = request.source
-  program.version++
-  program.lua = compiled.lua
-  program.lines = compiled.lines
-  program.keys = compiled.keys
-  program.pauses = compiled.pauses
-  program.updatedTick = game.tick
-  program.author = request.author
-  program.quarantined = undefined
-  program.limitErrors = []
-  program.history.push({ version: program.version, source: request.source, tick: game.tick, author: request.author })
-  while (program.history.length > HISTORY_VERSIONS) program.history.shift()
-  for (const listener of publishedListeners) listener(program)
-  return { ok: true, program }
+  applyBuild(program, compiled, source, request.author)
+  const { rebuilt, stale } = rebuildDependents(program, oldName, request.author)
+  return { ok: true, program, rebuilt, stale }
 }
 
 /** Опубликовать по имени (тесты, remote-интерфейс). */
@@ -162,11 +285,15 @@ export function publishProgram(name: string, source: string, author?: string): P
   return publish({ name, source, author })
 }
 
-export function deleteProgram(id: number): void {
+/** Удалить программу. Библиотеку, которую импортируют, удалить нельзя: usedBy — кто импортирует. */
+export function deleteProgram(id: number): { ok: true } | { ok: false; usedBy: string[] } {
   const program = storage.programs.byId[id]
-  if (program === undefined) return
+  if (program === undefined) return { ok: true }
+  const usedBy = dependentsOf(program.name, program.force).map((p) => p.name)
+  if (usedBy.length > 0) return { ok: false, usedBy }
   storage.programs.byId[id] = undefined
   for (const listener of removedListeners) listener(program)
+  return { ok: true }
 }
 
 /** Может ли игрок публиковать (настройка карты «кто может публиковать», частота). */

@@ -67,9 +67,10 @@ describe("лексер", () => {
 
   test("позиции — строки и столбцы в символах, русский текст не сдвигает", () => {
     const { tokens } = tokenize('const s = "мир"\n  x')
-    expect(tokens[3].start).toEqual({ line: 1, column: 11 })
-    expect(tokens[3].end).toEqual({ line: 1, column: 16 })
-    expect(tokens[4].start).toEqual({ line: 2, column: 3 })
+    // offset — в байтах (кириллица — 2 байта на букву), столбцы — в символах.
+    expect(tokens[3].start).toEqual({ line: 1, column: 11, offset: 10 })
+    expect(tokens[3].end).toEqual({ line: 1, column: 16, offset: 18 })
+    expect(tokens[4].start).toEqual({ line: 2, column: 3, offset: 21 })
   })
 
   test("русские имена допустимы", () => {

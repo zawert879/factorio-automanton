@@ -5,6 +5,10 @@
 // Редактор: поле кода растягивается на весь текст внутри общей прокрутки, слева — номера строк
 // (такое же поле, только для чтения, — строки совпадают), справа — невидимые метки строк, к которым
 // прокручивает клик по ошибке. Черновик у каждого игрока: закрыл окно — текст не пропал.
+//
+// Список — дерево папок (имя программы с «/», этап 17): папки сворачиваются кликом, поиск по имени
+// раскрывает всё найденное. Библиотеки помечены; у программы видно, кто её импортирует и не отстала ли
+// её сборка от новой версии модуля.
 import {
   ButtonGuiElement,
   DropDownGuiElement,
@@ -20,9 +24,9 @@ import {
   TextFieldGuiElement,
 } from "factorio:runtime"
 import { Diagnostic } from "../lang/lexer"
-import { ulen } from "../lang/runtime/strings"
+import { mapCase, ulen } from "../lang/runtime/strings"
 import { assignProgram } from "../program/machines"
-import { deleteProgram, notePublish, programsOf, publish, publishDenied } from "../program/store"
+import { deleteProgram, dependentsOf, findProgram, notePublish, ProgramRecord, programsOf, publish, publishDenied } from "../program/store"
 import { writeVsCodeFolder } from "../program/sync"
 import { guiOf, onGuiChange, onGuiClick, onGuiSelection, titlebar } from "./common"
 import { DTS } from "./dts.generated"
@@ -42,16 +46,24 @@ while (true) {
 }
 `
 
+/** Строка дерева в списке: папка (полный путь) или программа. */
+export type ListEntry = { folder: string } | { id: number }
+
 export interface ProgramsWindow {
   frame: FrameGuiElement
+  search: TextFieldGuiElement
   list: ListBoxGuiElement
-  listIds: number[]
+  entries: ListEntry[]
+  /** Свёрнутые папки (полный путь). */
+  collapsed: Record<string, boolean | undefined>
   name: TextFieldGuiElement
   info: LuaGuiElement
   pane: ScrollPaneGuiElement
   numbers: TextBoxGuiElement
   code: TextBoxGuiElement
   marks: FlowGuiElement
+  /** Под именем: кто импортирует, отставшая сборка. */
+  notes: FlowGuiElement
   lineCount: number
   errorLines: Record<number, boolean>
   errors: FlowGuiElement
@@ -97,9 +109,14 @@ export function openPrograms(player: LuaPlayer, programId?: number, robotId?: nu
   body.style.horizontal_spacing = 12
 
   const left = body.add({ type: "frame", style: "inside_shallow_frame_with_padding", direction: "vertical" })
+  const searchRow = left.add({ type: "flow", direction: "horizontal" })
+  searchRow.style.vertical_align = "center"
+  searchRow.add({ type: "label", caption: ["automaton-gui.search"] })
+  const search = searchRow.add({ type: "textfield", text: "", tags: { action: "programs-search" } })
+  search.style.width = 170
   const list = left.add({ type: "list-box", items: [], tags: { action: "programs-select" } })
-  list.style.width = 220
-  list.style.height = size.height
+  list.style.width = 240
+  list.style.height = size.height - 36
   const leftButtons = left.add({ type: "flow", direction: "horizontal" })
   button(leftButtons, ["automaton-gui.new-program"], "programs-new")
   button(leftButtons, ["automaton-gui.copy-program"], "programs-copy")
@@ -112,6 +129,7 @@ export function openPrograms(player: LuaPlayer, programId?: number, robotId?: nu
   const name = header.add({ type: "textfield", text: "", tags: { action: "programs-name" } })
   name.style.width = 300
   const info = header.add({ type: "label", caption: "" })
+  const notes = right.add({ type: "flow", direction: "vertical" })
 
   const pane = right.add({ type: "scroll-pane", vertical_scroll_policy: "auto-and-reserve-space", horizontal_scroll_policy: "never" })
   pane.style.width = size.width
@@ -140,14 +158,17 @@ export function openPrograms(player: LuaPlayer, programId?: number, robotId?: nu
   player.opened = frame
   const window: ProgramsWindow = {
     frame,
+    search,
     list,
-    listIds: [],
+    entries: [],
+    collapsed: {},
     name,
     info,
     pane,
     numbers,
     code,
     marks,
+    notes,
     lineCount: -1,
     errorLines: {},
     errors,
@@ -156,8 +177,8 @@ export function openPrograms(player: LuaPlayer, programId?: number, robotId?: nu
     robotId,
   }
   guiOf(player).programs = window
-  refreshList(window, player)
   load(window, player, programId)
+  refreshList(window, player)
 }
 
 export function closePrograms(player: LuaPlayer): void {
@@ -172,11 +193,62 @@ function windowOf(player: LuaPlayer): ProgramsWindow | undefined {
   return window !== undefined && window.frame.valid ? window : undefined
 }
 
+const FOLDER_COLOR = "#f3d9a6"
+const LIBRARY_COLOR = "#9fd4ff"
+
+interface FolderNode {
+  folders: Map<string, FolderNode>
+  programs: ProgramRecord[]
+}
+
+/** Строка программы в списке: последняя часть имени, версия, пометки. */
+function programItem(p: ProgramRecord, indent: string): LocalisedString {
+  const short = p.name.split("/").pop()!
+  const warn = p.quarantined || p.stale !== undefined ? "⚠ " : ""
+  if (!p.library) return `${indent}${warn}${short} v${p.version}`
+  return ["", `${indent}${warn}[color=${LIBRARY_COLOR}]${short}[/color] v${p.version} · `, ["automaton-gui.library-badge"]]
+}
+
 function refreshList(window: ProgramsWindow, player: LuaPlayer): void {
-  const programs = programsOf(player.force.name)
-  window.listIds = programs.map((p) => p.id)
-  window.list.items = programs.map((p) => (p.quarantined ? `⚠ ${p.name} v${p.version}` : `${p.name} v${p.version}`))
-  const index = window.programId === undefined ? -1 : window.listIds.indexOf(window.programId)
+  const filter = mapCase(window.search.text.trim(), false)
+  const root: FolderNode = { folders: new Map(), programs: [] }
+  for (const p of programsOf(player.force.name)) {
+    if (filter !== "" && !mapCase(p.name, false).includes(filter)) continue
+    const parts = p.name.split("/")
+    let node = root
+    for (let i = 0; i < parts.length - 1; i++) {
+      let child = node.folders.get(parts[i])
+      if (child === undefined) {
+        child = { folders: new Map(), programs: [] }
+        node.folders.set(parts[i], child)
+      }
+      node = child
+    }
+    node.programs.push(p)
+  }
+  const entries: ListEntry[] = []
+  const items: LocalisedString[] = []
+  // Папки — первыми (как в VS Code), найденное поиском — раскрыто.
+  const walk = (node: FolderNode, path: string, indent: string): void => {
+    const names: string[] = []
+    for (const [name] of node.folders) names.push(name)
+    table.sort(names)
+    for (const name of names) {
+      const full = path === "" ? name : `${path}/${name}`
+      const open = filter !== "" || !window.collapsed[full]
+      entries.push({ folder: full })
+      items.push(`${indent}${open ? "▾" : "▸"} [color=${FOLDER_COLOR}]${name}[/color]`)
+      if (open) walk(node.folders.get(name)!, full, `${indent}    `)
+    }
+    for (const p of node.programs) {
+      entries.push({ id: p.id })
+      items.push(programItem(p, indent))
+    }
+  }
+  walk(root, "", "")
+  window.entries = entries
+  window.list.items = items
+  const index = window.programId === undefined ? -1 : entries.findIndex((e) => "id" in e && e.id === window.programId)
   window.list.selected_index = index >= 0 ? index + 1 : 0
 }
 
@@ -214,42 +286,71 @@ function load(window: ProgramsWindow, player: LuaPlayer, programId: number | und
   window.programId = program?.id
   window.name.text = name ?? (fromDraft ? draft!.name : (program?.name ?? ""))
   window.code.text = source ?? (fromDraft ? draft!.source : (program?.source ?? TEMPLATE))
-  window.info.caption =
+  const info: LocalisedString =
     program === undefined
       ? ["automaton-gui.draft"]
       : fromDraft && draft!.source !== program.source
         ? ["automaton-gui.program-info-draft", program.version, program.author ?? "—"]
         : ["automaton-gui.program-info", program.version, program.author ?? "—"]
+  window.info.caption = program?.library ? ["", info, " · ", ["automaton-gui.library-badge"]] : info
   window.errorLines = {}
   window.errors.clear()
+  window.notes.clear()
   if (program?.quarantined) window.errors.add({ type: "label", caption: ["automaton-gui.quarantined"] }).style.font_color = { r: 1, g: 0.6, b: 0.2 }
-  window.versions.items = program === undefined ? [] : program.history.map((v) => `v${v.version} — ${v.author ?? "—"}`)
+  if (program !== undefined) showNotes(window, program)
+  window.versions.items =
+    program === undefined
+      ? []
+      : program.history.map((v): LocalisedString => (v.rebuiltFor === undefined ? `v${v.version} — ${v.author ?? "—"}` : ["automaton-gui.version-rebuilt", v.version, v.rebuiltFor]))
   window.versions.selected_index = program === undefined ? 0 : program.history.length
   const robot = window.robotId === undefined ? undefined : storage.robots.byId[window.robotId]
-  window.assign.visible = robot !== undefined && program !== undefined
+  window.assign.visible = robot !== undefined && program !== undefined && !program.library
   window.assign.caption = ["automaton-gui.assign", robot?.name ?? ""]
   layoutLines(window, true)
   window.pane.scroll_to_top()
 }
 
-/** Ошибка компиляции понятным текстом: «строка:столбец текст». */
+/** Кто импортирует программу; сборка, отставшая от новой версии модуля. */
+function showNotes(window: ProgramsWindow, program: ProgramRecord): void {
+  const users = dependentsOf(program.name, program.force).map((p) => p.name)
+  if (users.length > 0) {
+    const label = window.notes.add({ type: "label", caption: ["automaton-gui.used-by", users.join(", ")] })
+    label.style.single_line = false
+    label.style.maximal_width = 900
+  }
+  const stale = program.stale
+  if (stale !== undefined) {
+    const first = stale.diagnostics[0]
+    const label = window.notes.add({
+      type: "label",
+      caption: ["automaton-gui.stale", stale.module, stale.version, first === undefined ? "" : diagnosticText(first)],
+      tags: first === undefined ? {} : { action: "programs-goto", line: first.line, module: first.module ?? "" },
+    })
+    label.style.single_line = false
+    label.style.maximal_width = 900
+    label.style.font_color = { r: 1, g: 0.75, b: 0.3 }
+  }
+}
+
+/** Ошибка компиляции понятным текстом: «[модуль:]строка:столбец текст». */
 export function diagnosticText(d: Diagnostic): LocalisedString {
   const params: LocalisedString[] = d.params.map((p, i) => (d.code === "unsupported" && i === 0 ? [`automaton-feature.${p}`] : tostring(p)))
-  return ["", `${d.line}:${d.column}  `, [`automaton-diagnostic.${d.code}`, ...params]]
+  return ["", `${d.module !== undefined ? `${d.module}:` : ""}${d.line}:${d.column}  `, [`automaton-diagnostic.${d.code}`, ...params]]
 }
 
 function showErrors(window: ProgramsWindow, diagnostics: Diagnostic[]): void {
   window.errors.clear()
   window.errorLines = {}
   for (const d of diagnostics.slice(0, MAX_ERRORS)) {
-    if (d.line > 0) window.errorLines[d.line] = true
-    const line = window.errors.add({ type: "label", caption: diagnosticText(d), tags: { action: "programs-goto", line: d.line } })
+    // Ошибка в другом модуле: клик откроет его.
+    if (d.line > 0 && d.module === undefined) window.errorLines[d.line] = true
+    const line = window.errors.add({ type: "label", caption: diagnosticText(d), tags: { action: "programs-goto", line: d.line, module: d.module ?? "" } })
     line.style.font_color = { r: 1, g: 0.45, b: 0.4 }
     line.tooltip = ["automaton-gui.goto-line"]
   }
   if (diagnostics.length > MAX_ERRORS) window.errors.add({ type: "label", caption: ["automaton-gui.more-errors", diagnostics.length - MAX_ERRORS] })
   layoutLines(window, true)
-  if (diagnostics[0] !== undefined && diagnostics[0].line > 0) goToLine(window, diagnostics[0].line)
+  if (diagnostics[0] !== undefined && diagnostics[0].line > 0 && diagnostics[0].module === undefined) goToLine(window, diagnostics[0].line)
 }
 
 /** Выделить строку кода и прокрутить к ней. */
@@ -297,14 +398,34 @@ export function registerProgramsWindow(): void {
   })
   onGuiClick("programs-goto", (player, element) => {
     const window = windowOf(player)
-    const line = (element.tags as { line?: number }).line
-    if (window !== undefined && line !== undefined) goToLine(window, line)
+    const { line, module } = element.tags as { line?: number; module?: string }
+    if (window === undefined || line === undefined) return
+    if (module !== undefined && module !== "") {
+      // Строка в модуле — открыть его (если он есть в программах команды).
+      const target = findProgram(module, player.force.name)
+      if (target === undefined) return
+      load(window, player, target.id)
+      refreshList(window, player)
+    }
+    goToLine(window, line)
+  })
+  onGuiChange("programs-search", (player) => {
+    const window = windowOf(player)
+    if (window !== undefined) refreshList(window, player)
   })
   onGuiSelection("programs-select", (player, element) => {
     const window = windowOf(player)
     const selected = (element as ListBoxGuiElement).selected_index
     if (window === undefined || selected === 0) return
-    load(window, player, window.listIds[selected - 1])
+    const entry = window.entries[selected - 1]
+    if (entry === undefined) return
+    if ("folder" in entry) {
+      // Папка: свернуть или развернуть, выбранной остаётся программа.
+      window.collapsed[entry.folder] = window.collapsed[entry.folder] ? undefined : true
+      refreshList(window, player)
+      return
+    }
+    load(window, player, entry.id)
   })
   onGuiSelection("programs-version", (player, element) => {
     const window = windowOf(player)
@@ -337,7 +458,16 @@ export function registerProgramsWindow(): void {
   onGuiClick("programs-delete", (player) => {
     const window = windowOf(player)
     if (window === undefined || window.programId === undefined) return
-    deleteProgram(window.programId)
+    const program = storage.programs.byId[window.programId]
+    const deleted = deleteProgram(window.programId)
+    if (!deleted.ok) {
+      window.errors.clear()
+      const label = window.errors.add({ type: "label", caption: ["automaton-gui.library-in-use", program?.name ?? "", deleted.usedBy.join(", ")] })
+      label.style.single_line = false
+      label.style.maximal_width = 900
+      label.style.font_color = { r: 1, g: 0.45, b: 0.4 }
+      return
+    }
     drafts()[player.index] = undefined
     load(window, player, undefined)
     refreshList(window, player)
@@ -375,6 +505,18 @@ export function publishFromWindow(player: LuaPlayer): void {
   load(window, player, result.program.id)
   refreshList(window, player)
   window.errors.add({ type: "label", caption: ["automaton-gui.published", result.program.version] }).style.font_color = { r: 0.5, g: 1, b: 0.5 }
+  if ((result.rebuilt ?? []).length > 0) {
+    const label = window.errors.add({ type: "label", caption: ["automaton-gui.rebuilt", result.rebuilt!.join(", ")] })
+    label.style.font_color = { r: 0.5, g: 1, b: 0.5 }
+    label.style.single_line = false
+    label.style.maximal_width = 900
+  }
+  if ((result.stale ?? []).length > 0) {
+    const label = window.errors.add({ type: "label", caption: ["automaton-gui.stale-list", result.stale!.join(", ")] })
+    label.style.font_color = { r: 1, g: 0.75, b: 0.3 }
+    label.style.single_line = false
+    label.style.maximal_width = 900
+  }
 }
 
 function registerAssign(): void {
