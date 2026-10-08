@@ -2,7 +2,7 @@
 // Устройство: {__t = "Map" | "Set", __keys, __vals, __live — массивы слотов, __idx — ключ → слот,
 // __len — занято слотов, __size — живых}. Ключи undefined и NaN — в отдельных полях __nil и __nan.
 // Удалённые слоты — дыры; при большом числе дыр массивы уплотняются.
-import { charge, classes, err, Fn, newArray, program, Q, Val, Y } from "./core"
+import { charge, classes, err, Fn, newArray, program, spend, Val, Y } from "./core"
 import { append, isArray } from "./arrays"
 import { chars } from "./strings"
 
@@ -101,8 +101,8 @@ function listOf(d: Val, what: "keys" | "values" | "entries"): Val {
 function forEachSync(d: Val, fn: Val, isSet: boolean): void {
   const prog = program()
   const entries = listOf(d, "entries")
+  spend(entries.__n)
   for (let i = 1; i <= entries.__n; i++) {
-    Q.n = Q.n - 1
     const [key, value] = [entries[i][1], entries[i][2]]
     prog.calls(fn, undefined, isSet ? key : value, key, d)
   }
@@ -128,8 +128,7 @@ function forEachResumable(d: Val, k: Val, fn: Val, isSet: boolean): LuaMultiRetu
     child = undefined
     if (r === Y) return $multi(Y, { [2]: f, i, e: entries })
     i++
-    Q.n = Q.n - 1
-    if (Q.n <= 0 && i <= entries.__n) return $multi(Y, { i, e: entries })
+    if (spend(1) <= 0 && i <= entries.__n) return $multi(Y, { i, e: entries })
   }
   return $multi(undefined)
 }

@@ -12,8 +12,17 @@
 //   изнутри возвращают коды 1 / 2 и обрабатываются снаружи.
 import * as A from "./ast"
 import { analyze, Analysis, ClassInfo, FnInfo, Resolution, VarInfo } from "./analyze"
-import { BLOCKING_HOST_METHODS, Builtin, CALLABLE_LIBRARY_OBJECTS, HIGHER_ORDER_METHODS, LIBRARY_CONSTANTS, LIBRARY_METHODS } from "./builtins"
+import {
+  ARRAY_METHODS,
+  BLOCKING_HOST_METHODS,
+  Builtin,
+  CALLABLE_LIBRARY_OBJECTS,
+  HIGHER_ORDER_METHODS,
+  LIBRARY_CONSTANTS,
+  LIBRARY_METHODS,
+} from "./builtins"
 import { Diagnostic } from "./lexer"
+import { inferNumeric, Kind } from "./numeric"
 import { parse } from "./parser"
 import { EPILOGUE, PROLOGUE } from "./prologue"
 
@@ -22,11 +31,28 @@ export interface CompileResult {
   lua: string
   /** lines[i] — строка исходника для строки i + 1 сгенерированного Lua (0 — служебная). */
   lines: number[]
+  /** Строка Lua → имя читаемого свойства (для текста ошибки «Cannot read properties of undefined»). */
+  keys: Record<number, string>
   diagnostics: Diagnostic[]
 }
 
 /** В Lua 5.2 не больше 200 локальных переменных на функцию; запас — служебным. */
 const MAX_LOCALS = 190
+
+/** Сколько прототипов получают локальные имена F<n> в чанке (прямой вызов без P[n]); пролог — около 50 локальных. */
+const MAX_PROTOTYPE_LOCALS = 120
+
+/** Функции Math, которые для числовых аргументов совпадают с math Lua: вызываются напрямую. */
+const DIRECT_MATH: Record<string, number> = {
+  abs: 1, floor: 1, ceil: 1, sqrt: 1, sin: 1, cos: 1, tan: 1, asin: 1, acos: 1, atan: 1, exp: 1, log: 1, atan2: 2,
+}
+
+/**
+ * Имена функций библиотеки string Lua: s.rep на строке вернул бы функцию Lua, поэтому такие свойства
+ * читаются только через рантайм. Остальные имена у строки дают nil, и поле можно читать напрямую
+ * (объекты игры в программы попадают только обёртками-таблицами, не userdata).
+ */
+const LUA_STRING_METHODS = new Set(["byte", "char", "dump", "find", "format", "gmatch", "gsub", "len", "lower", "match", "rep", "reverse", "sub", "upper"])
 
 const LUA_KEYWORDS = new Set([
   "and", "break", "do", "else", "elseif", "end", "false", "for", "function", "goto", "if", "in", "local", "nil", "not",
@@ -38,6 +64,8 @@ interface Line {
   ts: number
   /** Строка кадра паузы: после text вставляется список сохраняемых переменных, затем save. */
   save?: string
+  /** Строка читает это свойство без проверки объекта на undefined. */
+  key?: string
 }
 
 /** Скомпилированное выражение. */
@@ -86,12 +114,12 @@ export const MAX_SOURCE_BYTES = 100000
 
 export function compile(source: string): CompileResult {
   if (source.length > MAX_SOURCE_BYTES) {
-    return { ok: false, lua: "", lines: [], diagnostics: [{ code: "program-too-large", params: [MAX_SOURCE_BYTES], line: 1, column: 1 }] }
+    return { ok: false, lua: "", lines: [], keys: {}, diagnostics: [{ code: "program-too-large", params: [MAX_SOURCE_BYTES], line: 1, column: 1 }] }
   }
   const parsed = parse(source)
-  if (parsed.diagnostics.length > 0) return { ok: false, lua: "", lines: [], diagnostics: parsed.diagnostics }
+  if (parsed.diagnostics.length > 0) return { ok: false, lua: "", lines: [], keys: {}, diagnostics: parsed.diagnostics }
   const analysis = analyze(parsed.program)
-  if (analysis.diagnostics.length > 0) return { ok: false, lua: "", lines: [], diagnostics: analysis.diagnostics }
+  if (analysis.diagnostics.length > 0) return { ok: false, lua: "", lines: [], keys: {}, diagnostics: analysis.diagnostics }
   const result = generate(parsed.program, analysis)
   if (!result.ok) return result
   // Пределы Lua (регистры, длина переходов) проверяет сам load: такую программу не публикуем.
@@ -99,7 +127,7 @@ export function compile(source: string): CompileResult {
   if (chunk === undefined) {
     const [luaLine] = string.match(message ?? "", "^prog:(%d+):")
     const line = luaLine !== undefined ? result.lines[tonumber(luaLine)! - 1] ?? 1 : 1
-    return { ok: false, lua: "", lines: [], diagnostics: [{ code: "program-too-complex", params: [], line, column: 1 }] }
+    return { ok: false, lua: "", lines: [], keys: {}, diagnostics: [{ code: "program-too-complex", params: [], line, column: 1 }] }
   }
   return result
 }
@@ -183,6 +211,7 @@ export function generate(program: A.Program, analysis: Analysis): CompileResult 
   const targetById = new Map<number, Target>()
   /** Метка «результат — undefined» текущей цепочки ?. (если компилируется её часть). */
   let chainNil: string | undefined
+  const numeric = inferNumeric(program, analysis)
 
   function report(code: string, params: (string | number)[], at: A.Loc): void {
     diagnostics.push({ code, params, line: at.line, column: at.column })
@@ -190,8 +219,8 @@ export function generate(program: A.Program, analysis: Analysis): CompileResult 
 
   // ---------- Вывод ----------
 
-  function emit(text: string, save?: string): void {
-    cur.lines.push({ text, ts: tsLine, save })
+  function emit(text: string, save?: string, key?: string): void {
+    cur.lines.push({ text, ts: tsLine, save, key })
   }
 
   function newLabel(): string {
@@ -273,15 +302,15 @@ export function generate(program: A.Program, analysis: Analysis): CompileResult 
   /** Строка «если cond — пауза в точке pc с кадром ребёнка child». */
   function emitPause(pc: number, child: string, cond: string): void {
     if (cur.root !== undefined) emit(`if ${cond} then return Y, {${pc}, ${child}} end`)
-    else emit(`if ${cond} then Q.d = Q.d - 1 return Y, {${pc}, ${child}`, `} end`)
+    else emit(`if ${cond} then QD = QD - 1 return Y, {${pc}, ${child}`, `} end`)
   }
 
   /** Квант инструкций: виток цикла. */
   function budget(): void {
     if (!owner().resumable) return
     const pause = registerPause()
-    emit(`Q.n = Q.n - 1`)
-    emitPause(pause.pc, "nil", "Q.n <= 0")
+    emit(`QN = QN - 1`)
+    emitPause(pause.pc, "nil", "QN <= 0")
     emit(`::${pause.label}::`)
   }
 
@@ -307,7 +336,7 @@ export function generate(program: A.Program, analysis: Analysis): CompileResult 
       cur.hasReturn = true
       return `return 1, ${value}`
     }
-    return owner().resumable ? `Q.d = Q.d - 1 return ${value}` : `return ${value}`
+    return owner().resumable ? `QD = QD - 1 return ${value}` : `return ${value}`
   }
 
   // ---------- Имена ----------
@@ -317,7 +346,44 @@ export function generate(program: A.Program, analysis: Analysis): CompileResult 
   }
 
   function varV(v: VarInfo): V {
-    return { code: v.cell ? `${v.lua}[1]` : v.lua, stable: !v.assigned }
+    return { code: v.cell ? `${v.lua}[1]` : v.lua, stable: !v.assigned, num: numeric.vars.has(v) }
+  }
+
+  /** Значение в простом имени (локальная или временная) — его можно упоминать несколько раз. */
+  function simple(v: V): V {
+    return isSimpleName(v.code) ? v : materialize(v)
+  }
+
+  /**
+   * Быстрый путь чтения: прямое обращение к таблице, медленный путь рантайма — если получили nil.
+   * undefined вместо объекта проверяется отдельно — ради понятного текста ошибки.
+   */
+  function fastRead(object: V, direct: (o: string) => string, slow: (o: string) => string, key?: string): V {
+    const o = simple(object).code
+    const t = temp()
+    if (key !== undefined) {
+      // Объект undefined — ошибка Lua «attempt to index»; текст с именем свойства восстановит рантайм по строке.
+      emit(`${t} = ${direct(o)} if ${t} == nil then ${t} = ${slow(o)} end`, undefined, key)
+    } else {
+      emit(`if ${o} == nil then ${slow(o)} end ${t} = ${direct(o)} if ${t} == nil then ${t} = ${slow(o)} end`)
+    }
+    return { code: t, stable: true }
+  }
+
+  /** Известный вид значения выражения (переменная, всегда хранящая массив / объект / экземпляр класса). */
+  function knownKind(e: A.Expr): Kind | undefined {
+    if (e.kind !== "Identifier") return undefined
+    const r = analysis.resolutions.get(e)
+    return r !== undefined && "var" in r ? numeric.kinds.get(r.var) : undefined
+  }
+
+  /** У экземпляров класса есть геттер или метод с этим именем (тогда поле читается через рантайм). */
+  function classHasMember(cls: ClassInfo | undefined, name: string): boolean {
+    while (cls !== undefined) {
+      if (cls.getters.has(name) || cls.methods.has(name)) return true
+      cls = cls.superInfo
+    }
+    return false
   }
 
   function storeVar(v: VarInfo, value: V): void {
@@ -572,12 +638,22 @@ export function generate(program: A.Program, analysis: Analysis): CompileResult 
         if (l.str || r.str) {
           return { code: `CHK(${l.str ? l.code : `S(${l.code})`} .. ${r.str ? r.code : `S(${r.code})`})`, str: true, call: true }
         }
-        return { code: `ADD(${l.code}, ${r.code})`, call: true }
+        {
+          // Проверка типов на месте: без вызова функции, если оба — числа.
+          const a = simple(l).code
+          const b = simple(r).code
+          return { code: `(type(${a}) == "number" and type(${b}) == "number" and ${a} + ${b} or ADD(${a}, ${b}))` }
+        }
       case "-":
       case "*":
       case "/":
         return { code: `(${l.code} ${operator} ${r.code})`, num: true }
       case "%":
+        if (l.num && r.stable && tonumber(r.code) !== undefined && tonumber(r.code)! > 0) {
+          // Остаток как в JS (знак делимого): для неотрицательного делимого совпадает с % Lua.
+          const a = simple(l).code
+          return { code: `(${a} >= 0 and ${a} % ${r.code} or FMOD(${a}, ${r.code}))`, num: true }
+        }
         return { code: `FMOD(${l.code}, ${r.code})`, num: true, call: true }
       case "**":
         return { code: `(${l.code} ^ ${r.code})`, num: true }
@@ -697,16 +773,29 @@ export function generate(program: A.Program, analysis: Analysis): CompileResult 
       }
     }
     const o = chainObject(object, optional)
-    if (property === "length") return { code: `LEN(${o.code})`, num: true, call: true }
+    const kind = optional ? undefined : knownKind(object)
+    if (property === "length") {
+      if (kind === "array") return { code: `${o.code}.__n`, num: true }
+      return fastRead(o, (x) => `${x}.__n`, (x) => `LENX(${x})`, "length")
+    }
     if (object.kind === "This" && rawThis(object) && !analysis.memberFunctionNames.has(property)) {
       return { code: `${o.code}${field(property)}` }
     }
-    return { code: `GET(${o.code}, ${luaString(property)})`, call: true }
+    if (kind === "object" || (kind !== undefined && kind !== "array" && !classHasMember(kind, property))) {
+      return { code: `${o.code}${field(property)}` }
+    }
+    if (LUA_STRING_METHODS.has(property)) return { code: `GET(${o.code}, ${luaString(property)})`, call: true }
+    return fastRead(o, (x) => `${x}${field(property)}`, (x) => `GETX(${x}, ${luaString(property)})`, property)
   }
 
   function index(object: A.Expr, indexExpr: A.Expr, optional: boolean, at: A.Loc): V {
     tsLine = at.line
     const [o, i] = ordered([() => chainObject(object, optional), () => withoutChain(() => expr(indexExpr))])
+    if (i.num) {
+      if (!optional && knownKind(object) === "array") return { code: `${o.code}[${i.code} + 1]` }
+      const index = simple(i).code
+      return fastRead(o, (x) => `${x}[${index} + 1]`, (x) => `IDXX(${x}, ${index})`)
+    }
     return { code: `IDX(${o.code}, ${i.code})`, call: true }
   }
 
@@ -753,7 +842,8 @@ export function generate(program: A.Program, analysis: Analysis): CompileResult 
         const pause = resumable && fn.resumable
         const env = fn.captures.length > 0 ? `${varV(r.var).code}.__e` : "nil"
         const parts = callParts([], e.args, pause)
-        return emitCall(pause, (k) => `P[${fn.index}](${env}, nil, ${k}${parts.args})`)
+        const v = emitCall(pause, (k) => `${prototype(fn)}(${env}, nil, ${k}${parts.args})`)
+        return { ...v, num: numeric.fns.has(fn) }
       }
     }
     if (callee.kind === "Member" && !e.optional) {
@@ -777,6 +867,26 @@ export function generate(program: A.Program, analysis: Analysis): CompileResult 
         }
       }
       const pause = resumable && methodMayPause(name, e.args)
+      const kind = callee.optional ? undefined : knownKind(callee.object)
+      if (kind === "array" && ARRAY_METHODS.has(name)) {
+        // Известный массив: метод рантайма напрямую, без разбора вида значения.
+        const parts = callParts([() => expr(callee.object)], e.args, pause)
+        const o = parts.prefix[0].code
+        return emitCall(pause, (k) => (pause ? `AMR.${name}(${o}, ${k}${parts.args})` : `AM.${name}(${o}, nil${parts.args})`))
+      }
+      if (kind !== undefined && kind !== "array" && kind !== "object") {
+        const m = findMethod(kind, name)
+        if (m !== undefined && !analysis.assignedProperties.has(name)) {
+          // Экземпляр именно этого класса: метод известен при компиляции.
+          const direct = resumable && m.resumable
+          const parts = callParts([() => expr(callee.object)], e.args, direct)
+          const o = simple(parts.prefix[0]).code
+          const method = temp()
+          emit(`${method} = ${o}.__cls.__m${field(name)}`)
+          const v = emitCall(direct, (k) => `${prototype(m)}(${method}.__e, ${o}, ${k}${parts.args})`)
+          return { ...v, num: numeric.fns.has(m) }
+        }
+      }
       const parts = callParts([() => chainObject(callee.object, callee.optional)], e.args, pause)
       const o = parts.prefix[0].code
       return emitCall(pause, (k) =>
@@ -822,7 +932,7 @@ export function generate(program: A.Program, analysis: Analysis): CompileResult 
       }
       case "library-function": {
         const parts = callParts([], e.args, false)
-        return { code: `LIB.${b.name}(${parts.args.substring(2)})`, call: true }
+        return { code: `LIB.${b.name}(${parts.args.substring(2)})`, call: true, num: b.name === "parseInt" || b.name === "parseFloat" }
       }
       case "library-class": {
         const parts = callParts([], e.args, false)
@@ -844,8 +954,25 @@ export function generate(program: A.Program, analysis: Analysis): CompileResult 
       report("unknown-library-method", [`${object}.${name}`], e)
       return { code: "nil", stable: true }
     }
+    if (object === "Math" && DIRECT_MATH[name] === e.args.length && e.args.every((a) => a.kind !== "Spread")) {
+      const values = ordered(e.args.map((a) => () => withoutChain(() => expr(a as A.Expr))))
+      if (values.every((v) => v.num)) {
+        return { code: `MATH.${name}(${values.map((v) => v.code).join(", ")})`, call: true, num: true }
+      }
+      return { code: `LIB.Math.${name}(${values.map((v) => v.code).join(", ")})`, call: true, num: true }
+    }
+    if (object === "Math" && name === "round" && e.args.length === 1 && e.args[0].kind !== "Spread") {
+      const v = withoutChain(() => expr(e.args[0] as A.Expr))
+      if (v.num) return { code: `MATH.floor(${v.code} + 0.5)`, call: true, num: true }
+      return { code: `LIB.Math.round(${v.code})`, call: true, num: true }
+    }
     const parts = callParts([], e.args, false)
     return { code: `LIB.${object}.${name}(${parts.args.substring(2)})`, call: true, num: object === "Math" }
+  }
+
+  /** Имя прототипа для прямого вызова: локальная F<n> чанка или P[n]. */
+  function prototype(fn: FnInfo): string {
+    return prototypeLocals.has(fn) ? `F${fn.index}` : `P[${fn.index}]`
   }
 
   function findMethod(cls: ClassInfo | undefined, name: string): FnInfo | undefined {
@@ -1335,7 +1462,7 @@ export function generate(program: A.Program, analysis: Analysis): CompileResult 
     const sync = temp()
     const point = body.pauses.length > 0 ? registerPause() : undefined
     if (point !== undefined) emit(`::${point.label}::`)
-    emit(`${depth} = Q.d ${sync} = Q.s`)
+    emit(`${depth} = QD ${sync} = QS`)
     emit(`${ok}, ${kind}, ${value} = PCALL(function(k)`)
     if (point !== undefined) {
       emit(`  local kc`)
@@ -1345,13 +1472,13 @@ export function generate(program: A.Program, analysis: Analysis): CompileResult 
       for (const l of dispatchLines(body.pauses, 1, "    ")) emit(l)
       emit(`  end`)
     }
-    for (const line of body.lines) cur.lines.push({ text: "  " + line.text, ts: line.ts, save: line.save })
+    for (const line of body.lines) cur.lines.push({ text: "  " + line.text, ts: line.ts, save: line.save, key: line.key })
     emit(`end, ${point !== undefined ? "kc" : "nil"})`)
     if (point !== undefined) {
       emit(`kc = nil`)
       emitPause(point.pc, value, `${ok} and ${kind} == Y`)
     }
-    emit(`if not ${ok} then Q.d = ${depth} Q.s = ${sync} end`)
+    emit(`if not ${ok} then QD = ${depth} QS = ${sync} end`)
     return { ok, kind, value }
   }
 
@@ -1559,7 +1686,7 @@ export function generate(program: A.Program, analysis: Analysis): CompileResult 
         emit(`do ${returnCode(v.code)} end`)
       }
     }
-    if (lf.resumable) emit(`Q.d = Q.d - 1`)
+    if (lf.resumable) emit(`QD = QD - 1`)
     assemble(lf, signature)
   }
 
@@ -1578,11 +1705,12 @@ export function generate(program: A.Program, analysis: Analysis): CompileResult 
     }
     const saved = ["e", ...(fn.thisVar !== undefined ? [thisName] : []), ...signature.params, ...locals]
     const savedList = saved.join(", ")
-    out.push({ text: `P[${fn.index}] = function(${luaParams.join(", ")})`, ts: line })
+    const name = prototypeLocals.has(fn) ? `F${fn.index}` : `P[${fn.index}]`
+    out.push({ text: `${name} = function(${luaParams.join(", ")})`, ts: line })
     for (const group of chunks(lf.resumable ? [...locals, "kc"] : locals, 40)) out.push({ text: `  local ${group.join(", ")}`, ts: line })
     if (lf.resumable) {
       const entry = `E${fn.index}`
-      out.push({ text: `  Q.d = Q.d + 1`, ts: line })
+      out.push({ text: `  QD = QD + 1`, ts: line })
       out.push({ text: `  if k then`, ts: line })
       let slot = 3
       for (const group of chunks(saved, 16)) {
@@ -1592,26 +1720,32 @@ export function generate(program: A.Program, analysis: Analysis): CompileResult 
       out.push({ text: `    local pc = k[1]`, ts: line })
       for (const l of dispatchLines([entry, ...lf.pauses], 0, "    ")) out.push({ text: l, ts: line })
       out.push({ text: `  end`, ts: line })
-      out.push({ text: `  if Q.d > MAXD then DEPTH() end`, ts: line })
-      out.push({ text: `  Q.n = Q.n - 1 if Q.n <= 0 then Q.d = Q.d - 1 return Y, {0, nil, ${savedList}} end`, ts: line })
+      out.push({ text: `  if QD > MAXD then DEPTH() end`, ts: line })
+      out.push({ text: `  QN = QN - 1 if QN <= 0 then QD = QD - 1 return Y, {0, nil, ${savedList}} end`, ts: line })
       out.push({ text: `  ::${entry}::`, ts: line })
     }
     for (const l of lf.lines) {
-      out.push({ text: "  " + l.text + (l.save !== undefined ? `, ${savedList}${l.save}` : ""), ts: l.ts })
+      out.push({ text: "  " + l.text + (l.save !== undefined ? `, ${savedList}${l.save}` : ""), ts: l.ts, key: l.key })
     }
     out.push({ text: "end", ts: line })
+    if (prototypeLocals.has(fn)) out.push({ text: `P[${fn.index}] = ${name}`, ts: line })
   }
 
   // ---------- Программа ----------
 
+  const generated = analysis.functions.filter((fn) => fn.kind !== "class" && (fn.kind !== "constructor" || needsConstructor(fn.cls!)))
+  const prototypeLocals = new Set(generated.slice(0, MAX_PROTOTYPE_LOCALS))
+
   for (const text of PROLOGUE.split("\n")) out.push({ text, ts: 0 })
-  for (const fn of analysis.functions) {
-    if (fn.kind === "class") continue
-    if (fn.kind === "constructor" && !needsConstructor(fn.cls!)) continue
-    compileFunction(fn)
-  }
+  for (const group of chunks([...prototypeLocals].map((fn) => `F${fn.index}`), 40)) out.push({ text: `local ${group.join(", ")}`, ts: 0 })
+  for (const fn of generated) compileFunction(fn)
+  // Возобновляемые прототипы: синхронный вызов коротких идёт напрямую (CALLS в прологе).
+  const resumableIndexes = analysis.functions.filter((fn) => fn.resumable && fn.kind !== "class").map((fn) => `[${fn.index}] = true`)
+  for (const group of chunks(resumableIndexes, 20)) out.push({ text: `for k, v in next, {${group.join(", ")}} do RES[k] = v end`, ts: 0 })
   for (const text of EPILOGUE.split("\n")) out.push({ text, ts: 0 })
 
-  if (diagnostics.length > 0) return { ok: false, lua: "", lines: [], diagnostics }
-  return { ok: true, lua: out.map((l) => l.text).join("\n"), lines: out.map((l) => l.ts), diagnostics }
+  if (diagnostics.length > 0) return { ok: false, lua: "", lines: [], keys: {}, diagnostics }
+  const keys: Record<number, string> = {}
+  for (let i = 0; i < out.length; i++) if (out[i].key !== undefined) keys[i + 1] = out[i].key!
+  return { ok: true, lua: out.map((l) => l.text).join("\n"), lines: out.map((l) => l.ts), keys, diagnostics }
 }

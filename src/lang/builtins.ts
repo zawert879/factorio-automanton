@@ -99,6 +99,13 @@ for (const name of VALUES) BUILTINS.set(name, { name, kind: "value" })
  */
 export const HIGHER_ORDER_METHODS = new Set(["forEach", "map", "filter", "find", "findIndex", "some", "every", "reduce", "flatMap"])
 
+/** Методы массивов рантайма (src/lang/runtime/arrays.ts): у известных массивов вызываются напрямую. */
+export const ARRAY_METHODS = new Set([
+  "push", "pop", "shift", "unshift", "slice", "splice", "concat", "join", "toString", "reverse", "indexOf", "lastIndexOf",
+  "includes", "fill", "at", "flat", "sort", "forEach", "map", "filter", "find", "findIndex", "findLast", "findLastIndex",
+  "some", "every", "reduce", "reduceRight", "flatMap",
+])
+
 /** Методы объектов стандартной библиотеки (проверяются при компиляции). */
 export const LIBRARY_METHODS: Record<string, string[]> = {
   Math: [

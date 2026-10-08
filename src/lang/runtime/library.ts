@@ -1,6 +1,6 @@
 // Стандартная библиотека: Math, Object, Array, JSON, Number, String, parseInt и др.
 // Вызывается из кода программ напрямую: LIB.Math.floor(x) (имена проверены при компиляции).
-import { charge, err, LIMITS, newArray, program, Q, Val } from "./core"
+import { charge, err, LIMITS, newArray, program, spend, Val } from "./core"
 import { append, isArray } from "./arrays"
 import { iter, newDict } from "./collections"
 import { encodeCodePoint, ulen } from "./strings"
@@ -199,8 +199,8 @@ const ArrayLib = {
       items = iter(source)
     }
     const prog = program()
+    if (mapFn !== undefined) spend(items.__n)
     for (let i = 1; i <= items.__n; i++) {
-      Q.n = Q.n - (mapFn !== undefined ? 1 : 0)
       append(result, mapFn !== undefined ? prog.calls(mapFn, undefined, items[i], i - 1) : items[i])
     }
     return result
@@ -241,7 +241,7 @@ function stringify(value: Val, indent: string, current: string, seen: LuaTable<V
   if (value.__f !== undefined || value.__hf !== undefined || value.__k !== undefined) return inArray ? "null" : undefined
   if (seen.get(value)) err("json-cycle")
   seen.set(value, true)
-  Q.n = Q.n - 1
+  spend(1)
   const inner = current + indent
   const separator = indent === "" ? "," : ",\n" + inner
   const open = indent === "" ? "" : "\n" + inner
@@ -395,7 +395,7 @@ const JsonLib = {
   },
   parse: (text: Val) => {
     const s = toStringValue(text)
-    Q.n = Q.n - math.floor(s.length / 256)
+    spend(math.floor(s.length / 256))
     return parseJson(s)
   },
 }

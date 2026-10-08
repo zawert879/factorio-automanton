@@ -37,14 +37,14 @@ class Smelting extends Job {
   }
 
   run(): void {
-    moveTo(this.mineAt);
+    move(this.mineAt);
     mine(this.ore, 50);
 
     this.furnaces
       .filter(lowOn(this.ore, 10))
       .sort((a, b) => me.distance(a) - me.distance(b))
       .forEach(f => {
-        moveTo(f);
+        move(f);
         put(f, this.ore, 20);
       });
   }
@@ -60,7 +60,7 @@ class Refuel extends Job {
   }
 
   run(): void {
-    moveTo(this.depot);
+    move(this.depot);
     take(this.depot, "coal", 10);
     me.refuel();
   }

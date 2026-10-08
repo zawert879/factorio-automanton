@@ -450,7 +450,11 @@ export function luaError(this: void, message: string): Val {
   const [arithmetic] = string.match(text, "attempt to perform arithmetic on .*%(a (%a+) value%)")
   const [called] = string.match(text, "attempt to call .*%(a (%a+) value%)")
   const [left, right] = string.match(text, "attempt to compare (%a+) with (%a+)")
-  if (indexed !== undefined) text = `Cannot read properties of ${luaTypeName(indexed as string)}`
+  if (indexed !== undefined) {
+    // Чтение поля без проверки (быстрый путь): имя свойства — по строке программы.
+    const key = line !== undefined ? (program() as Val).keys?.[tonumber(line)!] : undefined
+    text = `Cannot read properties of ${luaTypeName(indexed as string)}` + (key !== undefined ? ` (reading '${key}')` : "")
+  }
   else if (arithmetic !== undefined) text = `Cannot use ${luaTypeName(arithmetic as string)} in arithmetic`
   else if (called !== undefined) text = `${luaTypeName(called as string)} is not a function`
   else if (left !== undefined) text = `Cannot compare ${luaTypeName(left as string)} with ${luaTypeName(right as string)}`

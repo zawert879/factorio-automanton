@@ -10,23 +10,39 @@ export const PROLOGUE = `local R = ...
 local Y, Q, ERR, type = R.Y, R.Q, R.err, R.type
 local GETX, SETX, IDXX, SETIDXX, LENX, ADDX, SX, METHOD, CALLX = R.getx, R.setx, R.idxx, R.setidxx, R.lenx, R.addx, R.sx, R.method, R.callx
 local MAXS, MAXD = R.limits.string, R.limits.depth
+local GETX, IDXX, LENX = R.getx, R.idxx, R.lenx
 local PCALL, ERROR, FMOD, UNPACK, CAUGHT = R.pcall, R.error, R.fmod, R.unpack, R.caught
-local H, HO, LIB = R.host, R.hostObjects, R.lib
+local H, HO, LIB, MATH = R.host, R.hostObjects, R.lib, R.math
 local P = {}
+-- Квант, глубина вызовов, вложенность синхронных вызовов: upvalue быстрее полей таблицы.
+local QN, QD, QS, HARD = 0, 0, 0, Q.hard
+-- Номера возобновляемых прототипов (заполняет конец программы).
+local RES = {}
+local AM, AMR = R.arrayMethods, R.arrayMethodsResumable
+local next = R.next
 local function CALL(c, k, this, ...)
   local f = type(c) == "table" and c.__f
   if f then return P[f](c.__e, this, k, ...) end
   return CALLX(c, k, this, ...)
 end
 local function CALLS(c, this, ...)
-  Q.s = Q.s + 1
-  if Q.s > MAXD then ERR("stack-overflow") end
+  local f = type(c) == "table" and c.__f
+  if f and not RES[f] then
+    -- Короткая функция не приостанавливается: вызов напрямую.
+    QS = QS + 1
+    if QS > MAXD then ERR("stack-overflow") end
+    local r = P[f](c.__e, this, nil, ...)
+    QS = QS - 1
+    return r
+  end
+  QS = QS + 1
+  if QS > MAXD then ERR("stack-overflow") end
   local r, f = CALL(c, nil, this, ...)
   while r == Y do
-    if Q.n < Q.hard then ERR("callback-too-long") end
+    if QN < HARD then ERR("callback-too-long") end
     r, f = CALL(c, f, this)
   end
-  Q.s = Q.s - 1
+  QS = QS - 1
   return r
 end
 local function CALLM(o, name, k, ...)
@@ -76,14 +92,14 @@ local function NEW(cls, k, ...)
   return o
 end
 local function NEWS(cls, ...)
-  Q.s = Q.s + 1
-  if Q.s > MAXD then ERR("stack-overflow") end
+  QS = QS + 1
+  if QS > MAXD then ERR("stack-overflow") end
   local r, f = NEW(cls, nil, ...)
   while r == Y do
-    if Q.n < Q.hard then ERR("callback-too-long") end
+    if QN < HARD then ERR("callback-too-long") end
     r, f = NEW(cls, f)
   end
-  Q.s = Q.s - 1
+  QS = QS - 1
   return r
 end
 local function SUPERCTOR(cls, this, k, ...)
@@ -150,9 +166,15 @@ local function T(x)
   return x ~= nil and x ~= false and x ~= 0 and x ~= "" and x == x
 end
 local function DEPTH()
-  Q.d = Q.d - 1
+  QD = QD - 1
   ERR("stack-overflow")
 end`
 
 /** Конец чанка: прототипы и функции вызова — рантайму (методы высшего порядка, геттеры, колбэки игры). */
-export const EPILOGUE = `return {P = P, call = CALL, calls = CALLS, callm = CALLM, callms = CALLMS, new = NEW}`
+export const EPILOGUE = `return {
+  P = P, call = CALL, calls = CALLS, callm = CALLM, callms = CALLMS, new = NEW,
+  setBudget = function(n) QN, QD, QS = n, 0, 0 end,
+  budget = function() return QN end,
+  charge = function(n) QN = QN - n return QN end,
+  sync = function() return QS end,
+}`

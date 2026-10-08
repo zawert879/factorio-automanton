@@ -24,6 +24,8 @@ const tstl = spawnSync(join(root, "node_modules", ".bin", "tstl"), ["-p", join("
   stdio: "inherit",
 })
 if (tstl.status !== 0) process.exit(tstl.status ?? 1)
+// npm run bench:lang: только сборка (бенчмарк запускается отдельно).
+if (filter === "--build-only") process.exit(0)
 
 /**
  * tests/lang/examples.generated.ts: программы из блоков ```ts в docs/API.md и docs/language-samples/3-typescript.md

@@ -38,7 +38,8 @@ registerDebugCommands()
 // Проверки, которые включаются только служебными модами (их создают скрипты в tools/test/):
 // automaton-test — внутриигровые тесты (npm run test:game),
 // automaton-desync-test — снимок состояния для проверки сохранения/загрузки (npm run test:desync),
-// automaton-visual — сцена для снимков экрана (npm run shot).
+// automaton-visual — сцена для снимков экрана (npm run shot),
+// automaton-bench — бенчмарк языка в Lua Factorio (npm run bench:game).
 // Имя модуля — через переменную: TSTL не ищет его заранее, а в zip мода папки test/ нет (package.ignore).
 const testModule =
   script.active_mods["automaton-test"] !== undefined
@@ -47,7 +48,9 @@ const testModule =
       ? "test.stateDump"
       : script.active_mods["automaton-visual"] !== undefined
         ? "test.visual"
-        : undefined
+        : script.active_mods["automaton-bench"] !== undefined
+          ? "test.benchGame"
+          : undefined
 if (testModule !== undefined) {
   require(testModule)
 }

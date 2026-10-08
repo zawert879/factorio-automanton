@@ -103,6 +103,8 @@ export interface Analysis {
   memberFunctionNames: Set<string>
   /** Инструкция FunctionDecl / ClassDecl → объявленная переменная. */
   declOf: Map<A.Stmt, VarInfo>
+  /** Имена свойств, которым где-то присваивают (obj.имя = …): метод с таким именем может быть подменён. */
+  assignedProperties: Set<string>
   diagnostics: Diagnostic[]
 }
 
@@ -143,6 +145,7 @@ export function analyze(program: A.Program): Analysis {
   const fnOf = new Map<A.FunctionNode, FnInfo>()
   const classOf = new Map<A.ClassNode, ClassInfo>()
   const declOf = new Map<A.Stmt, VarInfo>()
+  const assignedProperties = new Set<string>()
   /** Функции-значения свойств объектов и присваиваний obj.имя = функция. */
   const propertyFns: { name: string; fn: FnInfo }[] = []
   let nextVarId = 1
@@ -449,6 +452,8 @@ export function analyze(program: A.Program): Analysis {
       }
       if (target.rest !== undefined) walkAssignTarget(target.rest, scope)
     } else {
+      if (target.kind === "Member") assignedProperties.add(target.property)
+      if (target.kind === "Index" && target.index.kind === "String") assignedProperties.add(target.index.value)
       walkExpr(target as A.Expr, scope)
     }
   }
@@ -744,7 +749,7 @@ export function analyze(program: A.Program): Analysis {
   const resumableMethodNames = classify(functions, classes, propertyFns)
   for (const fn of functions) for (const v of fn.vars) v.cell = v.captured && (v.assigned || v.unsafeCapture)
   main.resumable = true
-  return { main, functions, classes, resolutions, fnOf, classOf, resumableMethodNames, memberFunctionNames, declOf, diagnostics }
+  return { main, functions, classes, resolutions, fnOf, classOf, resumableMethodNames, memberFunctionNames, declOf, assignedProperties, diagnostics }
 }
 
 /** Возобновляемость: исходные признаки, затем распространение по вызовам до неподвижной точки. */

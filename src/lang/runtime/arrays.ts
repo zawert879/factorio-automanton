@@ -2,7 +2,7 @@
 // Сигнатура метода: (массив, k, ...аргументы); k — кадр продолжения (только у возобновляемых версий).
 // Методы высшего порядка есть в двух версиях: синхронной (колбэк вызывается до конца, без пауз) и
 // возобновляемой (колбэк может приостановить программу — метод сохраняет позицию в своём кадре).
-import { charge, err, Fn, isCallable, LIMITS, newArray, program, Q, Val, Y } from "./core"
+import { charge, err, Fn, isCallable, LIMITS, newArray, program, spend, Val, Y } from "./core"
 import { toStringValue, truthy } from "./values"
 
 export function isArray(this: void, x: Val): boolean {
@@ -82,7 +82,7 @@ function mergeSort(items: Val, n: number, before: (this: void, a: Val, b: Val) =
     for (let j = 1; j <= n; j++) items[j] = buffer[j]
     width *= 2
   }
-  Q.n = Q.n - math.floor(n / 8)
+  spend(math.floor(n / 8))
 }
 
 export const arrayMethods: Record<string, Fn> = {
@@ -114,7 +114,7 @@ export const arrayMethods: Record<string, Fn> = {
     for (let i = 1; i < n; i++) arr[i] = arr[i + 1]
     arr[n] = undefined
     arr.__n = n - 1
-    Q.n = Q.n - math.floor(n / 64)
+    spend(math.floor(n / 64))
     return value
   },
   unshift(arr: Val, _k: Val, ...items: Val[]): number {
@@ -244,92 +244,100 @@ export const arrayMethods: Record<string, Fn> = {
     }
     return arr
   },
-  // Синхронные версии методов высшего порядка.
+  // Синхронные версии методов высшего порядка (горячие циклы: без вызова функции на элемент, кроме колбэка).
   forEach(arr: Val, _k: Val, fn: Val): void {
-    const prog = program()
+    const calls = program().calls
     callback(fn, "forEach")
-    for (let i = 1; i <= arr.__n; i++) {
-      Q.n = Q.n - 1
-      prog.calls(fn, undefined, arr[i], i - 1, arr)
-    }
+    const n = arr.__n
+    spend(n)
+    for (let i = 1; i <= n; i++) calls(fn, undefined, arr[i], i - 1, arr)
   },
   map(arr: Val, _k: Val, fn: Val): Val {
-    const prog = program()
+    const calls = program().calls
     callback(fn, "map")
+    const n = arr.__n
+    spend(n)
     const result = newArray()
-    for (let i = 1; i <= arr.__n; i++) {
-      Q.n = Q.n - 1
-      append(result, prog.calls(fn, undefined, arr[i], i - 1, arr))
-    }
+    for (let i = 1; i <= n; i++) result[i] = calls(fn, undefined, arr[i], i - 1, arr)
+    result.__n = n
+    charge(n / 8)
     return result
   },
   filter(arr: Val, _k: Val, fn: Val): Val {
-    const prog = program()
+    const calls = program().calls
     callback(fn, "filter")
+    const n = arr.__n
+    spend(n)
     const result = newArray()
-    for (let i = 1; i <= arr.__n; i++) {
-      Q.n = Q.n - 1
+    let count = 0
+    for (let i = 1; i <= n; i++) {
       const item = arr[i]
-      if (truthy(prog.calls(fn, undefined, item, i - 1, arr))) append(result, item)
+      const r = calls(fn, undefined, item, i - 1, arr)
+      if (r !== undefined && r !== false && r !== 0 && r !== "" && r === r) {
+        count++
+        result[count] = item
+      }
     }
+    result.__n = count
+    charge(count / 8)
     return result
   },
   find(arr: Val, _k: Val, fn: Val): Val {
-    const prog = program()
+    const calls = program().calls
     callback(fn, "find")
+    spend(arr.__n)
     for (let i = 1; i <= arr.__n; i++) {
-      Q.n = Q.n - 1
-      if (truthy(prog.calls(fn, undefined, arr[i], i - 1, arr))) return arr[i]
+      const r = calls(fn, undefined, arr[i], i - 1, arr)
+      if (r !== undefined && r !== false && r !== 0 && r !== "" && r === r) return arr[i]
     }
     return undefined
   },
   findIndex(arr: Val, _k: Val, fn: Val): number {
-    const prog = program()
+    const calls = program().calls
     callback(fn, "findIndex")
+    spend(arr.__n)
     for (let i = 1; i <= arr.__n; i++) {
-      Q.n = Q.n - 1
-      if (truthy(prog.calls(fn, undefined, arr[i], i - 1, arr))) return i - 1
+      const r = calls(fn, undefined, arr[i], i - 1, arr)
+      if (r !== undefined && r !== false && r !== 0 && r !== "" && r === r) return i - 1
     }
     return -1
   },
   findLast(arr: Val, _k: Val, fn: Val): Val {
-    const prog = program()
+    const calls = program().calls
     callback(fn, "findLast")
-    for (let i = arr.__n; i >= 1; i--) {
-      Q.n = Q.n - 1
-      if (truthy(prog.calls(fn, undefined, arr[i], i - 1, arr))) return arr[i]
-    }
+    spend(arr.__n)
+    for (let i = arr.__n; i >= 1; i--) if (truthy(calls(fn, undefined, arr[i], i - 1, arr))) return arr[i]
     return undefined
   },
   findLastIndex(arr: Val, _k: Val, fn: Val): number {
-    const prog = program()
+    const calls = program().calls
     callback(fn, "findLastIndex")
-    for (let i = arr.__n; i >= 1; i--) {
-      Q.n = Q.n - 1
-      if (truthy(prog.calls(fn, undefined, arr[i], i - 1, arr))) return i - 1
-    }
+    spend(arr.__n)
+    for (let i = arr.__n; i >= 1; i--) if (truthy(calls(fn, undefined, arr[i], i - 1, arr))) return i - 1
     return -1
   },
   some(arr: Val, _k: Val, fn: Val): boolean {
-    const prog = program()
+    const calls = program().calls
     callback(fn, "some")
+    spend(arr.__n)
     for (let i = 1; i <= arr.__n; i++) {
-      Q.n = Q.n - 1
-      if (truthy(prog.calls(fn, undefined, arr[i], i - 1, arr))) return true
+      const r = calls(fn, undefined, arr[i], i - 1, arr)
+      if (r !== undefined && r !== false && r !== 0 && r !== "" && r === r) return true
     }
     return false
   },
   every(arr: Val, _k: Val, fn: Val): boolean {
-    const prog = program()
+    const calls = program().calls
     callback(fn, "every")
+    spend(arr.__n)
     for (let i = 1; i <= arr.__n; i++) {
-      Q.n = Q.n - 1
-      if (!truthy(prog.calls(fn, undefined, arr[i], i - 1, arr))) return false
+      const r = calls(fn, undefined, arr[i], i - 1, arr)
+      if (r === undefined || r === false || r === 0 || r === "" || r !== r) return false
     }
     return true
   },
   reduce(arr: Val, _k: Val, fn: Val, ...initial: Val[]): Val {
-    const prog = program()
+    const calls = program().calls
     callback(fn, "reduce")
     let i = 1
     let acc: Val
@@ -340,14 +348,13 @@ export const arrayMethods: Record<string, Fn> = {
       acc = arr[1]
       i = 2
     }
-    for (; i <= arr.__n; i++) {
-      Q.n = Q.n - 1
-      acc = prog.calls(fn, undefined, acc, arr[i], i - 1, arr)
-    }
+    const n = arr.__n
+    spend(n)
+    for (; i <= n; i++) acc = calls(fn, undefined, acc, arr[i], i - 1, arr)
     return acc
   },
   reduceRight(arr: Val, _k: Val, fn: Val, ...initial: Val[]): Val {
-    const prog = program()
+    const calls = program().calls
     callback(fn, "reduceRight")
     let i = arr.__n
     let acc: Val
@@ -358,18 +365,16 @@ export const arrayMethods: Record<string, Fn> = {
       acc = arr[i]
       i--
     }
-    for (; i >= 1; i--) {
-      Q.n = Q.n - 1
-      acc = prog.calls(fn, undefined, acc, arr[i], i - 1, arr)
-    }
+    spend(arr.__n)
+    for (; i >= 1; i--) acc = calls(fn, undefined, acc, arr[i], i - 1, arr)
     return acc
   },
   flatMap(arr: Val, _k: Val, fn: Val): Val {
     const prog = program()
     callback(fn, "flatMap")
+    spend(arr.__n)
     const result = newArray()
     for (let i = 1; i <= arr.__n; i++) {
-      Q.n = Q.n - 1
       const r = prog.calls(fn, undefined, arr[i], i - 1, arr)
       if (isArray(r)) for (let j = 1; j <= r.__n; j++) append(result, r[j])
       else append(result, r)
@@ -412,8 +417,7 @@ function walk(
     if (r === Y) return $multi(Y, { [2]: f, i, s })
     i++
     if (visit(s, r, i - 1)) break
-    Q.n = Q.n - 1
-    if (Q.n <= 0 && i <= arr.__n) return $multi(Y, { i, s })
+    if (spend(1) <= 0 && i <= arr.__n) return $multi(Y, { i, s })
   }
   return $multi(finish(s))
 }
@@ -555,8 +559,7 @@ export const arrayMethodsResumable: Record<string, Fn> = {
       if (r === Y) return $multi(Y, { [2]: f, i, acc })
       acc = r
       i++
-      Q.n = Q.n - 1
-      if (Q.n <= 0 && i <= arr.__n) return $multi(Y, { i, acc })
+      if (spend(1) <= 0 && i <= arr.__n) return $multi(Y, { i, acc })
     }
     return $multi(acc)
   },

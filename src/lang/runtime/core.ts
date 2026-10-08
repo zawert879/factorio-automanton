@@ -16,12 +16,6 @@ export const BRK = 2
 
 /** Состояние исполнения текущей машины (машины исполняются по одной). */
 export const Q = {
-  /** Остаток кванта инструкций. */
-  n: 0,
-  /** Глубина вызовов возобновляемых функций. */
-  d: 0,
-  /** Вложенность синхронных вызовов (колбэки из коротких функций и рантайма). */
-  s: 0,
   /** Выделено единиц памяти за отрезок. */
   a: 0,
   /** Предел выделений на отрезок. */
@@ -53,6 +47,11 @@ export type ResumableFn = (this: void, ...args: any[]) => LuaMultiReturn<[Val, V
 
 export interface ProgramExports {
   P: Val
+  /** Счётчики кванта, глубины и синхронных вызовов — upvalue пролога (быстрее полей таблицы). */
+  setBudget: (this: void, quantum: number) => void
+  budget: (this: void) => number
+  charge: (this: void, n: number) => number
+  sync: (this: void) => number
   /** CALL(значение-функция, k, this, ...аргументы). */
   call: ResumableFn
   /** CALLS(значение-функция, this, ...аргументы): синхронно, до конца. */
@@ -70,6 +69,11 @@ export function enter(this: void, program: ProgramExports): void {
 
 export function program(this: void): ProgramExports {
   return current!
+}
+
+/** Израсходовать n инструкций кванта текущей программы; результат — остаток. */
+export function spend(this: void, n: number): number {
+  return current!.charge(n)
 }
 
 // ---------- Память ----------
@@ -207,7 +211,7 @@ export function blockingCall(this: void, k: Val, name: string, init?: (this: voi
     if (k.error !== undefined) error(k.error, 0)
     return $multi(k.result)
   }
-  if (Q.s > 0) err("action-in-callback")
+  if (current!.sync() > 0) err("action-in-callback")
   const frame: Val = { __host: name }
   if (init !== undefined) init(frame)
   Q.w = frame

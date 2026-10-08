@@ -8,7 +8,9 @@
     "test": "node tools/test/run.mjs",
     "test:game": "node tools/test/game.mjs",
     "test:desync": "node tools/test/desync.mjs",
-    "shot": "node tools/visual/shot.mjs"
+    "shot": "node tools/visual/shot.mjs",
+    "bench:lang": "node tools/test/run.mjs --build-only && tools/lua/5.2/bin/lua tools/bench/lang.lua build",
+    "bench:game": "node tools/bench/game.mjs"
   },
   "devDependencies": {
     "lua-types": "2.14.1",

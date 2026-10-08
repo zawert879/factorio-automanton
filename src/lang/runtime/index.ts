@@ -1,6 +1,6 @@
 // Рантайм программ: таблица R для пролога скомпилированного кода, загрузка программы, исполнение
 // отрезками (квант инструкций), ожидание блокирующих вызовов API.
-import { arrayMethods } from "./arrays"
+import { arrayMethods, arrayMethodsResumable } from "./arrays"
 import { iter } from "./collections"
 import {
   BRK,
@@ -59,6 +59,10 @@ export const R: Val = {
   BRK,
   Q,
   err,
+  next: next,
+  math: math,
+  arrayMethods,
+  arrayMethodsResumable,
   type: type,
   getx,
   setx,
@@ -113,14 +117,17 @@ export const R: Val = {
 export interface Program extends ProgramExports {
   /** Строка Lua (с 1) − 1 → строка исходника. */
   lines: number[]
+  /** Строка Lua → имя свойства, которое на ней читается. */
+  keys: Record<number, string>
 }
 
 /** Загрузка скомпилированной программы в песочницу: пустое окружение, только R. */
-export function loadProgram(this: void, lua: string, lines: number[]): Program | string {
+export function loadProgram(this: void, lua: string, lines: number[], keys: Record<number, string> = {}): Program | string {
   const [chunk, message] = load(lua, "=prog", "t", {})
   if (chunk === undefined) return message ?? "load failed"
   const exports = (chunk as (this: void, r: Val) => Val)(R)
   exports.lines = lines
+  exports.keys = keys
   return exports as Program
 }
 
@@ -240,9 +247,7 @@ function checkMemory(machine: Machine, allocated: number): void {
 export function runSlice(this: void, program: Program, machine: Machine, quantum: number): void {
   if (machine.status !== "ready") return
   enter(program)
-  Q.n = quantum
-  Q.d = 0
-  Q.s = 0
+  program.setBudget(quantum)
   Q.w = undefined
   Q.am = Q.a + LIMITS.allocations
   const allocatedBefore = Q.a
@@ -268,7 +273,8 @@ export function runSlice(this: void, program: Program, machine: Machine, quantum
       machine.waiting = Q.w
       machine.status = "waiting"
     }
-    if (Q.n < 0) machine.debt = -Q.n
+    const left = program.budget()
+    if (left < 0) machine.debt = -left
     checkMemory(machine, Q.a - allocatedBefore)
     return
   }
