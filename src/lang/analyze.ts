@@ -101,6 +101,8 @@ export interface Analysis {
   resumableMethodNames: Set<string>
   /** Имена методов и геттеров всех классов: this.имя читается через рантайм, а не напрямую. */
   memberFunctionNames: Set<string>
+  /** Инструкция FunctionDecl / ClassDecl → объявленная переменная. */
+  declOf: Map<A.Stmt, VarInfo>
   diagnostics: Diagnostic[]
 }
 
@@ -140,6 +142,7 @@ export function analyze(program: A.Program): Analysis {
   const resolutions = new Map<object, Resolution>()
   const fnOf = new Map<A.FunctionNode, FnInfo>()
   const classOf = new Map<A.ClassNode, ClassInfo>()
+  const declOf = new Map<A.Stmt, VarInfo>()
   /** Функции-значения свойств объектов и присваиваний obj.имя = функция. */
   const propertyFns: { name: string; fn: FnInfo }[] = []
   let nextVarId = 1
@@ -202,7 +205,7 @@ export function analyze(program: A.Program): Analysis {
       for (const prop of pattern.properties) declarePattern(scope, prop.value, kind, loopVar)
       if (pattern.rest !== undefined) resolutions.set(pattern, { var: declare(scope, pattern.rest, kind, pattern, loopVar) })
     } else {
-      for (const element of pattern.elements) if (element !== undefined) declarePattern(scope, element.value, kind, loopVar)
+      for (const element of pattern.elements) if (element.value !== undefined) declarePattern(scope, element.value, kind, loopVar)
       if (pattern.rest !== undefined) declarePattern(scope, pattern.rest, kind, loopVar)
     }
   }
@@ -217,7 +220,7 @@ export function analyze(program: A.Program): Analysis {
       const rest = resolutions.get(pattern)
       if (rest !== undefined && "var" in rest) rest.var.initGen = ++gen
     } else {
-      for (const element of pattern.elements) if (element !== undefined) initPattern(element.value)
+      for (const element of pattern.elements) if (element.value !== undefined) initPattern(element.value)
       if (pattern.rest !== undefined) initPattern(pattern.rest)
     }
   }
@@ -230,7 +233,7 @@ export function analyze(program: A.Program): Analysis {
       }
     } else if (pattern.kind === "ArrayPattern") {
       for (const element of pattern.elements) {
-        if (element === undefined) continue
+        if (element.value === undefined) continue
         if (element.default !== undefined) walkExpr(element.default, scope)
         walkPatternDefaults(element.value, scope)
       }
@@ -265,17 +268,19 @@ export function analyze(program: A.Program): Analysis {
         const fnInfo = newFn("function", stmt.fn.name ?? "function", scope.fn, stmt.fn)
         const info = declare(scope, stmt.fn.name!, "function", stmt)
         info.fn = fnInfo
+        declOf.set(stmt, info)
         hoisted.push(fnInfo)
       } else if (stmt.kind === "ClassDecl") {
         const info = declare(scope, stmt.cls.name!, "class", stmt)
         info.cls = createClass(stmt.cls, scope)
         info.cls.variable = info
+        declOf.set(stmt, info)
       }
     }
     // Замыкания объявлений функций создаются в начале блока все вместе (сначала значения, потом
     // окружения) — поэтому видят друг друга.
     for (const stmt of body) {
-      if (stmt.kind === "FunctionDecl") scope.vars.get(stmt.fn.name!)!.initGen = ++gen
+      if (stmt.kind === "FunctionDecl") declOf.get(stmt)!.initGen = ++gen
     }
     const startGen = ++gen
     for (const fn of hoisted) fn.createdAtGen = startGen
@@ -438,7 +443,7 @@ export function analyze(program: A.Program): Analysis {
       }
     } else if (target.kind === "ArrayPattern") {
       for (const element of target.elements) {
-        if (element === undefined) continue
+        if (element.value === undefined) continue
         if (element.default !== undefined) walkExpr(element.default, scope)
         walkAssignTarget(element.value, scope)
       }
@@ -739,7 +744,7 @@ export function analyze(program: A.Program): Analysis {
   const resumableMethodNames = classify(functions, classes, propertyFns)
   for (const fn of functions) for (const v of fn.vars) v.cell = v.captured && (v.assigned || v.unsafeCapture)
   main.resumable = true
-  return { main, functions, classes, resolutions, fnOf, classOf, resumableMethodNames, memberFunctionNames, diagnostics }
+  return { main, functions, classes, resolutions, fnOf, classOf, resumableMethodNames, memberFunctionNames, declOf, diagnostics }
 }
 
 /** Возобновляемость: исходные признаки, затем распространение по вызовам до неподвижной точки. */

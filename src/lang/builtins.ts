@@ -81,8 +81,8 @@ export const BLOCKING_HOST_METHODS: Record<string, Record<string, boolean>> = {
 
 const HOST_OBJECTS = ["me", "console", "scan", "map", "board", "tasks", "signals", "time", "world", "inbox"]
 const LIBRARY_OBJECTS = ["Math", "Object", "Array", "JSON", "Number", "String"]
-const LIBRARY_CLASSES = ["Map", "Set", "Error", "ActionError"]
-const LIBRARY_FUNCTIONS = ["parseInt", "parseFloat", "isNaN", "isFinite"]
+const LIBRARY_CLASSES = ["Map", "Set", "Error", "TypeError", "RangeError", "SyntaxError", "ActionError"]
+const LIBRARY_FUNCTIONS = ["parseInt", "parseFloat", "isNaN", "isFinite", "Boolean"]
 const VALUES = ["undefined", "NaN", "Infinity"]
 
 export const BUILTINS = new Map<string, Builtin>()
@@ -98,3 +98,32 @@ for (const name of VALUES) BUILTINS.set(name, { name, kind: "value" })
  * вызов метода — точка остановки (рантайм использует возобновляемую версию метода).
  */
 export const HIGHER_ORDER_METHODS = new Set(["forEach", "map", "filter", "find", "findIndex", "some", "every", "reduce", "flatMap"])
+
+/** Методы объектов стандартной библиотеки (проверяются при компиляции). */
+export const LIBRARY_METHODS: Record<string, string[]> = {
+  Math: [
+    "abs", "floor", "ceil", "round", "trunc", "sign", "min", "max", "sqrt", "cbrt", "pow", "exp", "log", "log2", "log10",
+    "sin", "cos", "tan", "asin", "acos", "atan", "atan2", "hypot", "random",
+  ],
+  Object: ["keys", "values", "entries", "assign", "fromEntries", "freeze"],
+  Array: ["isArray", "from", "of"],
+  JSON: ["stringify", "parse"],
+  Number: ["isInteger", "isFinite", "isNaN", "parseInt", "parseFloat"],
+  String: ["fromCharCode"],
+}
+
+/** Объекты библиотеки, которые ещё и функции: String(x), Number(x). */
+export const CALLABLE_LIBRARY_OBJECTS = new Set(["String", "Number"])
+
+/** Константы стандартной библиотеки: подставляются при компиляции. */
+export const LIBRARY_CONSTANTS: Record<string, Record<string, number>> = {
+  Math: { PI: math.pi, E: math.exp(1), SQRT2: math.sqrt(2), LN2: math.log(2), LN10: math.log(10) },
+  Number: {
+    MAX_SAFE_INTEGER: 9007199254740991,
+    MIN_SAFE_INTEGER: -9007199254740991,
+    EPSILON: 2 ** -52,
+    MAX_VALUE: 1.7976931348623157e308,
+    POSITIVE_INFINITY: math.huge,
+    NEGATIVE_INFINITY: -math.huge,
+  },
+}

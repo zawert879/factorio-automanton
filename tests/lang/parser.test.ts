@@ -11,7 +11,7 @@ function pattern(p: A.Pattern): string {
     if (p.rest !== undefined) parts.push("..." + p.rest)
     return `{${parts.join(" ")}}`
   }
-  const parts = p.elements.map((e) => (e === undefined ? "_" : pattern(e.value) + (e.default ? "=" + show(e.default) : "")))
+  const parts = p.elements.map((e) => (e.value === undefined ? "_" : pattern(e.value) + (e.default ? "=" + show(e.default) : "")))
   if (p.rest !== undefined) parts.push("..." + pattern(p.rest))
   return `[${parts.join(" ")}]`
 }

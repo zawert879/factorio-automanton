@@ -84,7 +84,8 @@ export type Pattern = Loc &
   (
     | { kind: "IdentifierPattern"; name: string }
     | { kind: "ObjectPattern"; properties: { key: string; value: Pattern; default?: Expr }[]; rest?: string }
-    | { kind: "ArrayPattern"; elements: ({ value: Pattern; default?: Expr } | undefined)[]; rest?: Pattern }
+    /** Пропуск ([a, , b]) — элемент без value: в массивах Lua нельзя хранить nil. */
+    | { kind: "ArrayPattern"; elements: { value?: Pattern; default?: Expr }[]; rest?: Pattern }
   )
 
 // ---------- Функции и классы ----------

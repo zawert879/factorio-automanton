@@ -387,12 +387,12 @@ export function parse(source: string): ParseResult {
     }
     if (isPunct("[")) {
       next()
-      const elements: ({ value: A.Pattern; default?: A.Expr } | undefined)[] = []
+      const elements: { value?: A.Pattern; default?: A.Expr }[] = []
       let rest: A.Pattern | undefined
       while (!isPunct("]")) {
         if (isPunct(",")) {
           next()
-          elements.push(undefined)
+          elements.push({})
           continue
         }
         if (eat("...")) {
@@ -417,7 +417,7 @@ export function parse(source: string): ParseResult {
     if (expr.kind === "Identifier") return { line: expr.line, column: expr.column, kind: "IdentifierPattern", name: expr.name }
     if (expr.kind === "Member" || expr.kind === "Index") return expr
     if (expr.kind === "Array") {
-      const elements: ({ value: A.Pattern; default?: A.Expr } | undefined)[] = []
+      const elements: { value?: A.Pattern; default?: A.Expr }[] = []
       let rest: A.Pattern | undefined
       for (const element of expr.elements) {
         if (element.kind === "Spread") rest = assignmentPattern(element.argument)
