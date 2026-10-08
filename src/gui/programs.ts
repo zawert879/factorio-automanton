@@ -26,13 +26,27 @@ import {
 import { Diagnostic } from "../lang/lexer"
 import { ulen } from "../lang/runtime/strings"
 import { assignProgram } from "../program/machines"
-import { deleteProgram, dependentsOf, findProgram, notePublish, ProgramRecord, programsOf, publish, publishDenied } from "../program/store"
-import { writeVsCodeFolder } from "../program/sync"
+import {
+  deleteProgram,
+  deletePrograms,
+  dependentsOf,
+  findProgram,
+  notePublish,
+  onProgramPublished,
+  onProgramRemoved,
+  ProgramRecord,
+  programsOf,
+  publish,
+  publishDenied,
+  rightsDenied,
+} from "../program/store"
+import { onRefreshResult, requestRefresh, writeVsCodeFolder } from "../program/sync"
 import { guiOf, onGuiChange, onGuiClick, onGuiSelection, titlebar } from "./common"
 import { DTS } from "./dts.generated"
 import { folderItem, LIBRARY_COLOR, programTree, TreeEntry } from "./tree"
 
 const FRAME = "automaton-programs"
+const CONFIRM_FRAME = "automaton-refresh-confirm"
 const TYPES_FRAME = "automaton-types"
 const MAX_ERRORS = 8
 /** Высота строки шрифта кода (automaton-code, 14) в единицах интерфейса — по снимку экрана. */
@@ -153,6 +167,8 @@ export function openPrograms(player: LuaPlayer, programId?: number, robotId?: nu
   versions.style.width = 200
   button(buttons, ["automaton-gui.types"], "programs-types")
   button(buttons, ["automaton-gui.vscode-folder"], "programs-vscode")
+  const refresh = button(buttons, ["automaton-gui.refresh"], "programs-refresh")
+  refresh.tooltip = ["automaton-gui.refresh-tooltip"]
 
   player.opened = frame
   const window: ProgramsWindow = {
@@ -337,8 +353,86 @@ export function showTypes(player: LuaPlayer): void {
   text.select_all()
 }
 
+/** Сообщение под редактором (зелёное, оранжевое или красное). */
+function note(window: ProgramsWindow, caption: LocalisedString, color: { r: number; g: number; b: number }): void {
+  const label = window.errors.add({ type: "label", caption })
+  label.style.single_line = false
+  label.style.maximal_width = 900
+  label.style.font_color = color
+}
+
+/** Итог «Обновить из папки»: что опубликовано и что не собралось; программы без файлов — спросить. */
+function showRefreshResult(player: LuaPlayer, published: string[], failed: string[], missing: string[]): void {
+  const window = windowOf(player)
+  const lines: LocalisedString[] = [["automaton-gui.refresh-result", published.length, published.length > 0 ? published.join(", ") : "—"]]
+  if (failed.length > 0) lines.push(["automaton-gui.refresh-failed", failed.join(", ")])
+  if (window !== undefined) {
+    window.errors.clear()
+    for (const line of lines) note(window, line, line === lines[0] ? { r: 0.5, g: 1, b: 0.5 } : { r: 1, g: 0.75, b: 0.3 })
+    refreshList(window, player)
+  }
+  for (const line of lines) player.print(line)
+  if (missing.length > 0) askDeleteMissing(player, missing)
+}
+
+/** Программы игры без файлов в src: удалить их? (по сети это могут быть программы товарищей). */
+function askDeleteMissing(player: LuaPlayer, missing: string[]): void {
+  player.gui.screen[CONFIRM_FRAME]?.destroy()
+  const frame = player.gui.screen.add({ type: "frame", name: CONFIRM_FRAME, direction: "vertical", caption: ["automaton-gui.refresh-missing-title"] })
+  frame.auto_center = true
+  const text = frame.add({ type: "label", caption: ["automaton-gui.refresh-missing", missing.join(", ")] })
+  text.style.single_line = false
+  text.style.maximal_width = 520
+  const row = frame.add({ type: "flow", direction: "horizontal" })
+  button(row, ["automaton-gui.refresh-keep"], "refresh-keep")
+  button(row, ["automaton-gui.refresh-delete"], "refresh-delete", "red_button")
+  guiOf(player).refreshMissing = missing
+}
+
 export function registerProgramsWindow(): void {
   registerAssign()
+  onRefreshResult((player, published, failed, missing) => showRefreshResult(player, published, failed, missing))
+  // Программы изменились (публикация, удаление — в игре, из VS Code, товарищем) — списки в открытых окнах тоже.
+  const refreshOpen = () => {
+    for (const player of game.connected_players) {
+      const window = windowOf(player)
+      if (window !== undefined) refreshList(window, player)
+    }
+  }
+  onProgramPublished(() => refreshOpen())
+  onProgramRemoved(() => refreshOpen())
+  onGuiClick("programs-refresh", (player) => {
+    const window = windowOf(player)
+    requestRefresh(player)
+    if (window === undefined) return
+    window.errors.clear()
+    note(window, ["automaton-gui.refresh-sent"], { r: 0.8, g: 0.8, b: 0.8 })
+  })
+  onGuiClick("refresh-keep", (player) => {
+    player.gui.screen[CONFIRM_FRAME]?.destroy()
+    guiOf(player).refreshMissing = undefined
+  })
+  onGuiClick("refresh-delete", (player) => {
+    const names = guiOf(player).refreshMissing ?? []
+    player.gui.screen[CONFIRM_FRAME]?.destroy()
+    guiOf(player).refreshMissing = undefined
+    const denied = rightsDenied(player)
+    if (denied !== undefined) {
+      player.print([`automaton-diagnostic.${denied}`])
+      return
+    }
+    const { deleted, kept } = deletePrograms(names, player.force.name)
+    const window = windowOf(player)
+    const lines: LocalisedString[] = [["automaton-gui.refresh-deleted", deleted.length > 0 ? deleted.join(", ") : "—"]]
+    if (kept.length > 0) lines.push(["automaton-gui.refresh-kept", kept.join(", ")])
+    for (const line of lines) player.print(line)
+    if (window === undefined) return
+    window.errors.clear()
+    for (const line of lines) note(window, line, line === lines[0] ? { r: 0.5, g: 1, b: 0.5 } : { r: 1, g: 0.75, b: 0.3 })
+    // Удалённая могла быть открыта в редакторе.
+    if (window.programId !== undefined && storage.programs.byId[window.programId] === undefined) load(window, player, undefined)
+    refreshList(window, player)
+  })
   onGuiClick("programs-close", (player) => closePrograms(player))
   onGuiClick("types-close", (player) => player.gui.screen[TYPES_FRAME]?.destroy())
 

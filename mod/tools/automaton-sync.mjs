@@ -18,13 +18,18 @@
 // Параметры можно положить в .automaton-sync.json в папке: { "udp": 27155 } или { "rcon": true, "port": …, "password": … }.
 // Ошибки печатаются как «файл:строка:столбец: error: текст» — VS Code показывает их в коде (docs/VSCODE.md).
 // Папка одной карты: .automaton-map.json (пишет игра) — имя карты; в другую карту файлы не публикуются.
+import { spawn } from "node:child_process"
+import { createHash } from "node:crypto"
 import { createSocket } from "node:dgram"
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, watch, writeFileSync } from "node:fs"
 import { createConnection } from "node:net"
 import { dirname, join, relative, resolve, sep } from "node:path"
 import { fileURLToPath } from "node:url"
 
-const HERE = dirname(fileURLToPath(import.meta.url))
+const SELF = fileURLToPath(import.meta.url)
+const HERE = dirname(SELF)
+/** Версия утилиты — хеш её файла: игра отклоняет утилиту другой версии, чем мод. */
+const TOOL = createHash("sha1").update(readFileSync(SELF)).digest("hex").slice(0, 12)
 const PART = 1500
 
 // ---------- Параметры ----------
@@ -34,6 +39,7 @@ const options = {}
 const positional = []
 for (let i = 0; i < argv.length; i++) {
   if (argv[i] === "--rcon") options.rcon = true
+  else if (argv[i] === "--worker") continue
   else if (argv[i].startsWith("--")) options[argv[i].slice(2)] = argv[++i]
   else positional.push(argv[i])
 }
@@ -47,6 +53,8 @@ const port = Number(options.port ?? config.port ?? 27015)
 const udpPort = Number(options.udp ?? config.udp ?? 27155)
 const password = options.password ?? process.env.AUTOMATON_RCON_PASSWORD ?? config.password
 const lang = options.lang ?? config.lang ?? (/^ru/i.test(process.env.LANG ?? "ru") ? "ru" : "en")
+/** Порт для сигналов игры (кнопка «Обновить из папки» в окне программ) — в режиме слежения. */
+const listenPort = Number(options.listen ?? config.listen ?? 27154)
 
 if (useRcon && password === undefined) {
   console.error("automaton: нужен пароль RCON: --password, AUTOMATON_RCON_PASSWORD или .automaton-sync.json")
@@ -150,7 +158,7 @@ class Rcon {
   }
 
   async request(data) {
-    const reply = (await this.command(`/automaton-sync ${JSON.stringify(data)}`)).trim()
+    const reply = (await this.command(`/automaton-sync ${JSON.stringify({ ...data, tool: TOOL })}`)).trim()
     try {
       return JSON.parse(reply)
     } catch {
@@ -200,7 +208,7 @@ class Udp {
         else this.request(data, attempt + 1).then(resolveRequest, reject)
       }, 2000)
       this.waiters.set(id, { resolve: resolveRequest, timer })
-      this.socket.send(JSON.stringify({ ...data, id }), udpPort, "127.0.0.1")
+      this.socket.send(JSON.stringify({ ...data, id, tool: TOOL }), udpPort, "127.0.0.1")
     })
   }
 
@@ -275,14 +283,18 @@ function printError(root, file, error) {
 /** Текст, который уже есть в игре (опубликован или скачан): такой файл не публикуется повторно. */
 const synced = new Map()
 
-async function push(link, file, force = false) {
+async function push(link, file, force = false, quiet = false) {
   const source = readFileSync(file, "utf8").replace(/\r\n/g, "\n")
   if (!force && synced.get(file) === source) return true
   const name = programName(file, source)
   const map = mapOf(rootOf(file))
   const begin = await link.request({ cmd: "begin", name, map })
+  if (!begin.ok && begin.outdated) {
+    if (!quiet) console.log(`${file}:1:1: error: ${begin.error}`)
+    return false
+  }
   if (!begin.ok && wrongMap(begin)) {
-    console.log(`${file}:1:1: error: ${wrongMap(begin)}`)
+    if (!quiet) console.log(`${file}:1:1: error: ${wrongMap(begin)}`)
     return false
   }
   if (!begin.ok) {
@@ -301,7 +313,7 @@ async function push(link, file, force = false) {
   if (result.ok) {
     synced.set(file, source)
     // Тот же текст уже в игре (файл записала сама игра) — молча.
-    if (!result.unchanged) console.log(`automaton: «${name}» опубликована, v${result.version}`)
+    if (!result.unchanged && !quiet) console.log(`automaton: «${name}» опубликована, v${result.version}`)
     if (list(result.rebuilt).length > 0) console.log(`automaton: пересобраны: ${result.rebuilt.join(", ")}`)
     // Зависимые, которые с новой версией не собрались, — ошибки в их файлах (в игре работает прежняя сборка).
     for (const stale of list(result.stale)) {
@@ -309,8 +321,102 @@ async function push(link, file, force = false) {
     }
     return true
   }
-  for (const error of result.errors ?? [{ line: 1, column: 1, code: result.error ?? "error" }]) printError(root, file, error)
+  if (!quiet) for (const error of result.errors ?? [{ line: 1, column: 1, code: result.error ?? "error" }]) printError(root, file, error)
   return false
+}
+
+/**
+ * Кнопка «Обновить из папки»: опубликовать новые и изменённые файлы src (проходами — библиотеки раньше тех,
+ * кто их импортирует) и сообщить игре итог; программы без файлов игра предложит удалить сама.
+ */
+async function refresh(link) {
+  const reply = await link.request({ cmd: "list", map: mapOf(folder) })
+  if (!reply.ok) {
+    console.log(`automaton: ${wrongMap(reply) ?? reply.error}`)
+    return
+  }
+  const game = new Map(list(reply.programs).map((p) => [p.name, p]))
+  const local = new Map()
+  for (const file of programFiles(programsDir(folder))) {
+    const source = readFileSync(file, "utf8").replace(/\r\n/g, "\n")
+    local.set(programName(file, source), file)
+    synced.set(file, source)
+  }
+  const changed = (name) => game.get(name)?.sum !== checksum(synced.get(local.get(name)))
+  let pending = [...local.keys()].filter(changed)
+  const published = []
+  while (pending.length > 0) {
+    const next = []
+    for (const name of pending) {
+      if (await push(link, local.get(name), true, true)) published.push(name)
+      else next.push(name)
+    }
+    if (next.length === pending.length) break
+    pending = next
+  }
+  // Не собрались — ещё раз, уже с ошибками в их файлах.
+  for (const name of pending) await push(link, local.get(name), true)
+  const missing = [...game.keys()].filter((name) => !local.has(name))
+  await link.request({ cmd: "refresh-done", published, failed: pending, missing, map: mapOf(folder) })
+  console.log(`automaton: из папки опубликовано ${published.length}${published.length > 0 ? `: ${published.join(", ")}` : ""}`)
+  if (pending.length > 0) console.log(`automaton: не собрались: ${pending.join(", ")}`)
+  if (missing.length > 0) console.log(`automaton: в игре без файлов (игра спросит, удалить ли): ${missing.join(", ")}`)
+}
+
+/** Слушать сигналы игры: кнопка «Обновить из папки». */
+function listen(link, run) {
+  const socket = createSocket("udp4")
+  socket.on("message", (data) => {
+    let message
+    try {
+      message = JSON.parse(data.toString("utf8"))
+    } catch {
+      return
+    }
+    if (message.cmd !== "refresh") return
+    const map = mapOf(folder)
+    if (map !== undefined && message.map !== map) {
+      console.log(`automaton: «Обновить из папки» из карты «${message.map}», а это папка карты «${map}» — пропускаю`)
+      return
+    }
+    console.log("automaton: игра просит обновить из папки")
+    run(() => refresh(link))
+  })
+  // Порт может ещё держать прежний процесс (перезапуск после обновления утилиты) — пробуем снова.
+  let attempts = 0
+  socket.on("error", (error) => {
+    if (error.code === "EADDRINUSE" && ++attempts < 15) setTimeout(() => socket.bind(listenPort, "127.0.0.1"), 1000)
+    else console.log(`automaton: кнопка «Обновить из папки» работать не будет: порт ${listenPort} занят (${error.message})`)
+  })
+  socket.bind(listenPort, "127.0.0.1")
+}
+
+/** Контрольная сумма текста (байты UTF-8) — как в игре (src/program/sync.ts, checksum). */
+function checksum(text) {
+  let h = 0
+  for (const byte of Buffer.from(text, "utf8")) h = (h * 31 + byte) % 2147483647
+  return h
+}
+
+/** Сверка src с игрой при запуске слежения: что изменилось, пока утилита не работала. Только сообщает. */
+async function compare(link, files) {
+  const reply = await link.request({ cmd: "list", map: mapOf(folder) })
+  if (!reply.ok) {
+    console.log(`automaton: ${wrongMap(reply) ?? reply.error}`)
+    return
+  }
+  const game = new Map(list(reply.programs).map((p) => [p.name, p]))
+  const local = new Map(files.map((file) => [programName(file, synced.get(file)), file]))
+  const missing = [...game.keys()].filter((name) => !local.has(name))
+  const fresh = [...local.keys()].filter((name) => !game.has(name))
+  const differ = [...local.keys()].filter((name) => game.has(name) && game.get(name).sum !== checksum(synced.get(local.get(name))))
+  if (missing.length > 0) {
+    console.log(`automaton: в игре есть, а файла в src нет: ${missing.join(", ")}`)
+    console.log(`automaton:   вернуть файлы — node automaton-sync.mjs pull; удалить в игре — в окне программ или node automaton-sync.mjs delete ${missing.map((n) => `src/${n}.ts`).join(" ")}`)
+  }
+  if (fresh.length > 0) console.log(`automaton: файлы без программы в игре (сохраните файл — опубликуется): ${fresh.join(", ")}`)
+  if (differ.length > 0) console.log(`automaton: отличаются от игры (сохраните файл — опубликуется ваш; pull — взять из игры): ${differ.join(", ")}`)
+  if (missing.length + fresh.length + differ.length === 0) console.log("automaton: src совпадает с игрой")
 }
 
 /** Удалить программу файла в игре (файл удалён). Используемую библиотеку игра не удаляет. */
@@ -378,7 +484,51 @@ async function pull(link) {
   if (existsSync(types) && !existsSync(join(folder, "automaton.d.ts"))) copyFileSync(types, join(folder, "automaton.d.ts"))
 }
 
+/**
+ * Слежение — в отдельном процессе: когда игра записывает новую версию утилиты («Папка для VS Code»),
+ * процесс-сторож перезапускает его, и задача VS Code продолжает работать уже с новой версией.
+ */
+function supervise() {
+  let worker
+  const start = () => {
+    worker = spawn(process.execPath, [SELF, ...process.argv.slice(2), "--worker"], { stdio: "inherit" })
+    worker.on("exit", (code, signal) => {
+      if (!restarting && signal === null) process.exit(code ?? 0)
+    })
+  }
+  let restarting = false
+  let timer
+  let running = TOOL
+  watch(SELF, () => {
+    clearTimeout(timer)
+    timer = setTimeout(() => {
+      // macOS сообщает и о правке, сделанной незадолго до начала слежения: перезапуск — только если текст другой.
+      const now = existsSync(SELF) ? createHash("sha1").update(readFileSync(SELF)).digest("hex").slice(0, 12) : running
+      if (now === running) return
+      running = now
+      console.log("automaton: утилита обновилась — перезапускаю")
+      restarting = true
+      worker.once("exit", () => {
+        restarting = false
+        start()
+      })
+      worker.kill()
+    }, 500)
+  })
+  for (const signal of ["SIGINT", "SIGTERM"]) {
+    process.on(signal, () => {
+      worker.kill()
+      process.exit(0)
+    })
+  }
+  start()
+}
+
 async function main() {
+  if (mode === "watch" && !process.argv.includes("--worker")) {
+    supervise()
+    return
+  }
   const rcon = useRcon ? new Rcon() : new Udp()
   await rcon.connect()
   if (mode === "pull") {
@@ -399,8 +549,10 @@ async function main() {
   // watch: начало и конец каждой публикации отмечены — по ним VS Code обновляет список ошибок.
   // Файлы, которые уже лежат в папке (и подпапках), считаются синхронными (иначе запуск опубликовал бы все разом).
   const programs = programsDir(folder)
-  for (const file of programFiles(programs)) synced.set(file, readFileSync(file, "utf8").replace(/\r\n/g, "\n"))
+  const files = programFiles(programs)
+  for (const file of files) synced.set(file, readFileSync(file, "utf8").replace(/\r\n/g, "\n"))
   console.log(`automaton: слежу за ${programs} (Ctrl+C — выход)`)
+  await compare(rcon, files).catch((error) => console.log(`automaton: ${error.message}`))
   const timers = new Map()
   /** Удалённые файлы ждут немного: если появится такой же файл в другом месте — это перенос, а не удаление. */
   const pendingDeletes = new Map()
@@ -416,6 +568,7 @@ async function main() {
       console.log("automaton: публикация закончена")
     })
   }
+  listen(rcon, (job) => run(job))
   /** Файл исчез, а его текст (без путей импорта) совпадает с новым — перенос. */
   const movedFrom = (source) => {
     const key = withoutImportPaths(source)

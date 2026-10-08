@@ -6,6 +6,7 @@
 // С флагом --check проверяет tsc --strict, что программы-примеры из API.md и стартовые программы с этими
 // типами компилируются.
 import { execFileSync } from "node:child_process"
+import { createHash } from "node:crypto"
 import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -34,7 +35,19 @@ const header = `// Типы API автоматонов (мод Automaton для 
 const tsconfig = JSON.stringify(
   {
     // module / moduleResolution: import "../lib/Помощники" находит соседний файл без расширения (этап 17).
-    compilerOptions: { strict: true, target: "es2020", lib: ["es2020"], noEmit: true, moduleDetection: "force", module: "preserve", moduleResolution: "bundler", types: [] },
+    compilerOptions: {
+      strict: true,
+      target: "es2020",
+      lib: ["es2020"],
+      noEmit: true,
+      moduleDetection: "force",
+      module: "preserve",
+      moduleResolution: "bundler",
+      types: [],
+      // Плагин VS Code (mod/tools/automaton-ts-plugin.js): ошибки на неподдерживаемом и подсказки о тиках;
+      // язык подставляет игра по языку игрока.
+      plugins: [{ name: "automaton-ts-plugin", lang: "ru" }],
+    },
     // Программы — в src (рядом — служебные файлы); старые файлы в корне папки не мешают.
     include: ["automaton.d.ts", "src"],
   },
@@ -42,6 +55,7 @@ const tsconfig = JSON.stringify(
   2,
 )
 const tool = readFileSync(join(root, "mod", "tools", "automaton-sync.mjs"), "utf8")
+const tsPlugin = readFileSync(join(root, "mod", "tools", "automaton-ts-plugin.js"), "utf8")
 const dts = header + "\n" + declarations.join("\n")
 writeFileSync(join(root, "mod", "automaton.d.ts"), dts)
 writeFileSync(
@@ -49,7 +63,10 @@ writeFileSync(
   "// Создаётся tools/dts/generate.mjs из docs/API.md — не править руками.\n" +
     `export const DTS = ${JSON.stringify(dts)}\n` +
     `export const TSCONFIG = ${JSON.stringify(tsconfig)}\n` +
-    `export const SYNC_TOOL = ${JSON.stringify(tool)}\n`,
+    `export const SYNC_TOOL = ${JSON.stringify(tool)}\n` +
+    `export const TS_PLUGIN = ${JSON.stringify(tsPlugin)}\n` +
+    // Версия утилиты: игра отклоняет запросы утилиты другой версии (запущенной до обновления мода).
+    `export const SYNC_TOOL_HASH = ${JSON.stringify(createHash("sha1").update(tool).digest("hex").slice(0, 12))}\n`,
 )
 
 const starters = readdirSync(join(root, "examples"))

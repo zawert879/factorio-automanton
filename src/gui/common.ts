@@ -12,6 +12,8 @@ export interface GuiState {
   picker?: PickerWindow
   /** Недавно выбранные программы (окно выбора), новые первыми. */
   recent?: number[]
+  /** «Обновить из папки»: программы без файлов, о которых спросили «удалить?». */
+  refreshMissing?: string[]
 }
 
 export function guiOf(player: LuaPlayer): GuiState {

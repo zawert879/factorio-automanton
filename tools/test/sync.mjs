@@ -4,6 +4,7 @@
 // 2) Игра с окном (одиночная, на несколько секунд) с --enable-lua-udp: публикация и pull по UDP.
 import { spawn, spawnSync } from "node:child_process"
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs"
+import { createSocket } from "node:dgram"
 import { createConnection } from "node:net"
 import { join } from "node:path"
 import { buildMod, createMap, prepareWork, root, scriptError } from "./factorio.mjs"
@@ -12,9 +13,13 @@ const PORT = 27115
 const UDP_PORT = 27156
 const PASSWORD = "automaton-test"
 
+/** Запущенные утилиты слежения — остановить и при ошибке теста. */
+const children = []
+
 function fail(message) {
   console.error(`✗ ${message}`)
   server?.kill()
+  for (const child of children) child.kill()
   process.exit(1)
 }
 
@@ -139,10 +144,13 @@ async function waitFor(check, what, ms = 30000) {
   }
 }
 const watcher = spawn("node", [tool, "watch", project, ...rconArgs], { stdio: ["ignore", "pipe", "pipe"] })
+children.push(watcher)
 let watchOut = ""
 watcher.stdout.on("data", (chunk) => (watchOut += chunk))
 watcher.stderr.on("data", (chunk) => (watchOut += chunk))
 await waitFor(() => watchOut.includes("слежу"), "старта слежения")
+// Сверка при старте: «Привет» есть в игре, а в src проекта его нет.
+await waitFor(() => /в игре есть, а файла в src нет: .*Привет/.test(watchOut), "сверки src с игрой")
 const exportedOf = (...parts) => join(mapFolder, "src", ...parts)
 mkdirSync(join(project, "src", "common"), { recursive: true })
 renameSync(libFile, join(project, "src", "common", "Счёт.ts"))
@@ -160,6 +168,30 @@ unlinkSync(join(project, "src", "tmp", "Лишняя.ts"))
 await waitFor(() => watchOut.includes("«tmp/Лишняя» удалена"), "удаления программы")
 await waitFor(() => !existsSync(exportedOf("tmp", "Лишняя.ts")), "удаления файла из выгрузки")
 watcher.kill()
+
+// Файл появился, пока слежение не работало: при запуске утилита сообщает, а кнопка «Обновить из папки»
+// (игра шлёт утилите пакет на порт 27154) публикует его.
+await new Promise((r) => setTimeout(r, 1000))
+writeFileSync(join(project, "src", "Офлайн.ts"), 'print("написана без слежения")\n')
+const watcher2 = spawn("node", [tool, "watch", project, ...rconArgs], { stdio: ["ignore", "pipe", "pipe"] })
+children.push(watcher2)
+watchOut = ""
+watcher2.stdout.on("data", (chunk) => (watchOut += chunk))
+watcher2.stderr.on("data", (chunk) => (watchOut += chunk))
+await waitFor(() => watchOut.includes("файлы без программы в игре") && watchOut.includes("Офлайн"), "сверки: новый файл без программы")
+const button = createSocket("udp4")
+button.send(JSON.stringify({ cmd: "refresh", map: mapName, force: "player" }), 27154, "127.0.0.1")
+await waitFor(() => watchOut.includes("из папки опубликовано") && watchOut.includes("Офлайн"), "публикации по кнопке «Обновить из папки»")
+await waitFor(() => existsSync(exportedOf("Офлайн.ts")), "выгрузки опубликованного по кнопке")
+button.close()
+watcher2.kill()
+
+// Утилита другой версии (запущена до обновления мода): игра отклоняет её запросы с понятным текстом.
+const oldTool = join(env.work, "old-tool", "automaton-sync.mjs")
+mkdirSync(join(env.work, "old-tool"), { recursive: true })
+writeFileSync(oldTool, readFileSync(tool, "utf8") + "\n// старая версия\n")
+const oldPush = spawnSync("node", [oldTool, "push", appFile, ...rconArgs], { encoding: "utf8" })
+if (!(oldPush.stdout + oldPush.stderr).includes("утилита синхронизации другой версии, чем мод")) fail(`утилита другой версии:\n${oldPush.stdout}${oldPush.stderr}`)
 
 // Временную папку не удаляем: сервер ещё дописывает файлы после остановки (её чистит следующий запуск).
 server.kill()

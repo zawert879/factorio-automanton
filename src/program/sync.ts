@@ -19,7 +19,7 @@
 import { CustomCommandData, LuaPlayer, PlayerIndex } from "factorio:runtime"
 import { onEvent, onTick } from "../events"
 import { Diagnostic } from "../lang/lexer"
-import { DTS, SYNC_TOOL, TSCONFIG } from "../gui/dts.generated"
+import { DTS, SYNC_TOOL, SYNC_TOOL_HASH, TS_PLUGIN, TSCONFIG } from "../gui/dts.generated"
 import {
   deleteProgram,
   findProgram,
@@ -89,7 +89,10 @@ const README = `Папка программ автоматонов для VS Cod
    в других программах поправятся). Имя программы — путь файла в src без .ts: src/lib/Помощники.ts —
    программа «lib/Помощники».
    Импорт между программами — как между файлами: import { nearMarker } from "../lib/Помощники".
-   Новые программы из игры: «node automaton-sync.mjs pull».
+   Новые программы из игры: «node automaton-sync.mjs pull». Меняли файлы без задачи синхронизации —
+   кнопка «Обновить из папки» в окне программ.
+4. Плагин TypeScript подчёркивает то, чего нет в языке машин (async/await, var, enum…), и подсказывает,
+   сколько тиков займёт цикл (наведите на for / while). Не заработал — «TypeScript: Restart TS Server».
 Выделенный сервер: RCON — «node automaton-sync.mjs watch . --rcon --port … --password …».
 `
 
@@ -104,7 +107,13 @@ export interface SyncBuffer {
 }
 
 interface Request {
+  /** refresh-done: итог сверки src с игрой. */
+  published?: string[]
+  failed?: string[]
+  missing?: string[]
   id?: number
+  /** Версия утилиты (хеш её файла): другая — запрос отклоняется. */
+  tool?: string
   cmd?: string
   /** rename: новое имя программы (старое — name). */
   to?: string
@@ -166,8 +175,47 @@ function diagnosticsJson(diagnostics: Diagnostic[]): unknown[] {
   return diagnostics.map((d) => ({ line: d.line, column: d.column, code: d.code, params: d.params.map((p) => tostring(p)), module: d.module }))
 }
 
+/** Порт, на котором утилита в режиме слежения ждёт сигналы игры (кнопка «Обновить из папки»). */
+export const TOOL_PORT = 27154
+
+/**
+ * Попросить утилиту сверить src с игрой: она опубликует новые и изменённые файлы и пришлёт итог
+ * (refresh-done). Пакет уходит только с экземпляра игры этого игрока; без --enable-lua-udp — не уходит
+ * (результат вызова не используется: он у участников разный, а состояние игры — общее).
+ */
+export function requestRefresh(player: LuaPlayer): void {
+  pcall(() => helpers.send_udp(TOOL_PORT, helpers.table_to_json({ cmd: "refresh", map: mapName(), force: player.force.name }), player.index))
+}
+
+type RefreshListener = (this: void, player: LuaPlayer, published: string[], failed: string[], missing: string[]) => void
+const refreshListeners: RefreshListener[] = []
+
+/** Утилита сверила src с игрой (окно программ показывает итог и спрашивает про программы без файлов). */
+export function onRefreshResult(listener: RefreshListener): void {
+  refreshListeners.push(listener)
+}
+
+/** Настройки VS Code для папки: где искать плагин TypeScript (.automaton/node_modules), скрыть служебное. */
+const VSCODE_SETTINGS = `{
+  "typescript.tsserver.pluginPaths": ["./.automaton"],
+  "files.exclude": { ".automaton": true }
+}
+`
+
+/** Утилита другой версии, чем мод (её запустили до обновления): что сделать — текстом (старая утилита его покажет). */
+const OUTDATED_TOOL =
+  "утилита синхронизации другой версии, чем мод: в игре нажмите «Программы…» → «Папка для VS Code» и перезапустите задачу синхронизации в VS Code"
+
+/** Контрольная сумма текста (байты UTF-8) — та же считается в утилите: сверить файлы с игрой, не скачивая. */
+export function checksum(text: string): number {
+  let h = 0
+  for (let i = 1; i <= text.length; i++) h = (h * 31 + string.byte(text, i)) % 2147483647
+  return h
+}
+
 /** Обработать запрос утилиты; sender — ключ передачи (кто шлёт), player — игрок (нет — сервер). */
 function handle(request: Request, sender: string, player: LuaPlayer | undefined): Record<string, unknown> {
+  if (request.tool !== SYNC_TOOL_HASH) return { ok: false, error: OUTDATED_TOOL, outdated: true }
   const force = request.force ?? player?.force.name ?? "player"
   // Папка другой карты (VS Code открыт не на той папке): ничего не публиковать и не отдавать.
   if (request.map !== undefined && request.map !== mapName()) {
@@ -222,8 +270,12 @@ function handle(request: Request, sender: string, player: LuaPlayer | undefined)
       if (program === undefined) return findProgram(request.to, force) !== undefined ? { ok: true, already: true } : { ok: false, error: "no program" }
       return publishReply(publish({ id: program.id, name: request.to, source: program.source, force, author: player?.name ?? "VS Code" }), force)
     }
+    case "refresh-done":
+      // Итог кнопки «Обновить из папки» — тому, кто нажал (пакет пришёл с его экземпляра игры).
+      if (player !== undefined) for (const listener of refreshListeners) listener(player, request.published ?? [], request.failed ?? [], request.missing ?? [])
+      return { ok: true }
     case "list":
-      return { ok: true, programs: programsOf(force).map((p) => ({ name: p.name, version: p.version })) }
+      return { ok: true, programs: programsOf(force).map((p) => ({ name: p.name, version: p.version, sum: checksum(p.source) })) }
     case "get": {
       // Ответ ограничен по размеру: программа отдаётся частями по ~2000 байт с позиции from,
       // граница части — между символами UTF-8; next — откуда продолжать (нет — всё).
@@ -270,7 +322,11 @@ export function writeVsCodeFolder(player: LuaPlayer): string {
   const dir = syncFolder(player.force.name)
   const write = (path: string, text: string) => helpers.write_file(`${dir}/${path}`, text, false, player.index)
   write("automaton.d.ts", DTS)
-  write("tsconfig.json", TSCONFIG)
+  // Сообщения плагина — на языке игрока.
+  write("tsconfig.json", string.gsub(TSCONFIG, '"lang": "ru"', `"lang": "${player.locale === "ru" ? "ru" : "en"}"`)[0])
+  write(".automaton/node_modules/automaton-ts-plugin/package.json", '{ "name": "automaton-ts-plugin", "version": "1.0.0", "main": "index.js" }\n')
+  write(".automaton/node_modules/automaton-ts-plugin/index.js", TS_PLUGIN)
+  write(".vscode/settings.json", VSCODE_SETTINGS)
   write("automaton-sync.mjs", SYNC_TOOL)
   write(".vscode/tasks.json", TASKS)
   write("README.txt", README)

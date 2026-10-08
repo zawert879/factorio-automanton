@@ -305,6 +305,27 @@ export function deleteProgram(id: number): { ok: true } | { ok: false; usedBy: s
   return { ok: true }
 }
 
+/**
+ * Удалить программы по именам: проходами, чтобы библиотека удалялась после тех, кто её импортирует.
+ * kept — не удалены: их импортируют программы не из списка.
+ */
+export function deletePrograms(names: string[], force: string): { deleted: string[]; kept: string[] } {
+  let pending = names.filter((name) => findProgram(name, force) !== undefined)
+  const deleted: string[] = []
+  while (pending.length > 0) {
+    const next: string[] = []
+    for (const name of pending) {
+      const program = findProgram(name, force)
+      if (program === undefined) continue
+      if (deleteProgram(program.id).ok) deleted.push(name)
+      else next.push(name)
+    }
+    if (next.length === pending.length) break
+    pending = next
+  }
+  return { deleted, kept: pending }
+}
+
 /** Может ли игрок менять программы команды (настройка карты «кто может публиковать»). */
 export function rightsDenied(player: LuaPlayer): string | undefined {
   const rights = settings.global["automaton-publish-rights"]?.value as string | undefined

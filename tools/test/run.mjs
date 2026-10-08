@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url"
 import { checkAssets } from "./assets.mjs"
 import { checkLocale } from "./locale.mjs"
 import { checkSource } from "./source.mjs"
+import { checkTsPlugin } from "./tsplugin.mjs"
 
 const root = join(fileURLToPath(import.meta.url), "..", "..", "..")
 const lua = join(root, "tools", "lua", "5.2", "bin", "lua")
@@ -38,6 +39,13 @@ if (locale.problems.length > 0) {
 const traps = checkSource(root)
 if (traps.length > 0) {
   console.error(`Код мода:\n  ${traps.join("\n  ")}`)
+  process.exit(1)
+}
+
+// Плагин TypeScript для VS Code: ошибки на неподдерживаемом, подсказки о тиках.
+const plugin = checkTsPlugin(root)
+if (plugin.length > 0) {
+  console.error(`Плагин VS Code:\n  ${plugin.join("\n  ")}`)
   process.exit(1)
 }
 
