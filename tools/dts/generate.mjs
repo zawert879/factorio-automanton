@@ -17,8 +17,9 @@ const blocks = [...api.matchAll(/```ts\n([\s\S]*?)```/g)].map((m) => m[1])
 const declarations = blocks.filter((b) => /\bdeclare\b/.test(b) || b.startsWith("type Item"))
 const examples = blocks.filter((b) => !declarations.includes(b))
 // Примеры из руководства игрока — тоже программы, они должны проходить tsc.
-const guide = readFileSync(join(root, "docs", "PLAYER_GUIDE.md"), "utf8")
-for (const m of guide.matchAll(/```ts\n([\s\S]*?)```/g)) examples.push(m[1])
+for (const doc of [join(root, "docs", "PLAYER_GUIDE.md"), join(root, "README.md")]) {
+  for (const m of readFileSync(doc, "utf8").matchAll(/```ts\n([\s\S]*?)```/g)) examples.push(m[1])
+}
 
 const header = `// Типы API автоматонов (мод Automaton для Factorio) — для редактора VS Code.
 // Проще всего: в игре окно «Программы команды» → «Папка для VS Code» — мод запишет готовую папку

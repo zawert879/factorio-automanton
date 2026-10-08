@@ -19,10 +19,13 @@
     "test:mp": "node tools/test/mp.mjs",
     "bench:machines": "node tools/bench/machines.mjs",
     "package": "cd mod && npx --yes factoriomod-debug@2.0.14 package && mkdir -p ../dist && mv automaton_*.zip ../dist/",
-    "demo:science": "node tools/demo/science.mjs"
+    "demo:science": "node tools/demo/science.mjs",
+    "docs:record": "node tools/docs/record.mjs"
   },
   "devDependencies": {
+    "gifenc": "^1.0.3",
     "lua-types": "2.14.1",
+    "pngjs": "^7.0.0",
     "typed-factorio": "3.36.0",
     "typescript": "6.0.2",
     "typescript-to-lua": "1.37.1"

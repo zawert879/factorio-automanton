@@ -106,7 +106,8 @@ onEvent(defines.events.on_object_destroyed, (e) => {
 // automaton-bench — бенчмарк языка в Lua Factorio (npm run bench:game),
 // automaton-bench-flyers — нагрузочный тест летающих (npm run bench:flyers),
 // automaton-bench-machines — стресс-тест машин с программами (npm run bench:machines),
-// automaton-build-science — сохранение с демо-фабрикой науки (npm run demo:science).
+// automaton-build-science — сохранение с демо-фабрикой науки (npm run demo:science),
+// automaton-record — анимации для документации (npm run docs:record).
 // Имя модуля — через переменную: TSTL не ищет его заранее, а в zip мода папки test/ нет (package.ignore).
 const testModule =
   script.active_mods["automaton-test"] !== undefined
@@ -123,7 +124,9 @@ const testModule =
               ? "test.machinesBench"
               : script.active_mods["automaton-build-science"] !== undefined
                 ? "test.scienceBuild"
-                : undefined
+                : script.active_mods["automaton-record"] !== undefined
+                  ? "test.record"
+                  : undefined
 if (testModule !== undefined) {
   require(testModule)
 }

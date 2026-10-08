@@ -53,7 +53,7 @@ if (filter === "--build-only") process.exit(0)
  */
 function generateExamples() {
   const examples = []
-  for (const file of ["docs/API.md", "docs/language-samples/3-typescript.md", "docs/PLAYER_GUIDE.md"]) {
+  for (const file of ["docs/API.md", "docs/language-samples/3-typescript.md", "docs/PLAYER_GUIDE.md", "README.md"]) {
     const text = readFileSync(join(root, file), "utf8")
     let index = 0
     for (const match of text.matchAll(/```ts\n([\s\S]*?)```/g)) {
