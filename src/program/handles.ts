@@ -8,6 +8,7 @@ import { LuaEntity, LuaInventory, MapPosition } from "factorio:runtime"
 import { currentAction } from "../automaton/actions"
 import { distanceToEntity } from "../automaton/actions"
 import { entityFluid, entityFuel, entityInput, entityItemCount, entityOutput, entityProgress, entityRecipe, entityStatus } from "../automaton/inspect"
+import { modelOfRecord, robotVision } from "../automaton/models"
 import { isMoving } from "../automaton/movement"
 import { RobotRecord } from "../automaton/registry"
 import { defineHostObject, hostGetters, hostMethods, Val } from "../lang/runtime/core"
@@ -15,7 +16,8 @@ import { actionError, currentRobot } from "./context"
 import { programArray, programPosition, readPosition } from "./values"
 
 /** Характеристики модели Mk1 (docs/API.md, «Модели машин»). */
-export const WORKER_MK1_STATS = { model: "worker-mk1", reach: 10, mineReach: 2.7, vision: 10, quantum: 50 }
+/** Досягаемость — как у персонажа, у всех моделей одна. Остальное — у модели (src/automaton/models.ts). */
+export const ROBOT_REACH = { reach: 10, mineReach: 2.7 }
 
 export interface HandlesState {
   /** Обёртки зданий по unit_number: одна на здание, чтобы === и ключи Map работали. */
@@ -74,7 +76,7 @@ export function handleRobot(value: Val): RobotRecord {
 
 export function inSight(entity: LuaEntity): boolean {
   const robot = currentRobot()
-  return entity.valid && distanceToEntity(robot.entity.position, entity) <= WORKER_MK1_STATS.vision
+  return entity.valid && distanceToEntity(robot.entity.position, entity) <= robotVision(robot)
 }
 
 function requireSight(entity: LuaEntity): void {
@@ -225,7 +227,10 @@ defineHostObject("robot")
 const robotGetters = hostGetters.robot
 robotGetters.id = (o: Val) => o.__id
 robotGetters.name = (o: Val) => storage.robots.byId[o.__id]?.name
-robotGetters.model = () => WORKER_MK1_STATS.model
+robotGetters.model = (o: Val) => {
+  const record = storage.robots.byId[o.__id]
+  return record === undefined ? undefined : modelOfRecord(record).id
+}
 robotGetters.valid = (o: Val) => storage.robots.byId[o.__id]?.entity.valid === true
 robotGetters.inSight = (o: Val) => {
   const record = storage.robots.byId[o.__id]

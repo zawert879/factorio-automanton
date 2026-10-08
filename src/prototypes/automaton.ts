@@ -1,4 +1,4 @@
-// Прототипы рабочего автоматона Mk1: юнит, анимации тела, предмет, временный рецепт и заглушка для установки.
+// Прототипы рабочих автоматонов Mk1–Mk3 (8.1): юнит, анимации тела, предмет, рецепт и заглушка для установки.
 // Юнит нельзя поставить из инвентаря напрямую, поэтому предмет ставит заглушку
 // (simple-entity-with-owner), которую control заменяет на юнит (src/automaton/placement.ts).
 import { PrototypeData } from "factorio:common"
@@ -12,16 +12,21 @@ import {
   SimpleEntityWithOwnerPrototype,
   UnitPrototype,
 } from "factorio:prototype"
-import { ACTIVITIES, Activity, BODY_DIRECTIONS, bodyAnimationName, WORKER_MK1, WORKER_MK1_PLACER } from "../names"
+import { ACTIVITIES, Activity, BODY_DIRECTIONS, bodyAnimationName, MODELS, ModelSpec, WORKER_MK1, WORKER_MK2 } from "../names"
 
 declare const data: PrototypeData
 
 const SCALE = 0.8
-const STEEL: Color = { r: 0.62, g: 0.72, b: 0.88 }
-// Акцент — бирюзовый: оранжевый совпадал с цветом игрока по умолчанию, машины путались с игроками.
-const ACCENT: Color = { r: 0.15, g: 0.85, b: 0.9 }
+// Цвета моделей — в MODELS (src/names.ts). Акцент Mk1 — бирюзовый: оранжевый совпадал с цветом игрока
+// по умолчанию, машины путались с игроками.
 
-const ICONS: IconData[] = [{ icon: "__core__/graphics/icons/entity/character.png", icon_size: 64, tint: STEEL }]
+/** Значок модели: персонаж в цвете стали и цифра модели в углу. */
+function modelIcons(model: ModelSpec, digit: number): IconData[] {
+  return [
+    { icon: "__core__/graphics/icons/entity/character.png", icon_size: 64, tint: model.steel as Color },
+    { icon: `__base__/graphics/icons/signal/signal_${digit}.png`, icon_size: 64, scale: 0.25, shift: [9, 9], tint: model.accent as Color },
+  ]
+}
 
 /** Слой анимации персонажа, как он лежит в data.raw (нужные нам поля). */
 interface SourceLayer {
@@ -40,7 +45,7 @@ interface SourceLayer {
  * Анимация одного направления из анимации персонажа (8 направлений — 8 строк листа, а «полосы» —
  * несколько файлов по ширине). Перекрашена в сталь с янтарным акцентом и уменьшена.
  */
-function bodyAnimation(name: string, source: RotatedAnimation, direction: number, speed: number): AnimationPrototype {
+function bodyAnimation(name: string, source: RotatedAnimation, direction: number, speed: number, model: ModelSpec): AnimationPrototype {
   const layers = (source as unknown as { layers: SourceLayer[] }).layers.map((layer) => {
     const [x, y] = Array.isArray(layer.shift) ? layer.shift : [layer.shift?.x ?? 0, layer.shift?.y ?? 0]
     const common = {
@@ -51,7 +56,7 @@ function bodyAnimation(name: string, source: RotatedAnimation, direction: number
       shift: [x * SCALE, y * SCALE] as [number, number],
       animation_speed: speed,
       draw_as_shadow: layer.draw_as_shadow,
-      tint: layer.draw_as_shadow ? undefined : layer.apply_runtime_tint ? ACCENT : STEEL,
+      tint: (layer.draw_as_shadow ? undefined : layer.apply_runtime_tint ? model.accent : model.steel) as Color | undefined,
     }
     if (layer.stripes !== undefined) {
       const stripes = layer.stripes.map((stripe) => ({
@@ -78,14 +83,6 @@ const BODY_SOURCES: Record<Activity, [RotatedAnimation, number]> = {
   mine: [characterAnimations.mining_with_tool!, 0.9],
 }
 
-const bodyAnimations: AnimationPrototype[] = []
-for (const activity of ACTIVITIES) {
-  const [source, speed] = BODY_SOURCES[activity]
-  for (let direction = 0; direction < BODY_DIRECTIONS; direction++) {
-    bodyAnimations.push(bodyAnimation(bodyAnimationName(activity, direction), source, direction, speed))
-  }
-}
-
 /**
  * Собственный спрайт юнита — прозрачный: у юнита только анимация бега по пройденному пути,
  * простоя нет. Тело рисуется накладкой (src/automaton/appearance.ts) по состоянию и направлению.
@@ -98,77 +95,108 @@ const INVISIBLE: RotatedAnimation = {
   direction_count: 1,
 }
 
-const worker: UnitPrototype = {
-  type: "unit",
-  name: WORKER_MK1,
-  icons: ICONS,
-  flags: ["placeable-player", "placeable-off-grid", "player-creation"],
-  minable: { mining_time: 0.5, result: WORKER_MK1 },
-  max_health: 150,
-  collision_box: [
-    [-0.2, -0.2],
-    [0.2, 0.2],
-  ],
-  selection_box: [
-    [-0.35, -1.1],
-    [0.35, 0.2],
-  ],
-  movement_speed: 0.1,
-  distance_per_frame: 1,
-  run_animation: INVISIBLE,
-  // Юниту обязательно нужна атака; рабочему она ни к чему — нулевой урон, бой не начинается
-  // (команды отдаются с distraction = none).
-  attack_parameters: {
-    type: "projectile",
-    range: 0.5,
-    cooldown: 60,
-    ammo_category: "melee",
-    ammo_type: { action: { type: "direct", action_delivery: { type: "instant" } } },
-    animation: INVISIBLE,
-  },
-  vision_distance: 10,
-  distraction_cooldown: 300,
-  max_pursue_distance: 10,
-  ai_settings: { destroy_when_commands_fail: false, allow_try_return_to_spawner: false, do_separation: true },
-  has_belt_immunity: true,
-  dying_explosion: "explosion",
-}
-
-const placer: SimpleEntityWithOwnerPrototype = {
-  type: "simple-entity-with-owner",
-  name: WORKER_MK1_PLACER,
-  icons: ICONS,
-  flags: ["placeable-player", "placeable-off-grid", "player-creation"],
-  placeable_by: { item: WORKER_MK1, count: 1 },
-  minable: { mining_time: 0.1, result: WORKER_MK1 },
-  collision_box: worker.collision_box,
-  selection_box: worker.selection_box,
-  picture: { filename: "__core__/graphics/icons/entity/character.png", size: 64, scale: 0.5, tint: STEEL },
-  hidden_in_factoriopedia: true,
-}
-
-// item-with-tags: подобранная машина уносит в предмет свои id и имя (src/automaton/registry.ts).
-const item: ItemWithTagsPrototype = {
-  type: "item-with-tags",
-  name: WORKER_MK1,
-  icons: ICONS,
-  subgroup: "transport",
-  order: "z[automaton]-a[worker-mk1]",
-  place_result: WORKER_MK1_PLACER,
-  stack_size: 10,
-}
-
-// Временный рецепт для спайка: доступен с начала игры. Настоящий баланс — на этапах 6 и 8.
-const recipe: RecipePrototype = {
-  type: "recipe",
-  name: WORKER_MK1,
-  enabled: true,
-  energy_required: 2,
-  ingredients: [
+/** Рецепты моделей: Mk1 — со старта, Mk2 и Mk3 — улучшение предыдущей модели (открываются технологиями). */
+const RECIPES: Record<string, RecipePrototype["ingredients"]> = {
+  [WORKER_MK1]: [
     { type: "item", name: "iron-plate", amount: 10 },
     { type: "item", name: "iron-gear-wheel", amount: 5 },
   ],
-  results: [{ type: "item", name: WORKER_MK1, amount: 1 }],
+  [WORKER_MK2]: [
+    { type: "item", name: WORKER_MK1, amount: 1 },
+    { type: "item", name: "steel-plate", amount: 10 },
+    { type: "item", name: "electronic-circuit", amount: 10 },
+    { type: "item", name: "iron-gear-wheel", amount: 10 },
+  ],
+  "automaton-worker-mk3": [
+    { type: "item", name: WORKER_MK2, amount: 1 },
+    { type: "item", name: "battery", amount: 10 },
+    { type: "item", name: "advanced-circuit", amount: 10 },
+    { type: "item", name: "steel-plate", amount: 10 },
+  ],
 }
 
-data.extend([worker, placer, item, recipe, ...bodyAnimations])
+function modelPrototypes(model: ModelSpec, index: number): object[] {
+  const icons = modelIcons(model, index + 1)
+  const animations: AnimationPrototype[] = []
+  for (const activity of ACTIVITIES) {
+    const [source, frameSpeed] = BODY_SOURCES[activity]
+    // Кадры бега идут по пути: быстрая модель перебирает их быстрее.
+    const speed = activity === "run" ? frameSpeed * (model.speed / 0.1) : frameSpeed
+    for (let direction = 0; direction < BODY_DIRECTIONS; direction++) {
+      animations.push(bodyAnimation(bodyAnimationName(model.entity, activity, direction), source, direction, speed, model))
+    }
+  }
+
+  const worker: UnitPrototype = {
+    type: "unit",
+    name: model.entity,
+    icons,
+    flags: ["placeable-player", "placeable-off-grid", "player-creation"],
+    minable: { mining_time: 0.5, result: model.entity },
+    max_health: model.health,
+    collision_box: [
+      [-0.2, -0.2],
+      [0.2, 0.2],
+    ],
+    selection_box: [
+      [-0.35, -1.1],
+      [0.35, 0.2],
+    ],
+    movement_speed: model.speed,
+    distance_per_frame: 1,
+    run_animation: INVISIBLE,
+    // Юниту обязательно нужна атака; рабочему она ни к чему — нулевой урон, бой не начинается
+    // (команды отдаются с distraction = none).
+    attack_parameters: {
+      type: "projectile",
+      range: 0.5,
+      cooldown: 60,
+      ammo_category: "melee",
+      ammo_type: { action: { type: "direct", action_delivery: { type: "instant" } } },
+      animation: INVISIBLE,
+    },
+    vision_distance: 10,
+    distraction_cooldown: 300,
+    max_pursue_distance: 10,
+    ai_settings: { destroy_when_commands_fail: false, allow_try_return_to_spawner: false, do_separation: true },
+    has_belt_immunity: true,
+    dying_explosion: "explosion",
+  }
+
+  const placer: SimpleEntityWithOwnerPrototype = {
+    type: "simple-entity-with-owner",
+    name: model.placer,
+    icons,
+    flags: ["placeable-player", "placeable-off-grid", "player-creation"],
+    placeable_by: { item: model.entity, count: 1 },
+    minable: { mining_time: 0.1, result: model.entity },
+    collision_box: worker.collision_box,
+    selection_box: worker.selection_box,
+    picture: { filename: "__core__/graphics/icons/entity/character.png", size: 64, scale: 0.5, tint: model.steel as Color },
+    hidden_in_factoriopedia: true,
+  }
+
+  // item-with-tags: подобранная машина уносит в предмет свои id, имя, энергию и бак (src/automaton/registry.ts).
+  const item: ItemWithTagsPrototype = {
+    type: "item-with-tags",
+    name: model.entity,
+    icons,
+    subgroup: "transport",
+    order: `z[automaton]-a[${model.id}]`,
+    place_result: model.placer,
+    stack_size: 10,
+  }
+
+  const recipe: RecipePrototype = {
+    type: "recipe",
+    name: model.entity,
+    enabled: model.tech === undefined,
+    energy_required: 2 + index * 3,
+    ingredients: RECIPES[model.entity],
+    results: [{ type: "item", name: model.entity, amount: 1 }],
+  }
+
+  return [worker, placer, item, recipe, ...animations]
+}
+
+for (let i = 0; i < MODELS.length; i++) data.extend(modelPrototypes(MODELS[i], i) as never)

@@ -3,7 +3,6 @@ import { say as showBubble } from "../../automaton/status"
 import { defineHostObject, host, hostMethods, Val } from "../../lang/runtime/core"
 import { lib } from "../../lang/runtime/library"
 import { toStringValue } from "../../lang/runtime/values"
-import { WORKER_MK1 } from "../../names"
 import { currentMachine, currentRobot } from "../context"
 import { appendConsole } from "../machines"
 import { text, ticks } from "./common"
@@ -53,6 +52,6 @@ host.alert = (message: Val) => {
   const robot = currentRobot()
   const content = string.sub(text(message), 1, 200)
   for (const player of robot.entity.force.players) {
-    player.add_custom_alert(robot.entity, { type: "item", name: WORKER_MK1 }, [`automaton.alert`, robot.name, content], true)
+    player.add_custom_alert(robot.entity, { type: "item", name: robot.model }, [`automaton.alert`, robot.name, content], true)
   }
 }

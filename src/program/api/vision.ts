@@ -3,9 +3,10 @@
 import { LuaEntity, MapPosition } from "factorio:runtime"
 import { spend } from "../../automaton/energy"
 import { defineHostObject, hostMethods, Val } from "../../lang/runtime/core"
-import { MARKER, WORKER_MK1, WORKER_MK1_PLACER } from "../../names"
+import { robotVision } from "../../automaton/models"
+import { MARKER, ROBOT_ENTITIES, ROBOT_PLACERS } from "../../names"
 import { actionError, currentRobot } from "../context"
-import { entityHandle, robotHandle, WORKER_MK1_STATS } from "../handles"
+import { entityHandle, robotHandle } from "../handles"
 import { programArray, programPosition } from "../values"
 
 /** Энергия взгляда радиусом 10 клеток. */
@@ -30,7 +31,8 @@ const WATER_TILES = ["water", "deepwater", "water-green", "deepwater-green", "wa
 /** Радиус взгляда (не больше зрения машины) и его цена. */
 function look(radius: Val): number {
   const robot = currentRobot()
-  const r = type(radius) === "number" && radius > 0 ? math.min(radius as number, WORKER_MK1_STATS.vision) : WORKER_MK1_STATS.vision
+  const vision = robotVision(robot)
+  const r = type(radius) === "number" && radius > 0 ? math.min(radius as number, vision) : vision
   if (!spend(robot, SCAN_JOULES * (r / 10) ** 2)) actionError("no-fuel")
   return r
 }
@@ -62,7 +64,7 @@ void scan
 hostMethods.scan.robots = (_o: Val, _k: Val, radius: Val) => {
   const robot = currentRobot()
   const r = look(radius)
-  const found = robot.entity.surface.find_entities_filtered({ position: robot.entity.position, radius: r, name: WORKER_MK1, force: robot.entity.force })
+  const found = robot.entity.surface.find_entities_filtered({ position: robot.entity.position, radius: r, name: ROBOT_ENTITIES as string[], force: robot.entity.force })
   const others: LuaEntity[] = []
   for (const entity of found) if (entity !== robot.entity && storage.robots.idByUnit[entity.unit_number!] !== undefined) others.push(entity)
   return programArray(byDistance(others, (e) => e.position).map((e) => robotHandle(storage.robots.idByUnit[e.unit_number!]!)))
@@ -81,7 +83,7 @@ hostMethods.scan.entities = (_o: Val, _k: Val, filter: Val) => {
   })
   const buildings: LuaEntity[] = []
   for (const entity of found) {
-    if (SKIPPED_TYPES[entity.type] || entity.name === MARKER || entity.name === WORKER_MK1_PLACER) continue
+    if (SKIPPED_TYPES[entity.type] || entity.name === MARKER || ROBOT_PLACERS.includes(entity.name)) continue
     buildings.push(entity)
   }
   return programArray(byDistance(buildings, (e) => e.position).map((e) => entityHandle(e)))

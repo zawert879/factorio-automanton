@@ -10,7 +10,7 @@ import { cancelMove } from "./movement"
 import { RobotRecord } from "./registry"
 import { problemFor, showProblem } from "./status"
 
-export type ActionKind = "wait" | "mine" | "take" | "put" | "pickup" | "drop" | "give" | "repair" | "refuel" | "pump" | "fill" | "drain"
+export type ActionKind = "wait" | "mine" | "take" | "put" | "pickup" | "drop" | "give" | "repair" | "refuel" | "pump" | "fill" | "drain" | "charge" | "set-recipe" | "build" | "deconstruct" | "rotate"
 
 export type ActionError =
   | "out-of-reach"
@@ -32,8 +32,12 @@ export interface ActionParams {
   /** Сколько: предметов или (у жидкостей) единиц жидкости. */
   count?: number
   seconds?: number
-  /** Клетка (вода, из которой качает pump). */
+  /** Клетка (вода, из которой качает pump; куда ставить build). */
   position?: MapPosition
+  /** Направление (build), defines.direction. */
+  direction?: defines.direction
+  /** Повернуть против часовой стрелки (rotate). */
+  reverse?: boolean
 }
 
 export interface ActionState {
@@ -44,6 +48,8 @@ export interface ActionState {
   nextTick: number
   /** Сколько сделано (предметов перенесено, единиц добыто…). */
   done: number
+  /** Здание — результат действия (build). */
+  entity?: LuaEntity
   notifyPlayer?: PlayerIndex
 }
 
@@ -56,6 +62,8 @@ export interface ActionResult {
   ok: boolean
   /** Сколько сделано — и при успехе, и при ошибке. */
   count: number
+  /** Здание — результат действия (build). */
+  entity?: LuaEntity
   error?: ActionError
   reason?: ActionError
 }
@@ -112,7 +120,7 @@ function schedule(id: number, tick: number): void {
 function finish(record: RobotRecord, action: ActionState, error: ActionError | undefined, reason?: ActionError): void {
   const state = storage.actions
   state.current[record.id] = undefined
-  const result: ActionResult = { kind: action.kind, ok: error === undefined, count: action.done, error, reason }
+  const result: ActionResult = { kind: action.kind, ok: error === undefined, count: action.done, entity: action.entity, error, reason }
   state.lastResult[record.id] = result
   for (const listener of finishListeners) listener(record, result)
   if (record.entity.valid) {

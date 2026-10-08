@@ -161,6 +161,8 @@ export interface Machine {
   allocated?: number
   /** Живая память на последнем замере. */
   live?: number
+  /** Предел живой памяти этой машины (по умолчанию LIMITS.memory): у моделей и исследований — свой. */
+  memoryLimit?: number
   /** Перерасход кванта (синхронные колбэки, тяжёлые методы): столько инструкций машина пропускает. */
   debt?: number
 }
@@ -240,10 +242,11 @@ export function measure(this: void, root: Val, limit: number): number {
 function checkMemory(machine: Machine, allocated: number): void {
   machine.allocated = (machine.allocated ?? 0) + allocated
   if (machine.allocated < math.max(2000, (machine.live ?? 0) / 2)) return
-  const live = measure([machine.frame, machine.waiting], LIMITS.memory)
+  const limit = machine.memoryLimit ?? LIMITS.memory
+  const live = measure([machine.frame, machine.waiting], limit)
   machine.live = live
   machine.allocated = 0
-  if (live > LIMITS.memory) {
+  if (live > limit) {
     const value = makeError("RangeError", "Program uses too much memory", "memory")
     machine.status = "error"
     machine.error = { name: "RangeError", message: value.message, code: "memory", value }

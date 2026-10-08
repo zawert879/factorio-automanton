@@ -6,12 +6,12 @@
 import { LuaEntity } from "factorio:runtime"
 import { ActionState, distanceToEntity, face, registerActionHandler, StepOutcome } from "./actions"
 import { MINING_WATTS, spend } from "./energy"
+import { robotMiningSpeed } from "./models"
 import { RobotRecord } from "./registry"
 import { EPSILON, takeFromTank, tankOf } from "./tank"
 
-/** Досягаемость до месторождения (как у персонажа) и скорость добычи машины Mk1. */
+/** Досягаемость до месторождения (как у персонажа). Скорость добычи — у модели (src/automaton/models.ts). */
 export const MINE_REACH = 2.7
-export const MINING_SPEED = 0.5
 
 export function initMining(): void {
   storage.rng ??= game.create_random_generator(20261008)
@@ -46,8 +46,8 @@ export function fluidPerUnit(resource: LuaEntity): number {
   return (resource.prototype.mineable_properties.fluid_amount ?? 0) / 10
 }
 
-function unitTicks(resource: LuaEntity): number {
-  return math.max(1, math.ceil((resource.prototype.mineable_properties.mining_time / MINING_SPEED) * 60))
+function unitTicks(record: RobotRecord, resource: LuaEntity): number {
+  return math.max(1, math.ceil((resource.prototype.mineable_properties.mining_time / robotMiningSpeed(record)) * 60))
 }
 
 /** Клетка месторождения для действия: заданная (если ещё есть и рядом) или ближайшая подходящая. */
@@ -80,7 +80,7 @@ function nextUnit(record: RobotRecord, action: ActionState): StepOutcome {
   }
   action.params.target = resource
   face(record, resource.position, "mine")
-  return { after: unitTicks(resource) }
+  return { after: unitTicks(record, resource) }
 }
 
 /** Добыть одну единицу из клетки: продукты в груз, запас клетки — на единицу меньше. */
@@ -109,7 +109,7 @@ registerActionHandler("mine", {
     const resource = action.params.target
     // За время шага клетку могли истощить или машину увести.
     if (resource?.valid && distanceToEntity(record.entity.position, resource) <= MINE_REACH) {
-      if (!spend(record, (unitTicks(resource) / 60) * MINING_WATTS)) {
+      if (!spend(record, (unitTicks(record, resource) / 60) * MINING_WATTS)) {
         return action.done > 0 ? { finish: true, reason: "no-fuel" } : { finish: true, error: "no-fuel" }
       }
       mineUnit(record, action, resource)

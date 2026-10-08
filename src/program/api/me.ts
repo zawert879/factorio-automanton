@@ -4,7 +4,8 @@ import { fuelValue } from "../../automaton/energy"
 import { tankCapacity, tankOf } from "../../automaton/tank"
 import { charge, defineHostObject, hostGetters, hostMethods, hostSetters, Val } from "../../lang/runtime/core"
 import { actionError, currentMachine, currentRobot } from "../context"
-import { cargoHandle, distanceBetween, robotHandle, robotHealth, robotProgramName, robotState, WORKER_MK1_STATS } from "../handles"
+import { modelOfRecord, robotBattery, robotVision } from "../../automaton/models"
+import { cargoHandle, distanceBetween, ROBOT_REACH, robotHandle, robotHealth, robotProgramName, robotState } from "../handles"
 import { copyValue, programPosition } from "../values"
 import { text } from "./common"
 
@@ -15,7 +16,7 @@ defineHostObject("me")
 const getters = hostGetters.me
 getters.id = () => currentRobot().id
 getters.name = () => currentRobot().name
-getters.model = () => WORKER_MK1_STATS.model
+getters.model = () => modelOfRecord(currentRobot()).id
 getters.valid = () => true
 getters.inSight = () => true
 getters.position = () => programPosition(currentRobot().entity.position)
@@ -26,6 +27,8 @@ getters.label = () => currentMachine().label ?? ""
 getters.cargo = () => cargoHandle(currentRobot())
 getters.fuel = () => {
   const robot = currentRobot()
+  const battery = robotBattery(robot)
+  if (battery !== undefined) return math.min(1, robot.energy / battery)
   const stack = robot.fuel[0]
   const stored = robot.energy + (stack.valid_for_read ? stack.count * fuelValue(stack.name) : 0)
   return math.min(1, stored / FULL_TANK_JOULES)
@@ -37,9 +40,9 @@ getters.tank = () => {
   return { fluid: tank.amount > 0 ? tank.fluid : undefined, amount: tank.amount, capacity: tankCapacity(robot) }
 }
 getters.weapon = () => undefined
-getters.reach = () => WORKER_MK1_STATS.reach
-getters.mineReach = () => WORKER_MK1_STATS.mineReach
-getters.vision = () => WORKER_MK1_STATS.vision
+getters.reach = () => ROBOT_REACH.reach
+getters.mineReach = () => ROBOT_REACH.mineReach
+getters.vision = () => robotVision(currentRobot())
 getters.home = () => {
   const home = currentMachine().home
   return home === undefined ? undefined : programPosition(home)

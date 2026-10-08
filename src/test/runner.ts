@@ -2,8 +2,16 @@
 // (его создаёт npm run test:game во временной папке модов; в обычной игре его нет).
 // Тесты идут по очереди; t.after(тики, fn) продолжает тест позже. Итог —
 // script-output/automaton-test-results.json, как только все тесты закончатся или выйдет время.
+import { TECH } from "../names"
 import { registeredTests, TestCase, TestContext } from "./testing"
 import "./index"
+
+/**
+ * Исследования, которые открывают функции API (8.4): тестам API они нужны. Сенсоры и улучшения не
+ * исследуются — они меняют характеристики машин (их тесты исследуют сами и откатывают).
+ */
+const TEST_RESEARCH = [TECH.radio, TECH.display, TECH.tuning, TECH.fluids, TECH.construction, TECH.circuits]
+let prepared = false
 
 const RESULTS_FILE = "automaton-test-results.json"
 /** Последний тик, до которого тесты обязаны закончиться (npm run test:game гоняет игру дольше). */
@@ -59,6 +67,10 @@ function writeResults(): void {
 
 script.on_nth_tick(1, (event) => {
   const tick = event.tick
+  if (!prepared) {
+    prepared = true
+    for (const tech of TEST_RESEARCH) game.forces.player.technologies[tech].researched = true
+  }
   if (tick > DEADLINE_TICK) {
     if (current !== undefined) results.push({ name: current.name, ok: false, error: `не закончился к тику ${DEADLINE_TICK}` })
     for (const test of queue) results.push({ name: test.name, ok: false, error: "не запускался: вышло время" })

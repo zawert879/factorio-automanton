@@ -6,7 +6,7 @@
 // возят машины, а без электричества не работают лаборатории — иначе не исследовать вообще ничего.
 import { PrototypeData } from "factorio:common"
 import { Color, IconData, TechnologyPrototype } from "factorio:prototype"
-import { TECH } from "../names"
+import { CHARGING_STATION, TECH, UPGRADE_LEVELS, UPGRADES, WORKER_MK2, WORKER_MK3 } from "../names"
 
 declare const data: PrototypeData
 
@@ -32,6 +32,10 @@ interface Spec {
   trigger?: TechnologyPrototype["research_trigger"]
   /** Уровни одной технологии (Сенсоры 1–3): общий значок и «upgrade». */
   upgrade?: boolean
+  /** Рецепты, которые открывает (модели, станция). */
+  unlocks?: string[]
+  /** Описание эффекта (ключ automaton.tech-effect-…); по умолчанию — по имени технологии. */
+  effect?: string
 }
 
 const RED: Pack[] = ["automation-science-pack"]
@@ -55,7 +59,14 @@ const SPECS: Spec[] = [
   { name: TECH.construction, overlay: ICON + "blueprint.png", prerequisites: [TECH.radio, "logistic-science-pack"], count: 100, packs: GREEN },
   { name: TECH.circuits, overlay: ICON + "red-wire.png", prerequisites: ["circuit-network"], count: 100, packs: GREEN },
   { name: TECH.sensors2, overlay: ICON + "night-vision-equipment.png", prerequisites: [TECH.sensors1, "logistic-science-pack"], count: 150, packs: GREEN, upgrade: true },
-  { name: TECH.mk2, overlay: ICON + "battery.png", prerequisites: ["electric-energy-distribution-1"], count: 150, packs: GREEN },
+  {
+    name: TECH.mk2,
+    overlay: ICON + "battery.png",
+    prerequisites: ["electric-energy-distribution-1"],
+    count: 150,
+    packs: GREEN,
+    unlocks: [WORKER_MK2, CHARGING_STATION],
+  },
   {
     name: TECH.combat1,
     overlay: ICON + "submachine-gun.png",
@@ -65,7 +76,14 @@ const SPECS: Spec[] = [
   },
   // Синяя и дальше.
   { name: TECH.sensors3, overlay: ICON + "night-vision-equipment.png", prerequisites: [TECH.sensors2, "chemical-science-pack"], count: 250, packs: BLUE, upgrade: true },
-  { name: TECH.mk3, overlay: ICON + "accumulator.png", prerequisites: [TECH.mk2, "battery", "chemical-science-pack"], count: 300, packs: BLUE },
+  {
+    name: TECH.mk3,
+    overlay: ICON + "accumulator.png",
+    prerequisites: [TECH.mk2, "battery", "chemical-science-pack"],
+    count: 300,
+    packs: BLUE,
+    unlocks: [WORKER_MK3],
+  },
   {
     name: TECH.combat2,
     overlay: ICON + "rocket-launcher.png",
@@ -83,6 +101,35 @@ const SPECS: Spec[] = [
   },
 ]
 
+// Улучшения (8.3): по 3 уровня, зелёная → синяя → жёлтая наука.
+const UPGRADE_ICONS: Record<string, string> = {
+  speed: ICON + "exoskeleton-equipment.png",
+  cargo: ICON + "wooden-chest.png",
+  mining: ICON + "iron-ore.png",
+  processor: ICON + "advanced-circuit.png",
+  memory: ICON + "processing-unit.png",
+  tank: ICON + "storage-tank.png",
+}
+const UPGRADE_COST: { count: number; packs: Pack[]; prerequisite: string }[] = [
+  { count: 100, packs: GREEN, prerequisite: "logistic-science-pack" },
+  { count: 200, packs: BLUE, prerequisite: "chemical-science-pack" },
+  { count: 400, packs: [...BLUE, "utility-science-pack"], prerequisite: "utility-science-pack" },
+]
+for (const upgrade of UPGRADES) {
+  for (let level = 1; level <= UPGRADE_LEVELS; level++) {
+    const cost = UPGRADE_COST[level - 1]
+    SPECS.push({
+      name: `${upgrade.tech}-${level}`,
+      overlay: UPGRADE_ICONS[upgrade.kind],
+      prerequisites: level === 1 ? [TECH.radio, cost.prerequisite] : [`${upgrade.tech}-${level - 1}`, cost.prerequisite],
+      count: cost.count,
+      packs: cost.packs,
+      upgrade: true,
+      effect: `upgrade-${upgrade.kind}`,
+    })
+  }
+}
+
 /** Ключ описания эффекта: automaton.tech-effect-<имя без префикса>. */
 function effectKey(name: string): string {
   const [key] = string.gsub(name, "^automaton%-", "")
@@ -94,7 +141,10 @@ const technologies: TechnologyPrototype[] = SPECS.map((spec) => {
     type: "technology",
     name: spec.name,
     icons: icons(spec.overlay),
-    effects: [{ type: "nothing", effect_description: [effectKey(spec.name)], icons: icons(spec.overlay) }],
+    effects: [
+      ...(spec.unlocks ?? []).map((recipe) => ({ type: "unlock-recipe" as const, recipe })),
+      { type: "nothing", effect_description: spec.effect !== undefined ? [`automaton.tech-effect-${spec.effect}`] : [effectKey(spec.name)], icons: icons(spec.overlay) },
+    ],
     prerequisites: spec.prerequisites,
     upgrade: spec.upgrade,
   }

@@ -3,14 +3,17 @@
 // переходят игроку, при гибели высыпаются на землю.
 import { onEvent } from "../events"
 import { LuaEntity, LuaInventory, LuaItemStack, LuaRenderObject, LuaSurface, MapPosition, Tags } from "factorio:runtime"
-import { Activity, ROBOT_TAG, WORKER_MK1 } from "../names"
+import { Activity, modelOf, ROBOT_ENTITIES, ROBOT_TAG } from "../names"
 import { directionOf, drawBody } from "./appearance"
+import { applyUpgrades } from "./models"
 import type { Tank } from "./tank"
 
 export interface RobotRecord {
   id: number
   name: string
   entity: LuaEntity
+  /** Модель — имя сущности юнита (src/names.ts, MODELS); переживает гибель сущности. */
+  model: string
   /** Подпись с именем над машиной (видна в режиме Alt). */
   label: LuaRenderObject
   /** Тело — анимация поверх прозрачного юнита (src/automaton/appearance.ts). */
@@ -46,6 +49,7 @@ export interface RobotTag {
   tank?: Tank
 }
 
+/** Груз Mk1 без исследований (у моделей — MODELS[].cargoSlots). */
 export const CARGO_SLOTS = 10
 /** Новая машина «заведена на заводе»: хватает примерно на 160 клеток пути без топлива. */
 export const START_ENERGY = 2_000_000
@@ -79,21 +83,24 @@ export function registerRobot(entity: LuaEntity, tag?: RobotTag): RobotRecord {
   })
   const direction = directionOf(entity.orientation)
   const body = drawBody(entity, "idle", direction)
+  const model = modelOf(entity.name)!
   const record: RobotRecord = {
     id,
     name,
     entity,
+    model: entity.name,
     label,
     body,
     activity: "idle",
     direction,
-    cargo: game.create_inventory(CARGO_SLOTS),
+    cargo: game.create_inventory(model.cargoSlots),
     fuel: game.create_inventory(1),
-    energy: tag?.energy ?? START_ENERGY,
+    energy: tag?.energy ?? model.battery ?? START_ENERGY,
     tank: tag?.tank ?? { amount: 0, temperature: 15 },
   }
   registry.byId[id] = record
   registry.idByUnit[entity.unit_number!] = id
+  applyUpgrades(record)
   script.register_on_object_destroyed(entity)
   for (const listener of registeredListeners) listener(record)
   return record
@@ -153,13 +160,13 @@ function readTag(tags: Tags | undefined): RobotTag | undefined {
 
 /** Тег машины из предмета, которым её построили (руками — инвентарь потраченного, роботом — стек). */
 export function tagFromStack(stack: LuaItemStack | undefined): RobotTag | undefined {
-  if (stack === undefined || !stack.valid_for_read || stack.name !== WORKER_MK1) return undefined
+  if (stack === undefined || !stack.valid_for_read || modelOf(stack.name) === undefined) return undefined
   return readTag(stack.tags)
 }
 
-export function tagFromInventory(inventory: LuaInventory | undefined): RobotTag | undefined {
+export function tagFromInventory(inventory: LuaInventory | undefined, item: string): RobotTag | undefined {
   if (inventory === undefined) return undefined
-  const [stack] = inventory.find_item_stack(WORKER_MK1)
+  const [stack] = inventory.find_item_stack(item)
   return tagFromStack(stack)
 }
 
@@ -171,7 +178,7 @@ export function tagFromInventory(inventory: LuaInventory | undefined): RobotTag 
 export function tagMinedRobot(entity: LuaEntity, buffer: LuaInventory): void {
   const record = findRobot(entity)
   if (record === undefined) return
-  const [stack] = buffer.find_item_stack(WORKER_MK1)
+  const [stack] = buffer.find_item_stack(record.model)
   if (stack !== undefined) {
     stack.set_tag(ROBOT_TAG, robotTag(record))
     stack.label = record.name
@@ -196,20 +203,22 @@ export function adoptUnregisteredRobots(): void {
       record.direction = directionOf(record.entity.orientation)
       record.body = drawBody(record.entity, "idle", record.direction)
     }
+    record.model ??= record.entity.name
     if (!record.cargo?.valid) record.cargo = game.create_inventory(CARGO_SLOTS)
     if (!record.fuel?.valid) record.fuel = game.create_inventory(1)
     record.energy ??= START_ENERGY
     record.tank ??= { amount: 0, temperature: 15 }
+    applyUpgrades(record)
   }
   for (const [, surface] of game.surfaces) {
-    for (const entity of surface.find_entities_filtered({ name: WORKER_MK1 })) {
+    for (const entity of surface.find_entities_filtered({ name: ROBOT_ENTITIES as string[] })) {
       if (findRobot(entity) === undefined) registerRobot(entity)
     }
   }
 }
 
 export function registerRegistryEvents(): void {
-  const isWorker = (entity: LuaEntity) => entity.valid && entity.name === WORKER_MK1
+  const isWorker = (entity: LuaEntity) => entity.valid && modelOf(entity.name) !== undefined
   onEvent(defines.events.on_player_mined_entity, (e) => {
     if (isWorker(e.entity)) tagMinedRobot(e.entity, e.buffer)
   })

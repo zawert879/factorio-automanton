@@ -8,7 +8,7 @@ import { startAction } from "../automaton/actions"
 import { moveRobot } from "../automaton/movement"
 import { replacePlacer } from "../automaton/placement"
 import { findRobot, tagFromInventory, tagMinedRobot } from "../automaton/registry"
-import { WORKER_MK1, WORKER_MK1_PLACER } from "../names"
+import { TECH, WORKER_MK1, WORKER_MK1_PLACER } from "../names"
 import { assignProgram } from "../program/machines"
 import { publishProgram } from "../program/store"
 
@@ -74,6 +74,7 @@ const steps: Record<number, () => void> = {
     }
   },
   90: () => {
+    game.forces.player.technologies[TECH.fluids].researched = true
     const tiles = []
     for (let x = 120; x < 124; x++) for (let y = 40; y < 50; y++) tiles.push({ name: "water", position: { x, y } })
     nauvis().set_tiles(tiles)
@@ -107,7 +108,7 @@ const steps: Record<number, () => void> = {
     const character = nauvis().find_entities_filtered({ name: "character" })[0]
     const position = nauvis().find_non_colliding_position(WORKER_MK1, { x: 40, y: 50 }, 20, 0.5)!
     const placer = nauvis().create_entity({ name: WORKER_MK1_PLACER, position, force: "player" })!
-    replacePlacer(placer, tagFromInventory(character.get_main_inventory()))
+    replacePlacer(placer, tagFromInventory(character.get_main_inventory(), WORKER_MK1))
     character.get_main_inventory()!.remove({ name: WORKER_MK1, count: 1 })
   },
   450: () => placeAt({ x: 50, y: 50 }),

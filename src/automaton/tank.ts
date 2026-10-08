@@ -1,9 +1,10 @@
 // Бак машины (этап 7): одна жидкость с температурой; смешивание одной жидкости — средняя температура
 // по объёму. Отдельно от действий (src/automaton/fluids.ts), чтобы добыча урана (mining.ts) брала
 // кислоту из бака без цикла модулей.
+import { robotTankCapacity } from "./models"
 import type { RobotRecord } from "./registry"
 
-/** Бак Mk1 (растёт исследованиями — этап 8.3). */
+/** Бак Mk1 без исследований (у моделей — MODELS[].tank, растёт исследованиями — src/automaton/models.ts). */
 export const TANK_CAPACITY = 1000
 export const EPSILON = 1e-6
 
@@ -22,8 +23,8 @@ export function tankOf(record: RobotRecord): Tank {
   return record.tank
 }
 
-export function tankCapacity(_record: RobotRecord): number {
-  return TANK_CAPACITY
+export function tankCapacity(record: RobotRecord): number {
+  return robotTankCapacity(record)
 }
 
 /** Сколько ещё этой жидкости влезет в бак (0 — бак занят другой). */

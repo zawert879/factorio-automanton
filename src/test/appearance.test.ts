@@ -41,7 +41,7 @@ describe("тело машины", () => {
     const robot = placeRobot({ x: 265.5, y: 10.5 })
     expect(robot.body.valid).toBe(true)
     expect(robot.activity).toBe("idle")
-    expect(robot.body.animation).toBe(bodyAnimationName("idle", robot.direction))
+    expect(robot.body.animation).toBe(bodyAnimationName(WORKER_MK1, "idle", robot.direction))
     robot.entity.destroy()
   })
 
@@ -51,9 +51,9 @@ describe("тело машины", () => {
     moveRobot(robot, { position: { x: 290.5, y: 40.5 } })
     t.after(60, () => {
       expect(robot.activity).toBe("run")
-      expect(robot.body.animation).toBe(bodyAnimationName("run", 2))
+      expect(robot.body.animation).toBe(bodyAnimationName(WORKER_MK1, "run", 2))
       waitUntil(t, "приезда", () => !isMoving(robot), 900, () => {
-        expect(robot.body.animation).toBe(bodyAnimationName("idle", 2))
+        expect(robot.body.animation).toBe(bodyAnimationName(WORKER_MK1, "idle", 2))
         robot.entity.destroy()
       })
     })
@@ -64,7 +64,7 @@ describe("тело машины", () => {
     const robot = placeRobot({ x: 270.5, y: 95.5 })
     moveRobot(robot, { position: { x: 270.5, y: 65.5 } })
     t.after(60, () => {
-      expect(robot.body.animation).toBe(bodyAnimationName("run", 0))
+      expect(robot.body.animation).toBe(bodyAnimationName(WORKER_MK1, "run", 0))
       robot.entity.destroy()
     })
   })
@@ -83,7 +83,7 @@ describe("тело машины", () => {
     robot.body.destroy()
     adoptUnregisteredRobots()
     expect(robot.body.valid).toBe(true)
-    expect(robot.body.animation).toBe(bodyAnimationName("idle", robot.direction))
+    expect(robot.body.animation).toBe(bodyAnimationName(WORKER_MK1, "idle", robot.direction))
     robot.entity.destroy()
   })
 })

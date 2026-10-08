@@ -1,14 +1,15 @@
 // Движение и предметы (4.2) поверх систем этапа 2: move, canReach, follow, goHome, mine, take, put,
-// pickup, drop, give, repair, refuel; жидкости (7.1): pump, fill, drain. Блокирующие: программа ждёт
-// конца действия или поездки.
-import { MapPosition } from "factorio:runtime"
+// pickup, drop, give, repair, refuel; жидкости (7.1): pump, fill, drain; зарядка (8.2): charge;
+// наладка и строительство (8.5, 8.6): setRecipe, build, deconstruct, rotate. Блокирующие: программа
+// ждёт конца действия или поездки.
+import { LuaEntity, MapPosition } from "factorio:runtime"
 import { cancelMove, isMoving, moveRobot } from "../../automaton/movement"
 import { onEvent } from "../../events"
 import { host, hostBlocking, program, Val } from "../../lang/runtime/core"
 import { truthy } from "../../lang/runtime/values"
-import { WORKER_MK1 } from "../../names"
 import { actionError, currentMachine, currentRobot } from "../context"
-import { handleEntity, handleRobot, inSight, resolveTarget } from "../handles"
+import { entityHandle, handleEntity, handleRobot, inSight, resolveTarget } from "../handles"
+import { readPosition } from "../values"
 import { registerPoll, resume, sleepUntil } from "../scheduler"
 import { actionCall, count, finishWaiting, fluid, fluidAmount, item, optionalItem, startWaiting, ticks } from "./common"
 
@@ -64,7 +65,7 @@ blocking("canReach", (k, to) => {
 
 function requestPath(robotId: number, goal: MapPosition): number {
   const robot = storage.robots.byId[robotId]!
-  const prototype = prototypes.entity[WORKER_MK1]
+  const prototype = prototypes.entity[robot.model]
   const id = robot.entity.surface.request_path({
     bounding_box: prototype.collision_box,
     collision_mask: prototype.collision_mask,
@@ -147,6 +148,42 @@ blocking("repair", (k, target) =>
   actionCall(k, "repair", k !== undefined ? {} : { target: type(target) === "table" && target.__h === "robot" ? handleRobot(target).entity : handleEntity(target) }),
 )
 blocking("refuel", (k, what) => actionCall(k, "refuel", k !== undefined ? {} : { item: optionalItem(what) }))
+
+// ---------- Зарядка, наладка, строительство ----------
+
+blocking("charge", (k, station) =>
+  actionCall(k, "charge", k !== undefined ? {} : { target: station === undefined ? undefined : handleEntity(station) }),
+)
+
+blocking("setRecipe", (k, machine, recipe) => {
+  if (k !== undefined) return finishWaiting(k)
+  if (type(recipe) !== "string" || prototypes.recipe[recipe as string] === undefined) actionError("invalid-target", `unknown recipe ${tostring(recipe)}`)
+  return actionCall(k, "set-recipe", { target: handleEntity(machine), item: recipe as string })
+})
+
+const DIRECTIONS: Record<string, defines.direction> = {
+  north: defines.direction.north,
+  east: defines.direction.east,
+  south: defines.direction.south,
+  west: defines.direction.west,
+}
+
+blocking("build", (k, what, at, direction) => {
+  if (k !== undefined) {
+    const [built] = finishWaiting(k)
+    return $multi(built === undefined || !(built as LuaEntity).valid ? undefined : entityHandle(built as LuaEntity))
+  }
+  const position = readPosition(at)
+  if (position === undefined) actionError("invalid-target", "build needs a position {x, y}")
+  const dir = direction === undefined ? undefined : DIRECTIONS[direction as string]
+  if (direction !== undefined && dir === undefined) actionError("invalid-target", `bad direction ${tostring(direction)}`)
+  return actionCall(k, "build", { item: item(what), position, direction: dir })
+})
+
+blocking("deconstruct", (k, target) => actionCall(k, "deconstruct", k !== undefined ? {} : { target: handleEntity(target) }))
+blocking("rotate", (k, target, reverse) =>
+  actionCall(k, "rotate", k !== undefined ? {} : { target: handleEntity(target), reverse: reverse === true }),
+)
 
 // ---------- Жидкости ----------
 

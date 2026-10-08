@@ -41,5 +41,7 @@ declare global {
     sync?: Record<string, SyncBuffer | undefined>
     /** Команды, которым уже опубликованы стартовые программы (src/world/start.ts). */
     startersPublished?: Record<string, boolean | undefined>
+    /** Применённые уровни скорости и груза по командам (src/automaton/models.ts). */
+    upgradeLevels?: Record<string, string | undefined>
   }
 }

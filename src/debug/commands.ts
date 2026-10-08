@@ -5,7 +5,7 @@ import { entityFluid, entityFuel, entityInput, entityOutput, entityProgress, ent
 import { moveRobot } from "../automaton/movement"
 import { say } from "../automaton/status"
 import { RobotRecord } from "../automaton/registry"
-import { WORKER_MK1 } from "../names"
+import { MODELS, modelOf } from "../names"
 
 function adminPlayer(command: CustomCommandData): LuaPlayer | undefined {
   if (command.player_index === undefined) return undefined
@@ -22,8 +22,11 @@ export function registerDebugCommands(): void {
   commands.add_command("am-give", ["automaton.debug-give-help"], (command) => {
     const player = adminPlayer(command)
     if (player === undefined) return
-    const count = math.max(1, math.min(100, math.floor(tonumber(command.parameter) ?? 5)))
-    const inserted = player.insert({ name: WORKER_MK1, count })
+    // /am-give [число] [модель 1–3]
+    const [countArg, modelArg] = (command.parameter ?? "").split(" ")
+    const count = math.max(1, math.min(100, math.floor(tonumber(countArg) ?? 5)))
+    const model = MODELS[math.max(1, math.min(MODELS.length, math.floor(tonumber(modelArg) ?? 1))) - 1]
+    const inserted = player.insert({ name: model.entity, count })
     player.print(["automaton.debug-given", inserted])
   })
 
@@ -51,7 +54,7 @@ export function registerDebugCommands(): void {
     const target: { position: MapPosition } | { entity: LuaEntity } =
       x !== undefined && y !== undefined
         ? { position: { x, y } }
-        : selected !== undefined && selected.name !== WORKER_MK1
+        : selected !== undefined && modelOf(selected.name) === undefined
           ? { entity: selected }
           : { position: player.position }
     for (const record of robots) moveRobot(record, target, { notifyPlayer: player.index })

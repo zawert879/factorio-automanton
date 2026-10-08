@@ -15,7 +15,7 @@ export function directionOf(orientation: number): number {
 
 export function drawBody(entity: LuaEntity, activity: Activity, direction: number): LuaRenderObject {
   return rendering.draw_animation({
-    animation: bodyAnimationName(activity, direction),
+    animation: bodyAnimationName(entity.name, activity, direction),
     target: { entity },
     surface: entity.surface,
     render_layer: "object",
@@ -27,7 +27,7 @@ export function setActivity(record: RobotRecord, activity: Activity, direction: 
   if (record.activity === activity && record.direction === direction) return
   record.activity = activity
   record.direction = direction
-  if (record.body.valid) record.body.animation = bodyAnimationName(activity, direction)
+  if (record.body.valid) record.body.animation = bodyAnimationName(record.model, activity, direction)
 }
 
 export function registerAppearance(): void {

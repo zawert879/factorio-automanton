@@ -4,7 +4,6 @@ import { LocalisedString } from "factorio:runtime"
 import { onActionFinished } from "../automaton/actions"
 import { onMoveFinished } from "../automaton/movement"
 import { RobotRecord } from "../automaton/registry"
-import { WORKER_MK1 } from "../names"
 
 export type AlertKind = "error" | "stuck" | "no-fuel" | "quarantine"
 
@@ -18,7 +17,7 @@ export function alertRobot(robot: RobotRecord, kind: AlertKind, detail: Localise
   if (previous !== undefined && game.tick - previous < REPEAT_TICKS) return
   last.set(key, game.tick)
   for (const player of robot.entity.force.players) {
-    player.add_custom_alert(robot.entity, { type: "item", name: WORKER_MK1 }, [`automaton.alert-${kind}`, robot.name, detail], true)
+    player.add_custom_alert(robot.entity, { type: "item", name: robot.model }, [`automaton.alert-${kind}`, robot.name, detail], true)
   }
 }
 

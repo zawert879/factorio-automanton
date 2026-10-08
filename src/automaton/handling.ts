@@ -10,6 +10,7 @@ import { ActionError, ActionState, distanceToEntity, face, registerActionHandler
 import { fuelValue, HANDLING_JOULES, spend } from "./energy"
 import { findRobot, RobotRecord } from "./registry"
 import { REACH } from "./transfer"
+import { robotBattery } from "./models"
 
 export const PICKUP_RADIUS = 1.5
 const PICKUP_TICKS = 10
@@ -161,7 +162,8 @@ function bestFuel(record: RobotRecord): string | undefined {
 
 // Заправка не тратит энергию: иначе пустая машина не смогла бы заправиться.
 registerActionHandler("refuel", {
-  start: () => ({ after: REFUEL_TICKS }),
+  // Mk2+ — аккумулятор: заправлять нечего (charge).
+  start: (record) => (robotBattery(record) !== undefined ? { finish: true, error: "invalid-target" } : { after: REFUEL_TICKS }),
   step: (record: RobotRecord, action: ActionState): StepOutcome => {
     const item = action.params.item ?? bestFuel(record)
     if (item === undefined || fuelValue(item) <= 0) return { finish: true, error: "not-enough-items" }

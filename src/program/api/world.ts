@@ -3,7 +3,7 @@ import { BoundingBox } from "factorio:runtime"
 import { controlFlow, defineHostObject, host, hostBlocking, hostGetters, hostMethods, program, Val } from "../../lang/runtime/core"
 import { lib } from "../../lang/runtime/library"
 import { truthy } from "../../lang/runtime/values"
-import { MARKER, WORKER_MK1, WORKER_MK1_PLACER } from "../../names"
+import { MARKER, modelOf } from "../../names"
 import { findMarker } from "../../world/markers"
 import { findZone, zoneCenter } from "../../world/zones"
 import { actionError, currentMachine, currentRobot } from "../context"
@@ -69,7 +69,7 @@ host.find = (what: Val, where: Val) => {
   const found = zone.surface.find_entities_filtered(filter as never)
   const result: Val[] = []
   for (const entity of found) {
-    if (entity.type === "unit" || entity.type === "character" || entity.name === MARKER || entity.name === WORKER_MK1_PLACER || entity.name === WORKER_MK1) continue
+    if (entity.type === "unit" || entity.type === "character" || entity.name === MARKER || modelOf(entity.name) !== undefined) continue
     result.push(entityHandle(entity))
   }
   return programArray(result)

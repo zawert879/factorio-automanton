@@ -6,7 +6,10 @@ import { initMining } from "./automaton/mining"
 import "./automaton/handling"
 import "./automaton/transfer"
 import "./automaton/fluids"
+import "./automaton/charging"
+import "./automaton/construction"
 import { initMovement, registerMovement } from "./automaton/movement"
+import { registerModels } from "./automaton/models"
 import { registerPlacement } from "./automaton/placement"
 import { adoptUnregisteredRobots, initRegistry, registerRegistryEvents } from "./automaton/registry"
 import { registerDebugCommands } from "./debug/commands"
@@ -51,6 +54,7 @@ script.on_configuration_changed(() => {
 
 registerDemo()
 registerPlacement()
+registerModels()
 registerRegistryEvents()
 registerMovement()
 registerAppearance()

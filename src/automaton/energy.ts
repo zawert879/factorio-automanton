@@ -2,6 +2,7 @@
 // из топливного слота. Из груза машина сама не заправляется — это действие refuel (решение программы).
 // Нет ни запаса, ни топлива — машина встаёт: поездка и действие заканчиваются «кончилось топливо».
 // Без импорта actions: движение (его импортирует actions) тоже тратит энергию — иначе цикл модулей.
+import { modelOf } from "../names"
 import type { RobotRecord } from "./registry"
 
 /** Путь: 75 кВт на ходу (6 клеток в секунду). */
@@ -20,6 +21,15 @@ export function fuelValue(item: string): number {
  * (запас обнуляется: машина выдохлась).
  */
 export function spend(record: RobotRecord, joules: number): boolean {
+  // Mk2+ — аккумулятор: топливо не жгут, заряжаются на станции (charge).
+  if (modelOf(record.model)?.battery !== undefined) {
+    if (record.energy < joules) {
+      record.energy = 0
+      return false
+    }
+    record.energy -= joules
+    return true
+  }
   while (record.energy < joules) {
     const stack = record.fuel[0]
     if (!stack.valid_for_read) {

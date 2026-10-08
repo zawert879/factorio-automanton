@@ -21,7 +21,7 @@ import { RobotRecord } from "../automaton/registry"
 import { onEvent, onTick } from "../events"
 import { pausedLine } from "../lang/runtime"
 import { lib } from "../lang/runtime/library"
-import { WORKER_MK1 } from "../names"
+import { modelOf } from "../names"
 import { robotState } from "../program/handles"
 import { assignProgram, machineOf, restartMachine, stopMachine, wake } from "../program/machines"
 import { stepMachine } from "../program/scheduler"
@@ -268,7 +268,7 @@ export function registerMachineWindow(): void {
   script.on_event("automaton-open", (e) => {
     const player = game.get_player(e.player_index)
     const selected = player?.selected
-    if (player === undefined || selected === undefined || selected.name !== WORKER_MK1) return
+    if (player === undefined || selected === undefined || modelOf(selected.name) === undefined) return
     const robot = storage.robots.byId[storage.robots.idByUnit[selected.unit_number!] ?? -1]
     if (robot !== undefined) openMachine(player, robot)
   })

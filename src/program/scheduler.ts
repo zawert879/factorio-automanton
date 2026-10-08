@@ -5,13 +5,13 @@
 // Машина, ушедшая в минус по кванту (синхронные колбэки), пропускает тики, пока не отработает долг.
 import { ActionResult, onActionFinished } from "../automaton/actions"
 import { MoveResult, onMoveCancelled, onMoveFinished } from "../automaton/movement"
+import { robotMemory, robotQuantum } from "../automaton/models"
 import { RobotRecord } from "../automaton/registry"
 import { showProblem, problemFor } from "../automaton/status"
 import { onTick } from "../events"
 import { completeWait, Program, runSlice } from "../lang/runtime"
 import { enter, Q, Val } from "../lang/runtime/core"
 import { actionErrorValue, ActionErrorCode, context } from "./context"
-import { WORKER_MK1_STATS } from "./handles"
 import { alertRobot } from "./alerts"
 import { appendConsole, MachineRecord, onWake } from "./machines"
 import { loadedProgram, noteLimitError } from "./store"
@@ -68,8 +68,8 @@ export function waitingFrame(robotId: number): Val {
   return record !== undefined && record.machine.status === "waiting" ? record.machine.waiting : undefined
 }
 
-function quantumOf(_robot: RobotRecord): number {
-  return WORKER_MK1_STATS.quantum
+function quantumOf(robot: RobotRecord): number {
+  return robotQuantum(robot)
 }
 
 /** Ошибки лимитов (5.8): если программа раз за разом в них упирается — карантин. */
@@ -165,6 +165,7 @@ function runReady(): void {
       continue
     }
     budget -= quantum
+    record.machine.memoryLimit = robotMemory(robot)
     inMachine(record, robot, (program) => runSlice(program, record.machine, quantum))
     if (record.machine.status === "ready") enqueue(id)
   }
@@ -184,7 +185,8 @@ function onAction(robot: RobotRecord, result: ActionResult): void {
   if (frame === undefined || frame.__action !== result.kind) return
   const record = storage.machines[robot.id]!
   if (result.error !== undefined) resume(record, undefined, actionErrorValue(result.error as ActionErrorCode))
-  else resume(record, result.count)
+  // build возвращает здание (обёртку делает продолжение функции API), остальные — сколько сделано.
+  else resume(record, result.entity ?? result.count)
 }
 
 const MOVE_ERRORS: Record<MoveResult, ActionErrorCode | undefined> = { arrived: undefined, "no-path": "no-path", stuck: "stuck", "no-fuel": "no-fuel" }
