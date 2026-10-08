@@ -14,7 +14,7 @@ import { ActionState, distanceToEntity, face, registerActionHandler, StepOutcome
 import { spend } from "./energy"
 import { MINE_REACH } from "./mining"
 import { RobotRecord } from "./registry"
-import { addToTank, EPSILON, takeFromTank, tankFree, tankOf } from "./tank"
+import { addToTank, EPSILON, takeFromTank, tankCapacity, tankFree, tankOf } from "./tank"
 import { REACH } from "./transfer"
 
 /** Скорость набора воды и перелива в здание и из здания, ед/с. */
@@ -137,6 +137,8 @@ function pumpStep(record: RobotRecord, action: ActionState): StepOutcome {
 
 registerActionHandler("pump", {
   start: (record, action) => {
+    // Бака нет (летающие) — жидкости не для этой модели.
+    if (tankCapacity(record) <= 0) return { finish: true, error: "invalid-target" }
     const fluid = action.params.item!
     if (tankFree(record, fluid) <= EPSILON) return { finish: true, error: "cargo-full" }
     const resource = findFluidResource(record, fluid)
@@ -187,6 +189,8 @@ function fillStep(record: RobotRecord, action: ActionState): StepOutcome {
 
 registerActionHandler("fill", {
   start: (record, action) => {
+    // Бака нет (летающие) — жидкости не для этой модели.
+    if (tankCapacity(record) <= 0) return { finish: true, error: "invalid-target" }
     const target = action.params.target
     if (target === undefined || !target.valid) return { finish: true, error: "invalid-target" }
     if (!inReach(record, target)) return { finish: true, error: "out-of-reach" }
@@ -216,6 +220,8 @@ function drainStep(record: RobotRecord, action: ActionState): StepOutcome {
 
 registerActionHandler("drain", {
   start: (record, action) => {
+    // Бака нет (летающие) — жидкости не для этой модели.
+    if (tankCapacity(record) <= 0) return { finish: true, error: "invalid-target" }
     const target = action.params.target
     if (target === undefined || !target.valid) return { finish: true, error: "invalid-target" }
     if (!inReach(record, target)) return { finish: true, error: "out-of-reach" }

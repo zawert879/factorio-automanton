@@ -6,7 +6,7 @@
 // возят машины, а без электричества не работают лаборатории — иначе не исследовать вообще ничего.
 import { PrototypeData } from "factorio:common"
 import { Color, IconData, TechnologyPrototype } from "factorio:prototype"
-import { CHARGING_STATION, COMBAT_MK1, COMBAT_MK2, DISPLAYS, SIGNAL_MARKER, TECH, UPGRADE_LEVELS, UPGRADES, WORKER_MK2, WORKER_MK3 } from "../names"
+import { CHARGING_STATION, COMBAT_MK1, COMBAT_MK2, FLYER_MK1, FLYER_MK2, DISPLAYS, SIGNAL_MARKER, TECH, UPGRADE_LEVELS, UPGRADES, WORKER_MK2, WORKER_MK3 } from "../names"
 
 declare const data: PrototypeData
 
@@ -102,18 +102,26 @@ const SPECS: Spec[] = [
   {
     name: TECH.combat2,
     overlay: ICON + "rocket-launcher.png",
-    prerequisites: [TECH.combat1, "military-3", "rocketry"],
+    prerequisites: [TECH.combat1, TECH.mk2, "military-3", "rocketry"],
     count: 200,
     packs: [...BLUE, "military-science-pack"],
     unlocks: [COMBAT_MK2],
   },
-  { name: TECH.flying1, overlay: ICON + "flying-robot-frame.png", prerequisites: [TECH.mk3, "robotics"], count: 300, packs: BLUE },
+  {
+    name: TECH.flying1,
+    overlay: ICON + "flying-robot-frame.png",
+    prerequisites: [TECH.mk2, "robotics"],
+    count: 300,
+    packs: BLUE,
+    unlocks: [FLYER_MK1],
+  },
   {
     name: TECH.flying2,
     overlay: ICON + "flying-robot-frame.png",
-    prerequisites: [TECH.flying1, "utility-science-pack"],
+    prerequisites: [TECH.flying1, TECH.mk3, "utility-science-pack"],
     count: 500,
     packs: [...BLUE, "utility-science-pack"],
+    unlocks: [FLYER_MK2],
   },
 ]
 

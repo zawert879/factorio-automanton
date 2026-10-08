@@ -9,6 +9,7 @@ import "./automaton/fluids"
 import "./automaton/charging"
 import "./automaton/construction"
 import { registerCombat } from "./automaton/combat"
+import { initFlight, registerFlight } from "./automaton/flight"
 import { initMovement, registerMovement } from "./automaton/movement"
 import { registerModels } from "./automaton/models"
 import { registerPlacement } from "./automaton/placement"
@@ -39,6 +40,7 @@ function initStorage(): void {
   initDemoStorage()
   initRegistry()
   initMovement()
+  initFlight()
   initActions()
   initMining()
   initPrograms()
@@ -63,6 +65,7 @@ registerDemo()
 registerPlacement()
 registerModels()
 registerCombat()
+registerFlight()
 registerRegistryEvents()
 registerMovement()
 registerAppearance()
@@ -93,7 +96,8 @@ onEvent(defines.events.on_object_destroyed, (e) => {
 // automaton-test — внутриигровые тесты (npm run test:game),
 // automaton-desync-test — снимок состояния для проверки сохранения/загрузки (npm run test:desync),
 // automaton-visual — сцена для снимков экрана (npm run shot),
-// automaton-bench — бенчмарк языка в Lua Factorio (npm run bench:game).
+// automaton-bench — бенчмарк языка в Lua Factorio (npm run bench:game),
+// automaton-bench-flyers — нагрузочный тест летающих (npm run bench:flyers).
 // Имя модуля — через переменную: TSTL не ищет его заранее, а в zip мода папки test/ нет (package.ignore).
 const testModule =
   script.active_mods["automaton-test"] !== undefined
@@ -104,7 +108,9 @@ const testModule =
         ? "test.visual"
         : script.active_mods["automaton-bench"] !== undefined
           ? "test.benchGame"
-          : undefined
+          : script.active_mods["automaton-bench-flyers"] !== undefined
+            ? "test.flyersBench"
+            : undefined
 if (testModule !== undefined) {
   require(testModule)
 }

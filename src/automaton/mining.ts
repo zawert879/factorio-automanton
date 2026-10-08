@@ -6,7 +6,7 @@
 import { LuaEntity } from "factorio:runtime"
 import { ActionState, distanceToEntity, face, registerActionHandler, StepOutcome } from "./actions"
 import { MINING_WATTS, spend } from "./energy"
-import { robotMiningSpeed } from "./models"
+import { isFlyer, robotMiningSpeed } from "./models"
 import { RobotRecord } from "./registry"
 import { EPSILON, takeFromTank, tankOf } from "./tank"
 
@@ -104,7 +104,8 @@ function mineUnit(record: RobotRecord, action: ActionState, resource: LuaEntity)
 }
 
 registerActionHandler("mine", {
-  start: (record, action) => nextUnit(record, action),
+  // Летающие не добывают.
+  start: (record, action) => (isFlyer(record) ? { finish: true, error: "invalid-target" } : nextUnit(record, action)),
   step: (record, action) => {
     const resource = action.params.target
     // За время шага клетку могли истощить или машину увести.

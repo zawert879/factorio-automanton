@@ -3,7 +3,7 @@
 // Едущие машины раз в TURN_CHECK_TICKS тиков разворачиваются по направлению движения.
 import { LuaEntity, LuaRenderObject } from "factorio:runtime"
 import { onTick } from "../events"
-import { Activity, BODY_DIRECTIONS, bodyAnimationName } from "../names"
+import { Activity, BODY_DIRECTIONS, bodyPose, modelOf } from "../names"
 import type { RobotRecord } from "./registry"
 
 const TURN_CHECK_TICKS = 10
@@ -15,19 +15,23 @@ export function directionOf(orientation: number): number {
 
 export function drawBody(entity: LuaEntity, activity: Activity, direction: number): LuaRenderObject {
   return rendering.draw_animation({
-    animation: bodyAnimationName(entity.name, activity, direction),
+    animation: bodyPose(entity.name, activity, direction),
     target: { entity },
     surface: entity.surface,
-    render_layer: "object",
+    // Летающие — над зданиями.
+    render_layer: modelOf(entity.name)?.flying ? "air-object" : "object",
   })
 }
 
 /** Сменить анимацию тела; направление по умолчанию — прежнее. */
 export function setActivity(record: RobotRecord, activity: Activity, direction: number = record.direction): void {
   if (record.activity === activity && record.direction === direction) return
+  const before = bodyPose(record.model, record.activity, record.direction)
   record.activity = activity
   record.direction = direction
-  if (record.body.valid) record.body.animation = bodyAnimationName(record.model, activity, direction)
+  // Та же картинка (летающая села или взлетела в том же направлении) — не трогаем объект rendering.
+  const after = bodyPose(record.model, activity, direction)
+  if (after !== before && record.body.valid) record.body.animation = after
 }
 
 export function registerAppearance(): void {

@@ -23,9 +23,28 @@ function researchedLevels(force: LuaForce, tech: string): number {
   return level
 }
 
+/** Шаг множителя по виду улучшения. */
+const STEP: Record<string, number> = {}
+for (const upgrade of UPGRADES) STEP[upgrade.kind] = upgrade.step
+
 export function forceLevels(force: LuaForce): Levels {
   const cached = levels.get(force.name)
   if (cached !== undefined && cached.tick === game.tick) return cached.levels
+  return computeLevels(force)
+}
+
+/** Уровни по номеру команды: номер у сущности дешевле, чем сама команда (вызов API создаёт объект). */
+const levelsByIndex = new LuaMap<number, { tick: number; levels: Levels }>()
+
+function forceLevelsByIndex(index: number): Levels {
+  const cached = levelsByIndex.get(index)
+  if (cached !== undefined && cached.tick === game.tick) return cached.levels
+  const result = forceLevels(game.forces[index]!)
+  levelsByIndex.set(index, { tick: game.tick, levels: result })
+  return result
+}
+
+function computeLevels(force: LuaForce): Levels {
   const result = { sensors: 0 } as Levels
   for (const upgrade of UPGRADES) result[upgrade.kind] = researchedLevels(force, upgrade.tech)
   const sensors = [TECH.sensors1, TECH.sensors2, TECH.sensors3]
@@ -35,8 +54,7 @@ export function forceLevels(force: LuaForce): Levels {
 }
 
 function multiplier(record: RobotRecord, kind: UpgradeKind): number {
-  const upgrade = UPGRADES.find((u) => u.kind === kind)!
-  return 1 + upgrade.step * forceLevels(record.entity.force as LuaForce)[kind]
+  return 1 + STEP[kind] * forceLevelsByIndex(record.entity.force_index)[kind]
 }
 
 export function modelOfRecord(record: RobotRecord): ModelSpec {
@@ -67,8 +85,13 @@ export function robotTankCapacity(record: RobotRecord): number {
   return math.floor(modelOfRecord(record).tank * multiplier(record, "tank"))
 }
 
+/** Зрение: модели или по «Сенсорам» — что больше. */
 export function robotVision(record: RobotRecord): number {
-  return VISION_BY_SENSORS[forceLevels(record.entity.force as LuaForce).sensors]
+  return math.max(modelOfRecord(record).vision, VISION_BY_SENSORS[forceLevels(record.entity.force as LuaForce).sensors])
+}
+
+export function isFlyer(record: RobotRecord): boolean {
+  return modelOfRecord(record).flying === true
 }
 
 /** Ёмкость аккумулятора (Mk2+) или undefined (Mk1 жжёт топливо). */
@@ -79,7 +102,8 @@ export function robotBattery(record: RobotRecord): number | undefined {
 /** Скорость и размер груза — по текущим исследованиям (груз только растёт: лишнее не выбрасываем). */
 export function applyUpgrades(record: RobotRecord): void {
   if (!record.entity.valid) return
-  record.entity.speed = robotSpeed(record)
+  // Скорость хранит движок только у юнитов; летающие считают её сами (src/automaton/flight.ts).
+  if (record.entity.type === "unit") record.entity.speed = robotSpeed(record)
   const slots = robotCargoSlots(record)
   if (record.cargo.valid && record.cargo.length < slots) record.cargo.resize(slots)
 }
@@ -87,6 +111,7 @@ export function applyUpgrades(record: RobotRecord): void {
 /** Скорость и груз всех машин команды — по текущим исследованиям. */
 export function refreshForce(force: LuaForce): void {
   levels.delete(force.name)
+  levelsByIndex.delete(force.index)
   const current = forceLevels(force)
   storage.upgradeLevels ??= {}
   storage.upgradeLevels[force.name] = `${current.speed}/${current.cargo}`
@@ -110,6 +135,7 @@ export function registerModels(): void {
   onEvent(defines.events.on_technology_effects_reset, (e) => refreshForce(e.force))
   onEvent(defines.events.on_forces_merged, () => {
     for (const [name] of levels) levels.delete(name)
+    for (const [index] of levelsByIndex) levelsByIndex.delete(index)
   })
   onTick((tick) => {
     if (tick % APPLY_CHECK_TICKS === 0) checkApplied()

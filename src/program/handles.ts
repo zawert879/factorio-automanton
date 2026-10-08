@@ -8,6 +8,7 @@ import { LuaEntity, LuaInventory, MapPosition } from "factorio:runtime"
 import { currentAction } from "../automaton/actions"
 import { distanceToEntity } from "../automaton/actions"
 import { entityFluid, entityFuel, entityInput, entityItemCount, entityOutput, entityProgress, entityRecipe, entityStatus } from "../automaton/inspect"
+import { robotPosition } from "../automaton/flight"
 import { modelOfRecord, robotVision } from "../automaton/models"
 import { isMoving } from "../automaton/movement"
 import { RobotRecord } from "../automaton/registry"
@@ -236,7 +237,7 @@ robotGetters.inSight = (o: Val) => {
   const record = storage.robots.byId[o.__id]
   return record !== undefined && record.entity.valid && robotInSight(record)
 }
-robotGetters.position = (o: Val) => programPosition(sightedRobot(o).entity.position)
+robotGetters.position = (o: Val) => programPosition(robotPosition(sightedRobot(o)))
 robotGetters.state = (o: Val) => robotState(sightedRobot(o))
 robotGetters.program = (o: Val) => robotProgramName(sightedRobot(o))
 robotGetters.health = (o: Val) => robotHealth(sightedRobot(o))

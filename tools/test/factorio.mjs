@@ -21,7 +21,7 @@ export function buildMod() {
  * Временное окружение игры: мод automaton (симлинк на mod/) и служебный мод markerMod,
  * который включает в control.ts нужный тестовый модуль. Карта — без врагов, с фиксированным сидом.
  */
-export function prepareWork(name, markerMod) {
+export function prepareWork(name, markerMod, markerVersion = "0.0.1") {
   const work = join(tmpdir(), name)
   const mods = join(work, "mods")
   const data = join(work, "data")
@@ -33,7 +33,7 @@ export function prepareWork(name, markerMod) {
     join(mods, markerMod, "info.json"),
     JSON.stringify({
       name: markerMod,
-      version: "0.0.1",
+      version: markerVersion,
       title: markerMod,
       author: "automaton",
       factorio_version: "2.0",

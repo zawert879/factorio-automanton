@@ -6,6 +6,7 @@ import type { SyncBuffer } from "./program/sync"
 import type { CommsState } from "./program/comms"
 import type { BoardState, TasksState } from "./program/board"
 import type { MovementState } from "./automaton/movement"
+import type { FlightState } from "./automaton/flight"
 import type { RobotRegistry } from "./automaton/registry"
 import type { HandlesState } from "./program/handles"
 import type { MachineRecord } from "./program/machines"
@@ -22,6 +23,8 @@ declare global {
     commandUses: number
     robots: RobotRegistry
     movement: MovementState
+    /** Полёты летающих машин (src/automaton/flight.ts). */
+    flight: FlightState
     actions: ActionsState
     /** Случайные числа игровой логики (одинаковые у всех игроков). */
     rng: LuaRandomGenerator

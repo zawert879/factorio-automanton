@@ -73,12 +73,30 @@ function distance(a: MapPosition, b: MapPosition): number {
   return math.sqrt((a.x - b.x) ** 2 + (a.y - b.y) ** 2)
 }
 
+/** Летающие машины двигает свой модуль (src/automaton/flight.ts) — он регистрирует себя здесь. */
+export interface FlightHooks {
+  isFlyer: (this: void, record: RobotRecord) => boolean
+  start: (this: void, record: RobotRecord, target: { position: MapPosition } | { entity: LuaEntity }, options: { radius?: number; notifyPlayer?: PlayerIndex }) => void
+  cancel: (this: void, record: RobotRecord) => boolean
+  isMoving: (this: void, record: RobotRecord) => boolean
+}
+let flight: FlightHooks | undefined
+
+export function registerFlightHooks(hooks: FlightHooks): void {
+  flight = hooks
+}
+
 /** Отправить машину к точке или зданию. Прежняя поездка отменяется. */
 export function moveRobot(
   record: RobotRecord,
   target: { position: MapPosition } | { entity: LuaEntity },
   options: { radius?: number; notifyPlayer?: PlayerIndex } = {},
 ): void {
+  if (flight !== undefined && flight.isFlyer(record)) {
+    storage.movement.lastResult[record.id] = undefined
+    showProblem(record, undefined)
+    return flight.start(record, target, options)
+  }
   const state = storage.movement
   const common = { phase: "queued" as Phase, stuckRetries: 0, pathRetries: 0, notifyPlayer: options.notifyPlayer }
   const order: MoveOrder =
@@ -101,6 +119,13 @@ export function onMoveCancelled(listener: (this: void, record: RobotRecord) => v
 
 /** Отменить поездку без итога (машина займётся другим). */
 export function cancelMove(record: RobotRecord): void {
+  if (flight !== undefined && flight.isFlyer(record)) {
+    if (flight.cancel(record)) {
+      if (record.entity.valid) setActivity(record, "idle")
+      for (const listener of cancelListeners) listener(record)
+    }
+    return
+  }
   const state = storage.movement
   if (state.orders[record.id] === undefined) return
   state.orders[record.id] = undefined
@@ -109,6 +134,7 @@ export function cancelMove(record: RobotRecord): void {
 }
 
 export function isMoving(record: RobotRecord): boolean {
+  if (flight !== undefined && flight.isFlyer(record)) return flight.isMoving(record)
   return storage.movement.orders[record.id] !== undefined
 }
 
@@ -122,6 +148,8 @@ export function lastMoveResult(record: RobotRecord): MoveResult | undefined {
 }
 
 function stopCommand(record: RobotRecord): void {
+  // Летающие — не юниты (и тип у движка не спрашиваем: это вызов API на каждое прибытие).
+  if (flight !== undefined && flight.isFlyer(record)) return
   record.entity.commandable!.set_command({ type: defines.command.stop, distraction: defines.distraction.none })
 }
 
@@ -132,7 +160,12 @@ export function onMoveFinished(listener: (this: void, record: RobotRecord, resul
   finishListeners.push(listener)
 }
 
-function finish(id: number, result: MoveResult): void {
+/** Итог полёта (src/automaton/flight.ts): так же, как итог поездки. */
+export function finishMove(id: number, result: MoveResult, notifyPlayer?: PlayerIndex): void {
+  finish(id, result, notifyPlayer)
+}
+
+function finish(id: number, result: MoveResult, notifyPlayer?: PlayerIndex): void {
   const state = storage.movement
   const order = state.orders[id]
   state.orders[id] = undefined
@@ -143,9 +176,8 @@ function finish(id: number, result: MoveResult): void {
   stopCommand(record)
   setActivity(record, "idle")
   showProblem(record, result === "arrived" ? undefined : problemFor(result))
-  if (order?.notifyPlayer !== undefined) {
-    game.get_player(order.notifyPlayer)?.print([`automaton.move-${result}`, record.name])
-  }
+  const notify = order?.notifyPlayer ?? notifyPlayer
+  if (notify !== undefined) game.get_player(notify)?.print([`automaton.move-${result}`, record.name])
 }
 
 /** Детерминированный «случайный» номер для машины и попытки — чтобы встречные расходились по-разному. */

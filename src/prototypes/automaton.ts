@@ -19,6 +19,7 @@ import {
   bodyAnimationName,
   COMBAT_MK1,
   COMBAT_MK2,
+  FLYER_MK1,
   MODELS,
   ModelSpec,
   SHOT_EFFECT,
@@ -136,6 +137,55 @@ const RECIPES: Record<string, RecipePrototype["ingredients"]> = {
     { type: "item", name: "steel-plate", amount: 10 },
     { type: "item", name: "electronic-circuit", amount: 10 },
   ],
+  [FLYER_MK1]: [
+    { type: "item", name: "flying-robot-frame", amount: 1 },
+    { type: "item", name: "electronic-circuit", amount: 5 },
+    { type: "item", name: "steel-plate", amount: 2 },
+  ],
+  "automaton-flyer-mk2": [
+    { type: "item", name: FLYER_MK1, amount: 1 },
+    { type: "item", name: "advanced-circuit", amount: 5 },
+    { type: "item", name: "battery", amount: 5 },
+  ],
+}
+
+/**
+ * Летающие (этап 11): тело — дрон из графики логистического робота (сам робот из игры убран),
+ * перекрашенный в цвета модели, с тенью. 16 направлений листа — берём через одно (8 направлений тела);
+ * на месте — кадры «idle», в полёте — «in_motion».
+ */
+function flyerAnimation(name: string, model: ModelSpec, activity: Activity, direction: number): AnimationPrototype {
+  const column = direction * 2
+  // Позу выбирает bodyPose (src/names.ts): летающим всегда «idle» — кадры полёта, огоньки горят.
+  const moving = activity === "run" || activity === "idle"
+  return {
+    type: "animation",
+    name,
+    layers: [
+      {
+        filename: "__base__/graphics/entity/logistic-robot/logistic-robot.png",
+        width: 80,
+        height: 84,
+        x: column * 80,
+        y: moving ? 252 : 84,
+        frame_count: 1,
+        scale: 0.5,
+        shift: [0, -0.1],
+        tint: model.steel as Color,
+      },
+      {
+        filename: "__base__/graphics/entity/logistic-robot/logistic-robot-shadow.png",
+        width: 115,
+        height: 57,
+        x: column * 115,
+        y: moving ? 57 * 3 : 57,
+        frame_count: 1,
+        scale: 0.5,
+        shift: [31.75 / 32, 19.75 / 32 - 0.1],
+        draw_as_shadow: true,
+      },
+    ],
+  } as AnimationPrototype
 }
 
 /**
@@ -181,6 +231,7 @@ function attackParameters(model: ModelSpec): UnitPrototype["attack_parameters"] 
 
 function modelPrototypes(model: ModelSpec, index: number): object[] {
   const icons = modelIcons(model, model.digit)
+  if (model.flying) return flyerPrototypes(model, index, icons)
   const animations: AnimationPrototype[] = []
   for (const activity of ACTIVITIES) {
     const [source, frameSpeed] = BODY_SOURCES[activity]
@@ -259,6 +310,70 @@ function modelPrototypes(model: ModelSpec, index: number): object[] {
   }
 
   return [worker, placer, item, recipe, ...animations]
+}
+
+/**
+ * Летающая модель: сущность-заместитель без столкновений (simple-entity-with-owner) — выделяется
+ * и открывает окно машины; летит её тело (rendering), а саму сущность двигает мод (src/automaton/flight.ts).
+ */
+function flyerPrototypes(model: ModelSpec, index: number, icons: IconData[]): object[] {
+  const animations: AnimationPrototype[] = []
+  for (const activity of ACTIVITIES) {
+    for (let direction = 0; direction < BODY_DIRECTIONS; direction++) {
+      animations.push(flyerAnimation(bodyAnimationName(model.entity, activity, direction), model, activity, direction))
+    }
+  }
+  const box: [[number, number], [number, number]] = [
+    [-0.4, -0.9],
+    [0.4, -0.1],
+  ]
+  const flyer: SimpleEntityWithOwnerPrototype = {
+    type: "simple-entity-with-owner",
+    name: model.entity,
+    icons,
+    flags: ["placeable-player", "placeable-off-grid", "player-creation", "not-on-map"],
+    minable: { mining_time: 0.3, result: model.entity },
+    max_health: model.health,
+    collision_box: [
+      [-0.2, -0.2],
+      [0.2, 0.2],
+    ],
+    collision_mask: { layers: {} },
+    selection_box: box,
+    render_layer: "air-object",
+    picture: { filename: "__core__/graphics/empty.png", size: 1 },
+  }
+  const placer: SimpleEntityWithOwnerPrototype = {
+    type: "simple-entity-with-owner",
+    name: model.placer,
+    icons,
+    flags: ["placeable-player", "placeable-off-grid", "player-creation"],
+    placeable_by: { item: model.entity, count: 1 },
+    minable: { mining_time: 0.1, result: model.entity },
+    collision_box: flyer.collision_box,
+    collision_mask: { layers: {} },
+    selection_box: box,
+    picture: { filename: "__base__/graphics/icons/logistic-robot.png", size: 64, scale: 0.5, tint: model.steel as Color },
+    hidden_in_factoriopedia: true,
+  }
+  const item: ItemWithTagsPrototype = {
+    type: "item-with-tags",
+    name: model.entity,
+    icons,
+    subgroup: "transport",
+    order: `z[automaton]-a[${model.id}]`,
+    place_result: model.placer,
+    stack_size: 10,
+  }
+  const recipe: RecipePrototype = {
+    type: "recipe",
+    name: model.entity,
+    enabled: false,
+    energy_required: 5 + index,
+    ingredients: RECIPES[model.entity],
+    results: [{ type: "item", name: model.entity, amount: 1 }],
+  }
+  return [flyer, placer, item, recipe, ...animations]
 }
 
 for (let i = 0; i < MODELS.length; i++) data.extend(modelPrototypes(MODELS[i], i) as never)

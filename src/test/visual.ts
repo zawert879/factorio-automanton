@@ -70,6 +70,13 @@ script.on_nth_tick(1, (event) => {
   const tick = event.tick
   if (tick === 30) {
     arena()
+    // Игрок — у сцены (после генерации чанков): рядом с ним полёты летающих детализируются.
+    // В начале freeplay идёт заставка (крушение корабля) — в ней телепорт не работает.
+    const player = game.get_player(1 as PlayerIndex)
+    if (player !== undefined) {
+      if (player.controller_type === defines.controllers.cutscene) player.exit_cutscene()
+      player.teleport({ x: CENTER.x, y: CENTER.y + 15 })
+    }
     row("idle", CENTER.y - 6)
     row("mine", CENTER.y)
     // Эти поедут: проверка бега и разворота
@@ -83,6 +90,11 @@ script.on_nth_tick(1, (event) => {
     nauvis().create_entity({ name: MODELS[1].placer, position: { x: CENTER.x - 7.5, y: CENTER.y - 3 }, force: "player", raise_built: true })
     nauvis().create_entity({ name: MODELS[2].placer, position: { x: CENTER.x - 4.5, y: CENTER.y - 3 }, force: "player", raise_built: true })
     nauvis().create_entity({ name: CHARGING_STATION, position: { x: CENTER.x - 1, y: CENTER.y - 3 }, force: "player" })
+    // Летающие Mk1 и Mk2 (этап 11): одна висит, вторая летит через площадку.
+    nauvis().create_entity({ name: MODELS[5].placer, position: { x: CENTER.x + 8.5, y: CENTER.y - 3 }, force: "player", raise_built: true })
+    nauvis().create_entity({ name: MODELS[6].placer, position: { x: CENTER.x - 12.5, y: CENTER.y - 5 }, force: "player", raise_built: true })
+    const flyer = findRobot(nauvis().find_entities_filtered({ name: MODELS[6].entity, position: { x: CENTER.x - 12.5, y: CENTER.y - 5 }, radius: 0.5 })[0])!
+    moveRobot(flyer, { position: { x: CENTER.x + 30, y: CENTER.y - 5 } })
     // Боевые Mk1 и Mk2 (этап 10).
     nauvis().create_entity({ name: MODELS[3].placer, position: { x: CENTER.x + 2.5, y: CENTER.y - 3 }, force: "player", raise_built: true })
     nauvis().create_entity({ name: MODELS[4].placer, position: { x: CENTER.x + 5.5, y: CENTER.y - 3 }, force: "player", raise_built: true })
@@ -99,6 +111,7 @@ script.on_nth_tick(1, (event) => {
   if (tick === 155) shot("building", { x: CENTER.x + 2.5, y: CENTER.y + 4.5 }, 4)
   if (tick === 158) shot("status", { x: CENTER.x + 1, y: CENTER.y + 8 }, 3)
   if (tick === 159) shot("models", { x: CENTER.x - 2, y: CENTER.y - 3.5 }, 3)
+  if (tick === 80) shot("flyer", { x: CENTER.x + 2, y: CENTER.y - 4 }, 2)
   if (tick === 160) shot("b")
   // Крупно: бегущие на восток (AM-17) и на север (AM-18).
   if (tick === 170) {

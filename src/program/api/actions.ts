@@ -3,6 +3,7 @@
 // наладка и строительство (8.5, 8.6): setRecipe, build, deconstruct, rotate. Блокирующие: программа
 // ждёт конца действия или поездки.
 import { LuaEntity, MapPosition } from "factorio:runtime"
+import { isFlyer } from "../../automaton/models"
 import { cancelMove, isMoving, moveRobot } from "../../automaton/movement"
 import { onEvent } from "../../events"
 import { host, hostBlocking, program, Val } from "../../lang/runtime/core"
@@ -57,6 +58,8 @@ blocking("canReach", (k, to) => {
   if (k !== undefined) return finishWaiting(k)
   const robot = currentRobot()
   const target = resolveTarget(to)
+  // Летающим путь не нужен: долетят куда угодно.
+  if (isFlyer(robot)) return $multi(true)
   return startWaiting("canReach", (frame) => {
     frame.goal = target.position
     frame.__path = requestPath(robot.id, target.position)

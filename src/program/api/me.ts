@@ -2,6 +2,7 @@
 // память (memory: переживает перезапуск программы и подбор машины).
 import { fuelValue } from "../../automaton/energy"
 import { tankCapacity, tankOf } from "../../automaton/tank"
+import { robotPosition } from "../../automaton/flight"
 import { charge, defineHostObject, hostGetters, hostMethods, hostSetters, Val } from "../../lang/runtime/core"
 import { actionError, currentMachine, currentRobot } from "../context"
 import { modelOfRecord, robotBattery, robotVision } from "../../automaton/models"
@@ -19,7 +20,7 @@ getters.name = () => currentRobot().name
 getters.model = () => modelOfRecord(currentRobot()).id
 getters.valid = () => true
 getters.inSight = () => true
-getters.position = () => programPosition(currentRobot().entity.position)
+getters.position = () => programPosition(robotPosition(currentRobot()))
 getters.state = () => robotState(currentRobot())
 getters.program = () => robotProgramName(currentRobot())
 getters.health = () => robotHealth(currentRobot())
@@ -36,6 +37,7 @@ getters.fuel = () => {
 getters.tank = () => {
   const robot = currentRobot()
   const tank = tankOf(robot)
+  if (tankCapacity(robot) <= 0) return undefined
   charge(1)
   return { fluid: tank.amount > 0 ? tank.fluid : undefined, amount: tank.amount, capacity: tankCapacity(robot) }
 }

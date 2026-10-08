@@ -28,7 +28,7 @@ export function replacePlacer(placer: LuaEntity, tag?: RobotTag): void {
     return
   }
   // Без команды юнит может отвлечься на что-нибудь; пусть просто стоит.
-  worker.commandable!.set_command({ type: defines.command.stop, distraction: defines.distraction.none })
+  if (worker.type === "unit") worker.commandable!.set_command({ type: defines.command.stop, distraction: defines.distraction.none })
   registerRobot(worker, tag)
 }
 
