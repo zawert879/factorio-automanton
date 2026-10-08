@@ -1,6 +1,6 @@
 # Automaton — мод для Factorio
 
-Оверхол для игры с друзьями: конвейеры, буры, манипуляторы, логистические роботы и насосы убраны,
+Оверхол для игры с друзьями: конвейеры, буры, манипуляторы, логистические роботы и прибрежный насос убраны,
 их работу делают машины-автоматоны по программам на подмножестве TypeScript.
 
 - Дизайн и принятые решения: `docs/DESIGN.md`. Не менять решения молча — сначала спросить.
@@ -54,6 +54,9 @@
 - `src/settings.ts` — настройки мода (settings stage); `src/data.ts` (+ `data-updates`, `data-final-fixes`) —
   прототипы (data stage); `src/control.ts` — runtime (события, команды, GUI); модули — рядом, в подпапках.
 - `src/storage.d.ts` — тип `storage`; `src/names.ts` — имена прототипов (общие для data и control).
+- `src/prototypes/removal.ts` — удаление ванили (`data-final-fixes`), `src/prototypes/technologies.ts` — технологии.
+- `examples/*.ts` — стартовые программы библиотеки команды (первая строка `// @program Имя`); проверяются
+  `npm run dts` (tsc) и `npm test` (компилятор мода), попадают в мод через `src/program/examples.generated.ts`.
 - `src/debug/commands.ts` — отладочные команды (`/am-give [число]` — выдать машины); в мультиплеере только админам.
 - В `data`/`settings` глобальные `data`, `mods` объявляются в файле через `factorio:common`
   (в tsconfig подключены только типы runtime).
