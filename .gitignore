@@ -9,3 +9,5 @@ mod/**/*.lua
 # собранные тесты и локальная сборка Lua 5.2 (tools/lua/build.sh)
 build/
 tools/lua/5.2/
+# создаётся tools/test/run.mjs из документации
+tests/lang/examples.generated.ts
