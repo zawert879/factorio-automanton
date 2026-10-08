@@ -246,19 +246,41 @@ declare function rotate(target: Entity, reverse?: boolean): void;
 
 ```ts
 interface FluidTank {
-  readonly fluid: Fluid | null;
+  readonly fluid: Fluid | null;        // null — бак пуст
   readonly amount: number;
-  readonly capacity: number;
+  readonly capacity: number;           // Mk1 — 1000
 }
 
-/** [Жидкости] Набрать в бак: воду — у берега, нефть — на месторождении. */
+/**
+ * [Жидкости] Набрать в бак: воду — у берега (клетка воды в me.mineReach), нефть — стоя у месторождения.
+ * Без amount — до полного бака. Возвращает, сколько набрано.
+ */
 declare function pump(fluid: Fluid, amount?: number): number;
 
-/** [Жидкости] Залить из бака в здание (котёл, завод, резервуар). */
+/** [Жидкости] Залить из бака в здание в радиусе me.reach (котёл, резервуар, завод). Без amount — всё, что влезет. */
 declare function fill(into: Entity, amount?: number): number;
 
-/** [Жидкости] Слить из здания в бак. */
+/** [Жидкости] Слить из здания в бак (пар из котла, продукты нефтезавода). */
 declare function drain(from: Entity, fluid: Fluid, amount?: number): number;
+```
+
+- Бак держит одну жидкость; температура сохраняется (пар из котла остаётся горячим).
+- Вода — 500 ед/с, перелив в здание и из здания — 500 ед/с. Нефть — как нефтевышкой: раз в секунду
+  10 × выработка месторождения (запас / 300 000); каждый цикл снижает запас, выработка падает до 20%.
+- Уран добывается, только если в баке серная кислота: 1 кислоты на единицу руды.
+- Ошибки — как у предметов (бак — это «груз»): бак полон или в нём другая жидкость — `cargo-full`,
+  в баке или здании нет нужного — `not-enough-items`, здание не принимает — `target-full`,
+  рядом нечего качать — `no-resource`.
+
+```ts
+// Водовоз: от берега к резервуару у котлов
+const shore = scan.water()!;
+while (true) {
+  move(shore, { radius: 2 });
+  pump("water");
+  move(marker("котельная"), { radius: 2 });
+  fill(scan.entities({ name: "storage-tank" })[0]);
+}
 ```
 
 ## Энергия

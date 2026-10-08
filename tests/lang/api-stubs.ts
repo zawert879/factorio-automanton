@@ -103,6 +103,7 @@ const meFields: Record<string, (this: void) => Val> = {
   home: () => ({ x: 0, y: 0 }),
   weapon: () => ({ ammo: { count: 30 } }),
   cargo: () => inventory(arr({ name: "iron-plate", count: 8 })),
+  tank: () => ({ fluid: "water", amount: 0, capacity: 1000 }),
 }
 for (const [name, fn] of Object.entries(meFields)) hostGetters.me[name] = fn
 hostSetters.me.label = (_o: Val, v: Val) => log.push(`label ${tostring(v)}`)
@@ -148,6 +149,9 @@ for (const [name, fn] of Object.entries(nonBlocking)) host[name] = fn
 const blocking: Record<string, (this: void, ...args: Val[]) => Val> = {
   goHome: () => undefined,
   take: () => 10,
+  pump: () => 1000,
+  fill: () => 500,
+  drain: () => 100,
   reload: () => undefined,
   refuel: () => undefined,
   patrol: () => undefined,

@@ -1,5 +1,6 @@
 // Движение и предметы (4.2) поверх систем этапа 2: move, canReach, follow, goHome, mine, take, put,
-// pickup, drop, give, repair, refuel. Блокирующие: программа ждёт конца действия или поездки.
+// pickup, drop, give, repair, refuel; жидкости (7.1): pump, fill, drain. Блокирующие: программа ждёт
+// конца действия или поездки.
 import { MapPosition } from "factorio:runtime"
 import { cancelMove, isMoving, moveRobot } from "../../automaton/movement"
 import { onEvent } from "../../events"
@@ -9,7 +10,7 @@ import { WORKER_MK1 } from "../../names"
 import { actionError, currentMachine, currentRobot } from "../context"
 import { handleEntity, handleRobot, inSight, resolveTarget } from "../handles"
 import { registerPoll, resume, sleepUntil } from "../scheduler"
-import { actionCall, count, finishWaiting, item, optionalItem, startWaiting, ticks } from "./common"
+import { actionCall, count, finishWaiting, fluid, fluidAmount, item, optionalItem, startWaiting, ticks } from "./common"
 
 const FOLLOW_CHECK_TICKS = 30
 
@@ -146,6 +147,14 @@ blocking("repair", (k, target) =>
   actionCall(k, "repair", k !== undefined ? {} : { target: type(target) === "table" && target.__h === "robot" ? handleRobot(target).entity : handleEntity(target) }),
 )
 blocking("refuel", (k, what) => actionCall(k, "refuel", k !== undefined ? {} : { item: optionalItem(what) }))
+
+// ---------- Жидкости ----------
+
+blocking("pump", (k, what, amount) => actionCall(k, "pump", k !== undefined ? {} : { item: fluid(what), count: fluidAmount(amount) }))
+blocking("fill", (k, into, amount) => actionCall(k, "fill", k !== undefined ? {} : { target: handleEntity(into), count: fluidAmount(amount) }))
+blocking("drain", (k, from, what, amount) =>
+  actionCall(k, "drain", k !== undefined ? {} : { target: handleEntity(from), item: fluid(what), count: fluidAmount(amount) }),
+)
 
 export function registerActionApi(): void {
   onEvent(defines.events.on_script_path_request_finished, (e) => onPathFinished(e.id, e.path !== undefined, e.try_again_later))

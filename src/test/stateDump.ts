@@ -27,6 +27,11 @@ while (true) {
 
 const MINER_PROGRAM = `while (true) { mine("iron-ore", 3); wait(0.5) }`
 
+/** Жидкости (этап 7): набрать воду, залить в резервуар; второй — нефть с месторождения. */
+const WATER_PROGRAM = `const tank = scan.entities({ name: "storage-tank" })[0]
+while (true) { pump("water", 300); fill(tank); wait(0.2) }`
+const OIL_PROGRAM = `while (true) { pump("crude-oil", 30); print(Math.round(me.tank!.amount)) }`
+
 const DUMP_TICK = 600 // как в tools/test/desync.mjs
 
 function nauvis() {
@@ -66,6 +71,22 @@ const steps: Record<number, () => void> = {
     for (const worker of workers()) {
       if (worker.position.x > 85 && worker.position.y < 50) assignProgram(findRobot(worker)!, busy.program)
       if (worker.position.x > 95 && worker.position.y > 55) assignProgram(findRobot(worker)!, miner.program)
+    }
+  },
+  90: () => {
+    const tiles = []
+    for (let x = 120; x < 124; x++) for (let y = 40; y < 50; y++) tiles.push({ name: "water", position: { x, y } })
+    nauvis().set_tiles(tiles)
+    nauvis().create_entity({ name: "storage-tank", position: { x: 114.5, y: 45.5 }, force: "player" })
+    nauvis().create_entity({ name: "crude-oil", position: { x: 130.5, y: 60.5 }, amount: 300000 })
+    const water = publishProgram("водовоз", WATER_PROGRAM)
+    const oil = publishProgram("нефть", OIL_PROGRAM)
+    if (!water.ok || !oil.ok) error("программы жидкостей не компилируются")
+    placeAt({ x: 118.5, y: 45.5 })
+    placeAt({ x: 128.5, y: 60.5 })
+    for (const worker of workers()) {
+      if (math.abs(worker.position.x - 118.5) < 2 && math.abs(worker.position.y - 45.5) < 2) assignProgram(findRobot(worker)!, water.program)
+      if (math.abs(worker.position.x - 128.5) < 2 && math.abs(worker.position.y - 60.5) < 2) assignProgram(findRobot(worker)!, oil.program)
     }
   },
   120: () => workers()[0].die(),

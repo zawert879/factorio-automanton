@@ -201,6 +201,7 @@ export function robotState(record: RobotRecord): string {
     if (action.kind === "mine") return "mining"
     if (action.kind === "repair") return "building"
     if (action.kind === "wait") return "waiting"
+    if (action.kind === "pump") return "pumping"
     return "transferring"
   }
   if (isMoving(record)) return "moving"

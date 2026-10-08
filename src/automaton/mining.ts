@@ -1,11 +1,13 @@
 // Действие «добыть»: машина копает месторождение рядом, по единице за шаг, как персонаж киркой.
 // Время единицы — mining_time ресурса / скорость добычи машины. Продукты с вероятностью — через
 // генератор случайных чисел из storage (одинаково у всех игроков). Кончилась клетка месторождения —
-// переходит на соседнюю в пределах досягаемости. Жидкие ресурсы и ресурсы, требующие жидкости, — этап 7.
+// переходит на соседнюю в пределах досягаемости. Жидкие ресурсы (нефть) качает pump (fluids.ts); ресурсу,
+// которому нужна жидкость (уран — серная кислота), она идёт из бака: fluid_amount / 10 на единицу, как у бура.
 import { LuaEntity } from "factorio:runtime"
 import { ActionState, distanceToEntity, face, registerActionHandler, StepOutcome } from "./actions"
 import { MINING_WATTS, spend } from "./energy"
 import { RobotRecord } from "./registry"
+import { EPSILON, takeFromTank, tankOf } from "./tank"
 
 /** Досягаемость до месторождения (как у персонажа) и скорость добычи машины Mk1. */
 export const MINE_REACH = 2.7
@@ -18,7 +20,7 @@ export function initMining(): void {
 /** Даёт ли ресурс этот предмет (или любой, если предмет не указан). */
 function yields(resource: LuaEntity, item: string | undefined): boolean {
   const props = resource.prototype.mineable_properties
-  if (!props.minable || props.required_fluid !== undefined) return false
+  if (!props.minable) return false
   const products = props.products ?? []
   if (products.some((p) => p.type === "fluid")) return false
   return item === undefined || products.some((p) => p.name === item)
@@ -39,6 +41,11 @@ function findResource(record: RobotRecord, item: string | undefined): LuaEntity 
   return best
 }
 
+/** Сколько жидкости (из бака) нужно на единицу добычи: как у бура — fluid_amount на 10 единиц. */
+export function fluidPerUnit(resource: LuaEntity): number {
+  return (resource.prototype.mineable_properties.fluid_amount ?? 0) / 10
+}
+
 function unitTicks(resource: LuaEntity): number {
   return math.max(1, math.ceil((resource.prototype.mineable_properties.mining_time / MINING_SPEED) * 60))
 }
@@ -57,7 +64,7 @@ function nextUnit(record: RobotRecord, action: ActionState): StepOutcome {
   if (action.params.count !== undefined && action.done >= action.params.count) return { finish: true }
   const resource = resourceFor(record, action)
   // Если что-то уже добыто — это успех с причиной остановки; если ничего — ошибка.
-  const stop = (why: "no-resource" | "cargo-full" | "out-of-reach"): StepOutcome =>
+  const stop = (why: "no-resource" | "cargo-full" | "out-of-reach" | "not-enough-items"): StepOutcome =>
     action.done > 0 ? { finish: true, reason: why } : { finish: true, error: why }
   if (resource === undefined) {
     // Указанной цели нет рядом — «далеко»; не нашлось ничего — «нечего добывать».
@@ -66,6 +73,11 @@ function nextUnit(record: RobotRecord, action: ActionState): StepOutcome {
   }
   const sample = action.params.item ?? resource.prototype.mineable_properties.products?.[0]?.name
   if (sample !== undefined && !record.cargo.can_insert({ name: sample, count: 1 })) return stop("cargo-full")
+  const required = resource.prototype.mineable_properties.required_fluid
+  if (required !== undefined) {
+    const tank = tankOf(record)
+    if (tank.fluid !== required || tank.amount + EPSILON < fluidPerUnit(resource)) return stop("not-enough-items")
+  }
   action.params.target = resource
   face(record, resource.position, "mine")
   return { after: unitTicks(resource) }
@@ -73,6 +85,8 @@ function nextUnit(record: RobotRecord, action: ActionState): StepOutcome {
 
 /** Добыть одну единицу из клетки: продукты в груз, запас клетки — на единицу меньше. */
 function mineUnit(record: RobotRecord, action: ActionState, resource: LuaEntity): void {
+  const required = resource.prototype.mineable_properties.required_fluid
+  if (required !== undefined && takeFromTank(record, required, fluidPerUnit(resource)) + EPSILON < fluidPerUnit(resource)) return
   const rng = storage.rng
   for (const product of resource.prototype.mineable_properties.products ?? []) {
     if (product.type !== "item") continue

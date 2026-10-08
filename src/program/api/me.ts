@@ -1,7 +1,8 @@
 // Своя машина — me (4.4): состояние, имя и подпись, груз, топливо, параметры программы (args),
 // память (memory: переживает перезапуск программы и подбор машины).
 import { fuelValue } from "../../automaton/energy"
-import { defineHostObject, hostGetters, hostMethods, hostSetters, Val } from "../../lang/runtime/core"
+import { tankCapacity, tankOf } from "../../automaton/tank"
+import { charge, defineHostObject, hostGetters, hostMethods, hostSetters, Val } from "../../lang/runtime/core"
 import { actionError, currentMachine, currentRobot } from "../context"
 import { cargoHandle, distanceBetween, robotHandle, robotHealth, robotProgramName, robotState, WORKER_MK1_STATS } from "../handles"
 import { copyValue, programPosition } from "../values"
@@ -29,7 +30,12 @@ getters.fuel = () => {
   const stored = robot.energy + (stack.valid_for_read ? stack.count * fuelValue(stack.name) : 0)
   return math.min(1, stored / FULL_TANK_JOULES)
 }
-getters.tank = () => undefined
+getters.tank = () => {
+  const robot = currentRobot()
+  const tank = tankOf(robot)
+  charge(1)
+  return { fluid: tank.amount > 0 ? tank.fluid : undefined, amount: tank.amount, capacity: tankCapacity(robot) }
+}
 getters.weapon = () => undefined
 getters.reach = () => WORKER_MK1_STATS.reach
 getters.mineReach = () => WORKER_MK1_STATS.mineReach

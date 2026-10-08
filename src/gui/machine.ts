@@ -16,6 +16,7 @@ import {
   TextFieldGuiElement,
 } from "factorio:runtime"
 import { fuelValue } from "../automaton/energy"
+import { tankCapacity, tankOf } from "../automaton/tank"
 import { RobotRecord } from "../automaton/registry"
 import { onEvent, onTick } from "../events"
 import { pausedLine } from "../lang/runtime"
@@ -50,6 +51,7 @@ export interface MachineWindow {
   consoleSize: number
   cargo: TableGuiElement
   fuel: ProgressBarGuiElement
+  tank: ProgressBarGuiElement
   name: TextFieldGuiElement
   home: LabelGuiElement
   args: TextBoxGuiElement
@@ -113,6 +115,9 @@ export function openMachine(player: LuaPlayer, robot: RobotRecord): void {
   label(cargoRow, "fuel")
   const fuel = cargoRow.add({ type: "progressbar", value: 0 })
   fuel.style.width = 100
+  label(cargoRow, "tank")
+  const tank = cargoRow.add({ type: "progressbar", value: 0 })
+  tank.style.width = 100
 
   // Настройки машины.
   const settings = body.add({ type: "table", column_count: 2 })
@@ -149,6 +154,7 @@ export function openMachine(player: LuaPlayer, robot: RobotRecord): void {
     consoleSize: -1,
     cargo,
     fuel,
+    tank,
     name,
     home,
     args,
@@ -234,6 +240,10 @@ export function refreshMachine(window: MachineWindow): void {
   const stack = robot.fuel[0]
   const stored = robot.energy + (stack.valid_for_read ? stack.count * fuelValue(stack.name) : 0)
   window.fuel.value = math.min(1, stored / FULL_TANK_JOULES)
+  const tank = tankOf(robot)
+  window.tank.value = math.min(1, tank.amount / tankCapacity(robot))
+  window.tank.caption = tank.fluid === undefined ? "" : `${math.floor(tank.amount)}`
+  window.tank.tooltip = tank.fluid === undefined ? ["automaton-gui.tank-empty"] : ["", prototypes.fluid[tank.fluid]?.localised_name ?? tank.fluid, `: ${math.floor(tank.amount)} / ${tankCapacity(robot)}, ${math.floor(tank.temperature)} °C`]
   window.home.caption = record.home === undefined ? ["automaton-gui.no-home"] : `${math.floor(record.home.x)}, ${math.floor(record.home.y)}`
   window.pause.caption = [record.paused ? "automaton-gui.resume" : "automaton-gui.pause"]
 }

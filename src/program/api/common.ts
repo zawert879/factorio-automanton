@@ -39,6 +39,19 @@ export function item(value: Val): string {
   return value as string
 }
 
+/** Имя жидкости (проверка, что такая есть). */
+export function fluid(value: Val): string {
+  if (type(value) !== "string" || prototypes.fluid[value as string] === undefined) actionError("invalid-target", `unknown fluid ${tostring(value)}`)
+  return value as string
+}
+
+/** Количество жидкости: положительное число (дробное можно) или undefined («сколько получится»). */
+export function fluidAmount(value: Val): number | undefined {
+  if (value === undefined) return undefined
+  if (type(value) !== "number" || value !== value || value < 0) actionError("invalid-target", `bad amount ${tostring(value)}`)
+  return value as number
+}
+
 export function optionalItem(value: Val): string | undefined {
   return value === undefined ? undefined : item(value)
 }

@@ -10,7 +10,7 @@ import { cancelMove } from "./movement"
 import { RobotRecord } from "./registry"
 import { problemFor, showProblem } from "./status"
 
-export type ActionKind = "wait" | "mine" | "take" | "put" | "pickup" | "drop" | "give" | "repair" | "refuel"
+export type ActionKind = "wait" | "mine" | "take" | "put" | "pickup" | "drop" | "give" | "repair" | "refuel" | "pump" | "fill" | "drain"
 
 export type ActionError =
   | "out-of-reach"
@@ -27,9 +27,13 @@ export type ActionError =
 /** Параметры действия — простые данные и ссылки на объекты игры (лежат в storage). */
 export interface ActionParams {
   target?: LuaEntity
+  /** Предмет или (у pump / drain) жидкость. */
   item?: string
+  /** Сколько: предметов или (у жидкостей) единиц жидкости. */
   count?: number
   seconds?: number
+  /** Клетка (вода, из которой качает pump). */
+  position?: MapPosition
 }
 
 export interface ActionState {

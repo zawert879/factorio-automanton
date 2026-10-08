@@ -5,6 +5,7 @@ import { onEvent } from "../events"
 import { LuaEntity, LuaInventory, LuaItemStack, LuaRenderObject, LuaSurface, MapPosition, Tags } from "factorio:runtime"
 import { Activity, ROBOT_TAG, WORKER_MK1 } from "../names"
 import { directionOf, drawBody } from "./appearance"
+import type { Tank } from "./tank"
 
 export interface RobotRecord {
   id: number
@@ -22,6 +23,8 @@ export interface RobotRecord {
   fuel: LuaInventory
   /** Запас энергии, Дж: тратится на путь и действия, пополняется сжиганием топлива. */
   energy: number
+  /** Бак для жидкости (src/automaton/fluids.ts). */
+  tank: Tank
   /** Значок проблемы и облачко с текстом над машиной (src/automaton/status.ts). */
   problem?: LuaRenderObject
   bubble?: LuaRenderObject
@@ -39,6 +42,8 @@ export interface RobotTag {
   id: number
   name: string
   energy?: number
+  /** Бак уезжает вместе с машиной. */
+  tank?: Tank
 }
 
 export const CARGO_SLOTS = 10
@@ -85,6 +90,7 @@ export function registerRobot(entity: LuaEntity, tag?: RobotTag): RobotRecord {
     cargo: game.create_inventory(CARGO_SLOTS),
     fuel: game.create_inventory(1),
     energy: tag?.energy ?? START_ENERGY,
+    tank: tag?.tank ?? { amount: 0, temperature: 15 },
   }
   registry.byId[id] = record
   registry.idByUnit[entity.unit_number!] = id
@@ -131,13 +137,18 @@ function releaseItems(record: RobotRecord, to: LuaInventory | undefined): void {
 }
 
 export function robotTag(record: RobotRecord): RobotTag {
-  return { id: record.id, name: record.name, energy: record.energy }
+  return { id: record.id, name: record.name, energy: record.energy, tank: record.tank.amount > 0 ? record.tank : undefined }
 }
 
 function readTag(tags: Tags | undefined): RobotTag | undefined {
   const tag = tags?.[ROBOT_TAG] as Partial<RobotTag> | undefined
   if (tag === undefined || typeof tag.id !== "number" || typeof tag.name !== "string") return undefined
-  return { id: tag.id, name: tag.name, energy: typeof tag.energy === "number" ? tag.energy : undefined }
+  const tank = tag.tank
+  const validTank =
+    tank !== undefined && typeof tank.amount === "number" && typeof tank.temperature === "number" && (tank.fluid === undefined || typeof tank.fluid === "string")
+      ? { fluid: tank.fluid, amount: tank.amount, temperature: tank.temperature }
+      : undefined
+  return { id: tag.id, name: tag.name, energy: typeof tag.energy === "number" ? tag.energy : undefined, tank: validTank }
 }
 
 /** Тег машины из предмета, которым её построили (руками — инвентарь потраченного, роботом — стек). */
@@ -188,6 +199,7 @@ export function adoptUnregisteredRobots(): void {
     if (!record.cargo?.valid) record.cargo = game.create_inventory(CARGO_SLOTS)
     if (!record.fuel?.valid) record.fuel = game.create_inventory(1)
     record.energy ??= START_ENERGY
+    record.tank ??= { amount: 0, temperature: 15 }
   }
   for (const [, surface] of game.surfaces) {
     for (const entity of surface.find_entities_filtered({ name: WORKER_MK1 })) {
