@@ -36,7 +36,9 @@ const OIL_PROGRAM = `while (true) { pump("crude-oil", 30); print(Math.round(me.t
 const CROWD_PROGRAM = `const id = me.id
 const points = [{ x: 200, y: 100 }, { x: 230, y: 100 }, { x: 230, y: 130 }, { x: 200, y: 130 }]
 let i = id % 4
-subscribe("толпа")
+// Подписка на соседа (рассылки всем нет).
+const neighbour = robot(id - 1)
+if (neighbour !== null) subscribe(neighbour, "толпа")
 while (true) {
   if (id % 4 === 0) {
     move({ x: 203, y: 147 })
@@ -47,7 +49,7 @@ while (true) {
   }
   i++
   board.increment("шаги")
-  if (i % 3 === 0) broadcast("толпа", { from: id, i })
+  if (i % 3 === 0) publish("толпа", { from: id, i })
   const m = tryReceive<{ from: number; i: number }>("толпа")
   let sum = 0
   for (let k = 0; k < 50; k++) sum += Math.floor(Math.random() * 10)
@@ -56,7 +58,7 @@ while (true) {
 }`
 
 /** Связь (этап 9): запросы с ответом, доска, задачи — до и после сохранения. */
-const PING_PROGRAM = `subscribe("пинг")
+const PING_PROGRAM = `subscribe("понг-машина", "пинг")
 while (true) {
   const m = receive<number>("пинг", 2)
   if (m !== null) m.reply(m.data + 1)
@@ -68,7 +70,7 @@ while (true) {
   n = request<number>("пинг-машина", "пинг", n, 5)
   tasks.push("работа", n, { priority: n % 3 })
   board.set("последний", { n, at: time.tick })
-  broadcast("пинг", n)
+  publish("пинг", n)
   wait(0.3)
 }`
 
@@ -143,7 +145,10 @@ const steps: Record<number, () => void> = {
         record.name = "пинг-машина"
         assignProgram(record, ping.program)
       }
-      if (math.abs(worker.position.x - 144.5) < 2 && math.abs(worker.position.y - 40.5) < 2) assignProgram(record, pong.program)
+      if (math.abs(worker.position.x - 144.5) < 2 && math.abs(worker.position.y - 40.5) < 2) {
+        record.name = "понг-машина"
+        assignProgram(record, pong.program)
+      }
     }
   },
   // Бой (этап 10): боевая машина патрулирует два поста — команды движку переживают сохранение.

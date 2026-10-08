@@ -1,5 +1,5 @@
 // @program Рабочий
-// Находит оркестратора (сначала рядом, потом по радио), регистрируется у него и выполняет задания:
+// Находит оркестратора (сначала рядом, потом по доске), регистрируется у него и выполняет задания:
 // накопать руды на месторождении и отвезти в печь, которую назвал оркестратор.
 // Параметры: {"field": "<зона с рудой>", "amount": 50} — зону выделите «Программатором» на месторождении.
 
@@ -8,11 +8,9 @@ type Order = { furnace: Entity; ore: Item };
 function findBoss(): number {
   const near = scan.robots().find(r => r.program === "Оркестратор");
   if (near !== undefined) return near.id;
-  while (true) {
-    broadcast("ищу-оркестратора");
-    const answer = receive<number>("оркестратор", 10);
-    if (answer !== null) return answer.data;
-  }
+  // Далеко — по доске: оркестратор записал туда свой id.
+  waitUntil(() => board.get<number>("оркестратор") !== null, { every: 5 });
+  return board.get<number>("оркестратор")!;
 }
 
 const { field, amount } = me.args<{ field: string; amount?: number }>();

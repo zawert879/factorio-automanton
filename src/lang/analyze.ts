@@ -479,7 +479,8 @@ export function analyze(program: A.Program, units?: ModuleUnit[]): Analysis {
       resolutions.set(node, resolution)
       return resolution
     }
-    report("unknown-name", [name], at)
+    // Рассылки всем больше нет (растёт как N²): подсказать замену.
+    report(name === "broadcast" ? "broadcast-removed" : "unknown-name", [name], at)
     return undefined
   }
 

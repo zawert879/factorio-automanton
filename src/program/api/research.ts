@@ -9,7 +9,7 @@ import { actionError, currentRobot } from "../context"
 /** Функция API → технология. Связь, табло, цепи и бой добавятся с их этапами (9, 10). */
 export const REQUIRED_RESEARCH: Record<string, string> = {
   send: TECH.radio,
-  broadcast: TECH.radio,
+  publish: TECH.radio,
   subscribe: TECH.radio,
   unsubscribe: TECH.radio,
   receive: TECH.radio,

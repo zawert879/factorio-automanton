@@ -1,10 +1,10 @@
-// Связь (9.1, 9.2): send, broadcast, subscribe, unsubscribe, receive, tryReceive, request, robot, inbox;
-// сообщение — объект message (from, topic, data, sentAt, reply). Доставка и ящики — src/program/comms.ts.
+// Связь (9.1, 9.2): send, publish, subscribe, unsubscribe, receive, tryReceive, request, robot, inbox;
+// сообщение — объект message (from, topic, data, sentAt, reply). Доставка, ящики и подписки — src/program/comms.ts.
 import { LuaForce } from "factorio:runtime"
 import { charge, defineHostObject, host, hostBlocking, hostGetters, hostMethods, Val } from "../../lang/runtime/core"
 import { measure } from "../../lang/runtime"
 import { RobotRecord } from "../../automaton/registry"
-import { INBOX_SIZE, Mail, matches, nextMailId, post, setMessageWrapper, subscribed, takeFromInbox } from "../comms"
+import { follow, INBOX_SIZE, Mail, matches, nextMailId, post, setMessageWrapper, takeFromInbox, unfollow } from "../comms"
 import { actionError, actionErrorValue, currentRobot } from "../context"
 import { robotHandle } from "../handles"
 import { registerPoll, resume, sleepUntil } from "../scheduler"
@@ -63,7 +63,7 @@ function newMail(topic: string, data: Val, extra?: Partial<Mail>): Mail {
 defineHostObject("message")
 hostGetters.message.from = (o: Val) => robotHandle((o.__mail as Mail).from)
 hostGetters.message.topic = (o: Val) => (o.__mail as Mail).topic
-// Данные письма общие у всех получателей broadcast: своя копия — только когда программа их читает
+// Данные письма общие у всех получателей publish: своя копия — только когда программа их читает
 // (большинство писем при рассылке на сотни машин не читают — переполненный ящик их выбрасывает).
 hostGetters.message.data = (o: Val) => {
   const mail = o.__mail as Mail
@@ -90,29 +90,42 @@ host.send = (to: Val, topic: Val, data: Val) => {
   post(recipient(to), newMail(topicOf(topic), packData(data)))
 }
 
-host.broadcast = (topic: Val, data: Val) => {
+host.publish = (topic: Val, data: Val) => {
   const name = topicOf(topic)
   const me = currentRobot()
+  const followers = storage.comms.followers[me.id]
+  if (followers === undefined) return
   const force = me.entity.force_index
   const packed = packData(data)
-  // Только подписанные на тему; себе не шлём. Данные — одна копия на всех (копируется при чтении).
-  for (const [id, topics] of pairs(storage.comms.subscriptions)) {
-    if (id === me.id || !topics[name]) continue
+  // Только подписанным на эту машину (на все её темы или на эту); данные — одна копия на всех.
+  for (const [id, topics] of pairs(followers)) {
+    if (!topics[""] && !topics[name]) continue
     const record = storage.robots.byId[id]
     if (record === undefined || !record.entity.valid || record.entity.force_index !== force) continue
+    charge(1)
     post(id, newMail(name, packed, { shared: true }))
   }
 }
 
-host.subscribe = (topic: Val) => {
-  const id = currentRobot().id
-  const subscriptions = (storage.comms.subscriptions[id] ??= {})
-  subscriptions[topicOf(topic)] = true
+/** Старые программы (до подписок на машину): понятная ошибка вместо «нет такой функции». */
+host.broadcast = () => {
+  actionError("invalid-target", "broadcast removed: publish(topic, data) reaches robots subscribed to you with subscribe(id, topic)")
 }
 
-host.unsubscribe = (topic: Val) => {
-  const subscriptions = storage.comms.subscriptions[currentRobot().id]
-  if (subscriptions !== undefined) subscriptions[topicOf(topic)] = undefined
+host.subscribe = (robot: Val, topic: Val) => {
+  const source = findTeammate(robot)
+  if (source === undefined) {
+    // Раньше подписывались на тему: subscribe("тема") — подсказать, что теперь на машину.
+    actionError("invalid-target", `no robot ${tostring(type(robot) === "table" ? robot.__id : robot)} — subscribe(robot, topic?) subscribes to a robot`)
+  }
+  const me = currentRobot().id
+  if (source.id === me) return
+  follow(me, source.id, topic === undefined ? "" : topicOf(topic))
+}
+
+host.unsubscribe = (robot: Val, topic: Val) => {
+  const source = findTeammate(robot)
+  if (source !== undefined) unfollow(currentRobot().id, source.id, topic === undefined ? undefined : topicOf(topic))
 }
 
 host.tryReceive = (topic: Val) => {

@@ -47,7 +47,7 @@
 | [Энергия](#энергия) | `refuel`, `charge` | сразу / Mk2 |
 | [Зрение](#зрение) | `scan.robots`, `scan.entities`, `scan.items`, `scan.resources`, `scan.enemies`, `scan.water` | сразу, радиус растёт исследованиями |
 | [Карта](#карта) | метки, зоны, `find`, `map.tag` | сразу |
-| [Связь](#связь) | `send`, `broadcast`, `receive`, `request`, `robot` | [Радиосвязь] |
+| [Связь](#связь) | `send`, `publish`, `subscribe`, `receive`, `request`, `robot` | [Радиосвязь] |
 | [Доска и задачи](#доска-и-задачи) | `board` (общая память), `tasks` (очереди заданий) | [Радиосвязь] |
 | [Табло](#табло) | `display`: пиксельный холст — линии, фигуры, текст, иконки, таблицы | [Табло] |
 | [Бой](#бой) | `attack`, `guard`, `patrol`, `reload`, `me.weapon` | [Боевые автоматоны] |
@@ -377,8 +377,15 @@ declare const map: {
 Все `[Радиосвязь]`. Дальность не ограничена. Сообщение приходит на следующем тике.
 Входящий ящик — 64 сообщения; если переполнен, самые старые выбрасываются. Данные копируются при
 отправке (у каждого получателя — своя копия), до 2 000 единиц памяти; функции и экземпляры классов
-передать нельзя (`not-serializable`). Перезапуск программы очищает ящик и подписки. `send` машине,
-которой нет, — `invalid-target`; `reply` на обычное сообщение — сообщение с той же темой.
+передать нельзя (`not-serializable`). Перезапуск программы очищает ящик и её подписки (подписки других
+машин на неё остаются). `send` машине, которой нет, — `invalid-target`; `reply` на обычное сообщение —
+сообщение с той же темой.
+
+**Рассылки всем нет.** Машина публикует обновления (`publish`), а получают их только машины, которые
+подписались именно на неё (`subscribe(id)` — на все её темы, `subscribe(id, "тема")` — на одну). Цена
+публикации — число её подписчиков, а не всех машин: рассылка всем на тысячах машин съедала бы весь тик.
+Найти нужную машину — по доске (`board.set("оркестратор", me.id)` у неё, `board.get` у остальных) или
+зрением (`scan.robots()`).
 
 ```ts
 interface Message<T extends Value = Value> {
@@ -393,10 +400,12 @@ interface Message<T extends Value = Value> {
 /** Сообщение конкретной машине: по ссылке, id или имени. */
 declare function send(to: Robot | number | string, topic: string, data?: Value): void;
 
-/** Сообщение всем машинам команды, подписанным на тему. */
-declare function broadcast(topic: string, data?: Value): void;
-declare function subscribe(topic: string): void;
-declare function unsubscribe(topic: string): void;
+/** Опубликовать обновление: получат машины, подписанные на эту (на все её темы или на эту тему). */
+declare function publish(topic: string, data?: Value): void;
+/** Подписаться на публикации машины (по ссылке, id или имени): на все её темы или на одну. */
+declare function subscribe(robot: Robot | number | string, topic?: string): void;
+/** Отписаться от машины: от темы или (без темы) совсем. */
+declare function unsubscribe(robot: Robot | number | string, topic?: string): void;
 
 /** Ждать сообщение (необязательно — только по теме). По таймауту (секунды) — null. */
 declare function receive<T extends Value = Value>(topic?: string, timeout?: number): Message<T> | null;
@@ -691,12 +700,10 @@ const workers = new Map<number, WorkerInfo>();
 const assigned = new Set<number>();            // печи, на которые уже выдано задание
 
 move(zone("плавильня"));
-subscribe("ищу-оркестратора");
+// Рабочие находят оркестратора по доске (рассылки всем нет).
+board.set("оркестратор", me.id);
 
 function handleMail(): void {
-  for (let m = tryReceive("ищу-оркестратора"); m !== null; m = tryReceive("ищу-оркестратора")) {
-    send(m.from, "оркестратор", me.id);
-  }
   for (let m = tryReceive<string>("регистрация"); m !== null; m = tryReceive<string>("регистрация")) {
     workers.set(m.from.id, { robot: m.from, name: m.data, status: "свободен", busy: false });
     m.reply("ok");
@@ -758,11 +765,9 @@ type Order = { furnace: Entity; ore: Item };
 function findBoss(): number {
   const near = scan.robots().find(r => r.program === "Оркестратор");
   if (near !== undefined) return near.id;
-  while (true) {
-    broadcast("ищу-оркестратора");
-    const answer = receive<number>("оркестратор", 10);
-    if (answer !== null) return answer.data;
-  }
+  // Далеко — по доске: оркестратор записал туда свой id.
+  waitUntil(() => board.get<number>("оркестратор") !== null, { every: 5 });
+  return board.get<number>("оркестратор")!;
 }
 
 const { field } = me.args<{ field: string }>();
@@ -837,7 +842,7 @@ while (true) {
   patrol(route, () => ammoLeft() < 20 || me.health < 0.4);
 
   if (me.health < 0.4) {
-    broadcast("нужен-ремонт", me.id);
+    publish("нужен-ремонт", me.id);   // получат ремонтники, подписанные на эту машину
     goHome();
     waitUntil(() => me.health > 0.9, { every: 2 });
   }

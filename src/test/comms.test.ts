@@ -3,7 +3,7 @@ import { MapPosition } from "factorio:runtime"
 import { findRobot, RobotRecord } from "../automaton/registry"
 import { MODELS, TECH } from "../names"
 import { describeDiagnostics } from "../program/commands"
-import { assignProgram, MachineRecord } from "../program/machines"
+import { assignProgram, MachineRecord, restartMachine } from "../program/machines"
 import { publishProgram } from "../program/store"
 import { describe, expect, test, waitUntil } from "./testing"
 
@@ -91,23 +91,56 @@ try { request("молчун", "эй", 1, 0.3) } catch (e) { print(e instanceof A
     })
   })
 
-  test("broadcast — только подписанным; ящик на 64, старые выбрасываются", (t) => {
+  test("publish — только подписанным на машину (на тему или на все темы); ящик на 64", (t) => {
     const sender = robotNamed("диктор")
     const listener = robotNamed("слушатель")
+    const all = robotNamed("всеслух")
     const deaf = robotNamed("глухой")
-    const ml = start(listener, `subscribe("новости")
+    const ml = start(listener, `subscribe("диктор", "новости")
 wait(1)
 const first = tryReceive<number>("новости")!
-print(inbox.count, inbox.dropped, first.data)`)
-    const md = start(deaf, `wait(1)
+print(inbox.count, inbox.dropped, first.data, tryReceive("погода") === null)`)
+    const ma = start(all, `subscribe(robot("диктор")!)
+wait(1)
+print(tryReceive("погода") !== null)`)
+    // Подписка на тему (как было с broadcast) — ошибка с подсказкой: подписываются на машину.
+    const md = start(deaf, `try { subscribe("новости") } catch (e) { print(e instanceof ActionError ? e.code : "?") }
+wait(1)
 print(tryReceive("новости") === null, inbox.count)`)
     const msd = start(sender, `wait(0.2)
-for (let i = 1; i <= 70; i++) broadcast("новости", i)`)
-    waitUntil(t, "конца программ", finished(ml, md, msd), 300, () => {
-      // 70 сообщений: 6 самых старых выброшены, первое оставшееся — №7, после него в ящике 63.
-      expect(output(ml)).toBe("63 6 7")
-      expect(output(md)).toBe("true 0")
-      cleanup(sender, listener, deaf)
+for (let i = 1; i <= 70; i++) publish("новости", i)
+publish("погода", "дождь")`)
+    waitUntil(t, "конца программ", finished(ml, ma, md, msd), 300, () => {
+      // 70 новостей: 6 самых старых выброшены, первая оставшаяся — №7, после неё в ящике 63; погоды нет.
+      expect(output(ml)).toBe("63 6 7 true")
+      expect(output(ma)).toBe("true")
+      expect(output(md)).toBe("invalid-target|true 0")
+      cleanup(sender, listener, all, deaf)
+    })
+  })
+
+  test("отписка и перезапуск: свои подписки снимаются, подписки на машину остаются", (t) => {
+    const source = robotNamed("источник")
+    const fan = robotNamed("поклонник")
+    const mf = start(fan, `subscribe("источник")
+unsubscribe("источник")
+subscribe("источник", "a")
+unsubscribe("источник", "a")
+subscribe("источник", "b")
+wait(1)
+print(tryReceive("a") === null, tryReceive("b") !== null)`)
+    const ms = start(source, `wait(0.3)
+publish("a")
+publish("b")`)
+    waitUntil(t, "конца программ", finished(mf, ms), 300, () => {
+      expect(output(mf)).toBe("true true")
+      // Подписчик закончил — его подписка жива до перезапуска; перезапуск источника её не трогает.
+      expect(storage.comms.followers[source.id]?.[fan.id]?.["b"]).toBe(true)
+      restartMachine(ms)
+      expect(storage.comms.followers[source.id]?.[fan.id]?.["b"]).toBe(true)
+      restartMachine(mf)
+      expect(storage.comms.followers[source.id]).toBe(undefined)
+      cleanup(source, fan)
     })
   })
 

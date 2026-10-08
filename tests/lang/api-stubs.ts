@@ -164,7 +164,7 @@ const nonBlocking: Record<string, (this: void, ...args: Val[]) => Val> = {
   alert: (text: Val) => log.push(`alert ${tostring(text)}`),
   chat: (text: Val) => log.push(`chat ${tostring(text)}`),
   send: () => true,
-  broadcast: () => 1,
+  publish: () => 1,
   subscribe: () => undefined,
   unsubscribe: () => undefined,
   tryReceive: (topic: Val) => queue(topic).shift(),

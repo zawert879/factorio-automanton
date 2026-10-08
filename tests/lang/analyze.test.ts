@@ -1,4 +1,5 @@
 // Тесты анализа: области видимости, захват переменных, короткие и возобновляемые функции.
+import { compile } from "../../src/lang/codegen"
 import { analyze, Analysis, FnInfo, VarInfo } from "../../src/lang/analyze"
 import { parse } from "../../src/lang/parser"
 import { describe, expect, test } from "../../src/test/testing"
@@ -183,5 +184,14 @@ describe("анализ: ошибки", () => {
       print(inner)
     `).diagnostics.map((d) => d.code)
     expect(codes).toEqual(["unknown-name"])
+  })
+})
+
+describe("связь: рассылки всем нет", () => {
+  test("broadcast — ошибка с подсказкой publish + subscribe(id)", () => {
+    const result = compile(`broadcast("новости", 1)`)
+    expect(result.ok).toBe(false)
+    expect(result.diagnostics[0].code).toBe("broadcast-removed")
+    expect(compile(`subscribe(7, "новости")\npublish("новости", 1)\nunsubscribe(7)`).ok).toBe(true)
   })
 })

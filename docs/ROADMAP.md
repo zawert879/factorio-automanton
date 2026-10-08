@@ -163,7 +163,7 @@
 
 ## Этап 9. Связь, табло и сигналы
 
-- [x] **9.1 Сообщения.** `send`, `broadcast`, `subscribe`, `receive`, `tryReceive`, `request` / `reply`;
+- [x] **9.1 Сообщения.** `send`, `broadcast` (позже заменён на `publish` + `subscribe(id)`), `subscribe`, `receive`, `tryReceive`, `request` / `reply`;
   копирование данных, ящик на 64 сообщения, доставка на следующем тике.
 - [x] **9.2 Обнаружение.** `robot()`; поиск оркестратора вокруг и по радио, регистрация через `request`.
 - [x] **9.3 Доска.** `board` с атомарными `increment`, `compareAndSet`, `claim` / `release` (с ttl).

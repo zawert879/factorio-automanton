@@ -59,7 +59,7 @@ const HOST_FUNCTIONS: Record<string, boolean> = {
   find: false,
   // Связь
   send: false,
-  broadcast: false,
+  publish: false,
   subscribe: false,
   unsubscribe: false,
   receive: true,
