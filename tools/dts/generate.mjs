@@ -76,9 +76,10 @@ if (process.argv.includes("--check")) {
   writeFileSync(join(dir, "automaton.d.ts"), dts)
   // Каждый пример — отдельный файл; moduleDetection: force делает их модулями (одинаковые имена не мешают).
   examples.forEach((source, i) => writeFileSync(join(dir, `example${i + 1}.ts`), source))
-  // Стартовые программы — по своим именам (папки — подпапки), как в папке для VS Code: так проверяются и импорты.
+  // Стартовые программы — по своим именам (папки — подпапки), как в папке для VS Code: так проверяются и импорты
+  // (и в примерах из документации: import из "./lib/Помощники").
   for (const { name, source } of starters) {
-    const path = join(dir, "starters", ...name.split("/")) + ".ts"
+    const path = join(dir, ...name.split("/")) + ".ts"
     mkdirSync(join(path, ".."), { recursive: true })
     writeFileSync(path, source)
   }

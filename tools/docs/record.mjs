@@ -118,7 +118,7 @@ for (const scene of readdirSync(outDir, { withFileTypes: true }).filter((e) => e
 }
 
 // Снимки окон из npm run shot (build/visual) — уменьшенные, для руководства.
-for (const name of ["machine-window", "tech-tree", "models"]) {
+for (const name of ["machine-window", "picker", "tech-tree", "models"]) {
   const file = join(root, "build", "visual", `${name}.png`)
   if (!existsSync(file)) continue
   const small = shrink(PNG.sync.read(readFileSync(file)))

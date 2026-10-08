@@ -70,13 +70,16 @@ function generateExamples() {
       examples.push({ name: `${file} #${index}`, source: match[1] })
     }
   }
+  // Стартовые программы — с именем (program): они же модули друг для друга (lib/Помощники).
   for (const file of readdirSync(join(root, "examples")).filter((f) => f.endsWith(".ts")).sort()) {
-    examples.push({ name: `examples/${file}`, source: readFileSync(join(root, "examples", file), "utf8") })
+    const source = readFileSync(join(root, "examples", file), "utf8")
+    const program = /^\/\/ @program (.+)$/m.exec(source)?.[1].trim()
+    examples.push({ name: `examples/${file}`, source, program })
   }
   writeFileSync(
     join(root, "tests", "lang", "examples.generated.ts"),
     "// Создаётся tools/test/run.mjs из документации — не править руками.\n" +
-      `export const EXAMPLES: { name: string; source: string }[] = ${JSON.stringify(examples, null, 2)}\n`,
+      `export const EXAMPLES: { name: string; source: string; program?: string }[] = ${JSON.stringify(examples, null, 2)}\n`,
   )
 }
 

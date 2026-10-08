@@ -4,6 +4,7 @@
 // «Получаемо» — замыкание от сырья: месторождения (руда, нефть), деревья и камни, жидкости озёр
 // (воду и нефть возят машины — этап 7) → рецепты, доступные со старта или открытые достижимыми
 // технологиями → продукты, отработанное топливо, продукты запуска ракеты.
+import { findProgram } from "../program/store"
 import { LuaTechnologyPrototype } from "factorio:runtime"
 import { compile } from "../lang/codegen"
 import { STARTER_PROGRAMS } from "../program/examples.generated"
@@ -181,9 +182,12 @@ describe("целостность после удаления ванили", () =
 
   test("стартовые программы опубликованы команде и компилируются", () => {
     expect(storage.startersPublished?.["player"]).toBe(true)
+    // Модули — другие стартовые программы (lib/Помощники).
+    const resolve = (name: string) => STARTER_PROGRAMS.find((s) => s.name === name)
     for (const starter of STARTER_PROGRAMS) {
-      const result = compile(starter.source)
+      const result = compile(starter.source, { name: starter.name, resolve })
       expect(`${starter.name}: ${result.ok}`).toBe(`${starter.name}: true`)
+      expect(`${starter.name}: ${findProgram(starter.name) !== undefined}`).toBe(`${starter.name}: true`)
     }
   })
 })

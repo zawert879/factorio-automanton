@@ -10,6 +10,8 @@
 // batch — сколько брать за раз.
 // Топливо машина берёт в сундуке у метки «уголь» (параметр "coal").
 
+import { attempt, buildingAt, refuelFrom } from "./lib/Помощники";
+
 type Place = { marker?: string; zone?: string };
 type Route = { item: Item; from: Place; to: Place; keep?: number; batch?: number };
 
@@ -24,26 +26,10 @@ if (routes.length === 0) {
   exit();
 }
 
-/** Здание у метки: ближайшее к самой метке (машина останавливается в паре клеток от неё — с любой стороны). */
-function nearMarker(at: Marker, types: string[]): Entity | null {
-  let best: Entity | null = null;
-  let bestDistance = Infinity;
-  for (const e of scan.entities({ type: types, radius: 6 })) {
-    const d = (e.position.x - at.position.x) ** 2 + (e.position.y - at.position.y) ** 2;
-    if (d < bestDistance) {
-      best = e;
-      bestDistance = d;
-    }
-  }
-  return best;
-}
-
 /** Здания места: сундук у метки или все подходящие здания в зоне. */
 function buildingsOf(place: Place): Entity[] {
   if (place.marker !== undefined) {
-    const at = marker(place.marker);
-    move(at, { radius: 2 });
-    const building = nearMarker(at, BUILDING_TYPES);
+    const building = buildingAt(place.marker, BUILDING_TYPES);
     return building === null ? [] : [building];
   }
   if (place.zone !== undefined) {
@@ -53,25 +39,6 @@ function buildingsOf(place: Place): Entity[] {
     return all;
   }
   return [];
-}
-
-/** Действие, которое может не выйти (пусто, полно) — тогда просто дальше. */
-function attempt(action: () => number): number {
-  try {
-    return action();
-  } catch (e) {
-    if (e instanceof ActionError && (e.code === "not-enough-items" || e.code === "target-full" || e.code === "cargo-full")) return 0;
-    throw e;
-  }
-}
-
-function refill(): void {
-  if (me.fuel >= 0.3) return;
-  if (me.cargo.count("coal") === 0) {
-    const chest = buildingsOf({ marker: coalDepot })[0];
-    if (chest !== undefined) attempt(() => take(chest, "coal", 10));
-  }
-  if (me.cargo.count("coal") > 0) refuel("coal");
 }
 
 function run(route: Route): void {
@@ -101,7 +68,7 @@ function run(route: Route): void {
 
 while (true) {
   for (const route of routes) {
-    refill();
+    refuelFrom(coalDepot);
     run(route);
   }
   wait(1);

@@ -25,11 +25,24 @@ export function publishStarters(force: LuaForce): void {
   storage.startersPublished ??= {}
   if (storage.startersPublished[force.name]) return
   storage.startersPublished[force.name] = true
-  for (const starter of STARTER_PROGRAMS) {
-    if (findProgram(starter.name, force.name) !== undefined) continue
-    const result = publish({ name: starter.name, source: starter.source, force: force.name, author: "Automaton" })
-    if (!result.ok) log(`automaton: стартовая программа ${starter.name} не скомпилировалась: ${serpent.line(result.diagnostics)}`)
+  // Программа собирается только после библиотек, которые импортирует (lib/Помощники): проходы, пока
+  // публикуется хоть одна.
+  let pending = STARTER_PROGRAMS.filter((starter) => findProgram(starter.name, force.name) === undefined)
+  let failures: string[] = []
+  while (pending.length > 0) {
+    const next: typeof pending = []
+    failures = []
+    for (const starter of pending) {
+      const result = publish({ name: starter.name, source: starter.source, force: force.name, author: "Automaton" })
+      if (!result.ok) {
+        next.push(starter)
+        failures.push(`${starter.name}: ${serpent.line(result.diagnostics)}`)
+      }
+    }
+    if (next.length === pending.length) break
+    pending = next
   }
+  for (const failure of failures) log(`automaton: стартовая программа не скомпилировалась: ${failure}`)
 }
 
 /** on_init и on_configuration_changed (мод добавили в старое сохранение). */
