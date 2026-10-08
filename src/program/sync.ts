@@ -7,8 +7,10 @@
 // - RCON (выделенный сервер): команда /automaton-sync <json>, ответ — rcon.print.
 // Большая программа передаётся частями с номерами (повтор потерянного пакета не задваивает текст). Части
 // копятся в storage: запросы исполняют все участники, и подключившийся посреди передачи получит тот же текст.
-// Каждая опубликованная программа выгружается в script-output/automaton/<команда>/<имя>.ts (только на сервере);
-// папки в имени программы (этап 17) — подпапки.
+// Каждая опубликованная программа выгружается в script-output/automaton/<карта>/<команда>/<имя>.ts (только на
+// сервере); папки в имени программы (этап 17) — подпапки. У каждой карты своя папка: имя карты — по номеру
+// (seed), запоминается в сохранении. В папке лежит .automaton-map.json — утилита передаёт имя карты, и игра
+// не принимает файлы из папки другой карты.
 import { CustomCommandData, LuaPlayer, PlayerIndex } from "factorio:runtime"
 import { onEvent, onTick } from "../events"
 import { Diagnostic } from "../lang/lexer"
@@ -60,6 +62,8 @@ const TASKS = `{
 
 const README = `Папка программ автоматонов для VS Code (мод Automaton).
 
+Это папка одной карты: программы из неё публикуются только в эту карту (имя — в .automaton-map.json).
+
 1. Откройте эту папку в VS Code (Файл → Открыть папку) и разрешите автоматическую задачу
    «Automaton: публиковать при сохранении» (нужен Node.js 18+).
 2. Запускайте игру с параметром «--enable-lua-udp 27155» (Steam: Factorio → Свойства → Параметры запуска).
@@ -83,6 +87,8 @@ export interface SyncBuffer {
 interface Request {
   id?: number
   cmd?: string
+  /** Имя карты из .automaton-map.json папки: файлы другой карты не принимаются. */
+  map?: string
   name?: string
   force?: string
   seq?: number
@@ -102,6 +108,16 @@ export function fileName(name: string): string {
   return safe
 }
 
+/** Имя карты для папки VS Code: при создании карты (или при добавлении мода в старое сохранение). */
+export function initSync(): void {
+  storage.mapName ??= `карта-${game.get_surface("nauvis")?.map_gen_settings.seed ?? 0}`
+}
+
+/** Папка программ команды этой карты в script-output. */
+export function syncFolder(force: string): string {
+  return `automaton/${fileName(storage.mapName ?? "карта")}/${fileName(force)}`
+}
+
 /** Путь файла программы: папки из имени — подпапки (lib/Помощники → lib/Помощники.ts). */
 export function programPath(name: string): string {
   return `${name.split("/").map((part) => fileName(part)).join("/")}.ts`
@@ -114,6 +130,10 @@ function diagnosticsJson(diagnostics: Diagnostic[]): unknown[] {
 /** Обработать запрос утилиты; sender — ключ передачи (кто шлёт), player — игрок (нет — сервер). */
 function handle(request: Request, sender: string, player: LuaPlayer | undefined): Record<string, unknown> {
   const force = request.force ?? player?.force.name ?? "player"
+  // Папка другой карты (VS Code открыт не на той папке): ничего не публиковать и не отдавать.
+  if (request.map !== undefined && request.map !== storage.mapName) {
+    return { ok: false, error: "wrong-map", map: storage.mapName, folderMap: request.map }
+  }
   if (player !== undefined && (request.cmd === "begin" || request.cmd === "end")) {
     const denied = publishDenied(player)
     if (denied !== undefined) return { ok: false, errors: [{ line: 0, column: 0, code: denied, params: [] }] }
@@ -191,13 +211,14 @@ const udpDisabled = new LuaSet<number>()
 
 /** Записать папку для VS Code (у игрока): программы команды, типы, tsconfig, утилиту, задачу VS Code. */
 export function writeVsCodeFolder(player: LuaPlayer): string {
-  const dir = `automaton/${fileName(player.force.name)}`
+  const dir = syncFolder(player.force.name)
   const write = (path: string, text: string) => helpers.write_file(`${dir}/${path}`, text, false, player.index)
   write("automaton.d.ts", DTS)
   write("tsconfig.json", TSCONFIG)
   write("automaton-sync.mjs", SYNC_TOOL)
   write(".vscode/tasks.json", TASKS)
   write("README.txt", README)
+  write(".automaton-map.json", helpers.table_to_json({ map: storage.mapName ?? "", force: player.force.name }))
   for (const program of programsOf(player.force.name)) write(programPath(program.name), program.source)
   return dir
 }
@@ -223,6 +244,6 @@ export function registerSync(): void {
   })
   // Выгрузка опубликованных программ — только на сервере (в одиночной игре — у игрока).
   onProgramPublished((program) => {
-    helpers.write_file(`automaton/${fileName(program.force)}/${programPath(program.name)}`, program.source, false, 0)
+    helpers.write_file(`${syncFolder(program.force)}/${programPath(program.name)}`, program.source, false, 0)
   })
 }

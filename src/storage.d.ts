@@ -52,6 +52,8 @@ declare global {
     clipboard?: Record<number, CopiedSettings | undefined>
     /** Программы, которые VS Code передаёт частями (/automaton-sync): по отправителю. */
     sync?: Record<string, SyncBuffer | undefined>
+    /** Имя карты для папки VS Code (script-output/automaton/<имя>/<команда>): своя у каждой карты. */
+    mapName?: string
     /** Команды, которым уже опубликованы стартовые программы (src/world/start.ts). */
     startersPublished?: Record<string, boolean | undefined>
     /** Сообщения между машинами (src/program/comms.ts). */

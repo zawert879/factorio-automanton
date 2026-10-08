@@ -9,7 +9,11 @@ describe("миграции", () => {
     const surface = game.get_surface("nauvis")!
     surface.request_to_generate_chunks({ x: -900, y: 650 }, 1)
     surface.force_generate_chunk_requests()
-    surface.set_tiles([{ name: "grass-1", position: { x: -900, y: 650 } }])
+    // Своя чистая площадка: на разных картах здесь бывают деревья и вода (машина встала бы рядом).
+    for (const e of surface.find_entities_filtered({ area: [[-903, 647], [-897, 653]] })) if (e.type !== "character") e.destroy()
+    const tiles = []
+    for (let x = -902; x < -897; x++) for (let y = 648; y < 653; y++) tiles.push({ name: "grass-1", position: { x, y } })
+    surface.set_tiles(tiles, true, true, true)
     surface.create_entity({ name: MODELS[0].placer, position: { x: -899.5, y: 650.5 }, force: "player", raise_built: true })
     const robot = findRobot(surface.find_entities_filtered({ name: MODELS[0].entity, position: { x: -899.5, y: 650.5 }, radius: 0.5 })[0])!
     // Как в сохранении старой версии: полей ещё нет.

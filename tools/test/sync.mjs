@@ -3,7 +3,7 @@
 //    в формате для VS Code, pull (тот же текст), выгрузка в script-output.
 // 2) Игра с окном (одиночная, на несколько секунд) с --enable-lua-udp: публикация и pull по UDP.
 import { spawn, spawnSync } from "node:child_process"
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs"
 import { createConnection } from "node:net"
 import { join } from "node:path"
 import { buildMod, createMap, prepareWork, root, scriptError } from "./factorio.mjs"
@@ -90,7 +90,12 @@ if (!existsSync(pulledFile)) fail(`pull не скачал программу:\n$
 if (readFileSync(pulledFile, "utf8") !== longProgram) fail("pull скачал другой текст")
 if (!existsSync(join(pulled, "automaton.d.ts"))) fail("pull не положил automaton.d.ts")
 
-const exported = join(env.data, "script-output", "automaton", "player", "Привет.ts")
+// Своя папка у каждой карты: script-output/automaton/карта-<seed>/player.
+const maps = existsSync(join(env.data, "script-output", "automaton")) ? readdirSync(join(env.data, "script-output", "automaton")) : []
+if (maps.length !== 1 || !maps[0].startsWith("карта-")) fail(`папка карты: ${maps.join(", ")}`)
+const mapName = maps[0]
+const mapFolder = join(env.data, "script-output", "automaton", mapName, "player")
+const exported = join(mapFolder, "Привет.ts")
 if (!existsSync(exported) || readFileSync(exported, "utf8") !== longProgram) fail(`нет выгрузки в ${exported}`)
 
 // Модули в папках (этап 17): имя — путь от папки с tsconfig.json; ошибки зависимой — в её файле.
@@ -112,11 +117,20 @@ if (!breakOut.includes(`${appFile}:1:10: error: в «lib/Счёт» нет эк�
 const modulesPulled = join(env.work, "pulled-modules")
 spawnSync("node", [tool, "pull", modulesPulled, ...rconArgs], { encoding: "utf8" })
 if (!existsSync(join(modulesPulled, "lib", "Счёт.ts")) || !existsSync(join(modulesPulled, "app", "Главная.ts"))) fail("pull не разложил программы по папкам")
-if (!existsSync(join(env.data, "script-output", "automaton", "player", "lib", "Счёт.ts"))) fail("выгрузка не разложила программы по папкам")
+if (!existsSync(join(mapFolder, "lib", "Счёт.ts"))) fail("выгрузка не разложила программы по папкам")
+
+// Папка другой карты: игра ничего не принимает, утилита объясняет, в чём дело.
+writeFileSync(join(project, ".automaton-map.json"), JSON.stringify({ map: "карта-999", force: "player" }))
+const wrongPush = spawnSync("node", [tool, "push", appFile, ...rconArgs], { encoding: "utf8" })
+const wrongOut = wrongPush.stdout + wrongPush.stderr
+if (!wrongOut.includes(`эта папка — для карты «карта-999», а в игре открыта «${mapName}»`)) fail(`папка другой карты:\n${wrongOut}`)
+writeFileSync(join(project, ".automaton-map.json"), JSON.stringify({ map: mapName, force: "player" }))
+const rightPush = spawnSync("node", [tool, "push", appFile, ...rconArgs], { encoding: "utf8" })
+if (!(rightPush.stdout + rightPush.stderr).includes("«app/Главная» опубликована")) fail(`папка своей карты:\n${rightPush.stdout}${rightPush.stderr}`)
 
 // Временную папку не удаляем: сервер ещё дописывает файлы после остановки (её чистит следующий запуск).
 server.kill()
-console.log("RCON (выделенный сервер): публикация частями, ошибки, pull, выгрузка, модули в папках — ок")
+console.log("RCON (выделенный сервер): публикация частями, ошибки, pull, выгрузка, модули в папках, папка своей карты — ок")
 
 // ---------- UDP: игра с окном ----------
 const gui = prepareWork("automaton-sync-udp", "automaton-sync-udp")

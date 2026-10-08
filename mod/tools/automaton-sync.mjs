@@ -13,6 +13,7 @@
 //   RCON (выделенный сервер): --rcon --port 27015 --password … (или AUTOMATON_RCON_PASSWORD).
 // Параметры можно положить в .automaton-sync.json в папке: { "udp": 27155 } или { "rcon": true, "port": …, "password": … }.
 // Ошибки печатаются как «файл:строка:столбец: error: текст» — VS Code показывает их в коде (docs/VSCODE.md).
+// Папка одной карты: .automaton-map.json (пишет игра) — имя карты; в другую карту файлы не публикуются.
 import { createSocket } from "node:dgram"
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, watch, writeFileSync } from "node:fs"
 import { createConnection } from "node:net"
@@ -229,6 +230,24 @@ function fileOf(root, name) {
   return join(root, ...name.split("/").map((part) => part.replace(/[\\:*?"<>|]/g, "_"))) + ".ts"
 }
 
+/** Имя карты папки (из .automaton-map.json, его пишет «Папка для VS Code»); нет файла — без проверки. */
+function mapOf(root) {
+  const file = join(root, ".automaton-map.json")
+  if (!existsSync(file)) return undefined
+  try {
+    return JSON.parse(readFileSync(file, "utf8")).map || undefined
+  } catch {
+    return undefined
+  }
+}
+
+/** Игра открыта на другой карте: понятная ошибка вместо публикации не туда. */
+function wrongMap(reply) {
+  return reply.error === "wrong-map"
+    ? `эта папка — для карты «${reply.folderMap}», а в игре открыта «${reply.map}»: откройте в игре «Программы…» → «Папка для VS Code» и работайте в её папке`
+    : undefined
+}
+
 /** Список из ответа игры: пустая таблица Lua приходит как {}, а не []. */
 const list = (value) => (Array.isArray(value) ? value : [])
 
@@ -245,7 +264,12 @@ async function push(link, file, force = false) {
   const source = readFileSync(file, "utf8").replace(/\r\n/g, "\n")
   if (!force && synced.get(file) === source) return true
   const name = programName(file, source)
-  const begin = await link.request({ cmd: "begin", name })
+  const map = mapOf(rootOf(file))
+  const begin = await link.request({ cmd: "begin", name, map })
+  if (!begin.ok && wrongMap(begin)) {
+    console.log(`${file}:1:1: error: ${wrongMap(begin)}`)
+    return false
+  }
   if (!begin.ok) {
     for (const error of begin.errors ?? []) console.log(`${file}:1:1: error: ${message(error)}`)
     if (begin.errors === undefined) throw new Error(`игра не приняла программу: ${begin.error}`)
@@ -254,10 +278,10 @@ async function push(link, file, force = false) {
   let parts = 0
   for (let i = 0; i < source.length; i += PART) {
     parts++
-    const part = await link.request({ cmd: "part", seq: parts, text: source.slice(i, i + PART) })
+    const part = await link.request({ cmd: "part", seq: parts, text: source.slice(i, i + PART), map })
     if (!part.ok) throw new Error(`игра не приняла часть программы: ${part.error}`)
   }
-  const result = await link.request({ cmd: "end", parts })
+  const result = await link.request({ cmd: "end", parts, map })
   const root = rootOf(file)
   if (result.ok) {
     synced.set(file, source)
@@ -274,12 +298,14 @@ async function push(link, file, force = false) {
 }
 
 async function pull(link) {
-  const list = await link.request({ cmd: "list" })
+  const map = mapOf(folder)
+  const list = await link.request({ cmd: "list", map })
+  if (!list.ok && wrongMap(list)) throw new Error(wrongMap(list))
   for (const program of list.programs ?? []) {
     let text = ""
     let from = 1
     while (from !== undefined) {
-      const part = await link.request({ cmd: "get", name: program.name, from })
+      const part = await link.request({ cmd: "get", name: program.name, from, map })
       if (!part.ok) throw new Error(`не удалось скачать «${program.name}»`)
       text += part.text
       from = part.next

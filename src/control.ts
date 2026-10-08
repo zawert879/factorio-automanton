@@ -26,7 +26,7 @@ import { registerAssignTools } from "./gui/assignTools"
 import { registerAlerts } from "./program/alerts"
 import { registerActionApi } from "./program/api"
 import { registerProgramCommands } from "./program/commands"
-import { registerSync } from "./program/sync"
+import { initSync, registerSync } from "./program/sync"
 import { forgetEntityHandle, initHandles } from "./program/handles"
 import { initMachines, registerMachines } from "./program/machines"
 import { initScheduler, registerScheduler } from "./program/scheduler"
@@ -42,6 +42,8 @@ import { initZones, registerZones } from "./world/zones"
 
 function initStorage(): void {
   initDemoStorage()
+  // Имя карты — до стартовых программ: их публикация выгружает файлы в папку карты.
+  initSync()
   initRegistry()
   initMovement()
   initFlight()
