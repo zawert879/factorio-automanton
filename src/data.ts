@@ -2,3 +2,4 @@
 // Порядок загрузки: data всех модов -> data-updates -> data-final-fixes.
 import "./prototypes/automaton"
 import "./prototypes/world"
+import "./prototypes/gui"

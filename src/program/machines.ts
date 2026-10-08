@@ -6,7 +6,7 @@ import { cancelMove } from "../automaton/movement"
 import { onRobotRegistered, onRobotRemoved, RobotRecord } from "../automaton/registry"
 import { Val } from "../lang/runtime/core"
 import { Machine, newMachine } from "../lang/runtime"
-import { onProgramPublished, ProgramRecord } from "./store"
+import { onProgramPublished, onProgramRemoved, ProgramRecord } from "./store"
 
 export interface MachineRecord {
   robotId: number
@@ -24,6 +24,8 @@ export interface MachineRecord {
   label?: string
   /** Машину подобрали: программа стоит, память и параметры ждут, пока её поставят снова. */
   parked?: boolean
+  /** Пауза для отладки (окно машины): планировщик её пропускает, «Шаг» исполняет один квант. */
+  paused?: boolean
   lastChatTick?: number
 }
 
@@ -81,6 +83,11 @@ export function restartMachine(record: MachineRecord): void {
     record.machine = { status: "done" }
     return
   }
+  if (program.quarantined) {
+    record.machine = { status: "done" }
+    appendConsole(record, `— ${program.name}: программа в карантине`)
+    return
+  }
   record.version = program.version
   record.machine = newMachine()
   appendConsole(record, `— ${program.name} v${program.version}`)
@@ -105,6 +112,16 @@ export function registerMachines(): void {
   onProgramPublished((program) => {
     for (const [, record] of pairs(storage.machines)) {
       if (record.programId === program.id && !record.parked) restartMachine(record)
+    }
+  })
+  // Программу удалили или отправили в карантин — машины с ней останавливаются.
+  onProgramRemoved((program) => {
+    for (const [, record] of pairs(storage.machines)) {
+      if (record.programId !== program.id) continue
+      stopActivity(record.robotId)
+      record.machine = { status: "done" }
+      if (!program.quarantined) record.programId = undefined
+      appendConsole(record, program.quarantined ? `— ${program.name}: в карантине (постоянные ошибки лимитов)` : `— ${program.name}: программа удалена`)
     }
   })
   onRobotRemoved((id, reason) => {

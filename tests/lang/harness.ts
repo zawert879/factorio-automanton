@@ -79,7 +79,7 @@ export function run(source: string, options: RunOptions = {}): RunResult {
     const error = compiled.diagnostics.map((d) => `${d.code}(${d.params.join(",")})@${d.line}`).join("; ")
     return { output, status: "compile-error", error, ticks: 0 }
   }
-  const program = loadProgram(compiled.lua, compiled.lines, compiled.keys)
+  const program = loadProgram(compiled.lua, compiled.lines, compiled.keys, compiled.pauses)
   if (type(program) === "string") return { output, status: "load-error", error: program as string, ticks: 0, lua: compiled.lua }
   const loaded = program as Exclude<typeof program, string>
   let machine = newMachine()

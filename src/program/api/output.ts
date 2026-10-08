@@ -32,7 +32,10 @@ defineHostObject("console")
 hostMethods.console.log = (_o: Val, _k: Val, ...values: Val[]) => printValues(...values)
 
 host.say = (message: Val, seconds: Val) => {
-  showBubble(currentRobot(), string.sub(text(message), 1, 200), ticks(seconds, 3) / 60)
+  const content = string.sub(text(message), 1, 200)
+  showBubble(currentRobot(), content, ticks(seconds, 3) / 60)
+  // Облачко исчезает — в консоли машины (окно машины) его видно и потом.
+  appendConsole(currentMachine(), `say: ${content}`)
 }
 
 host.chat = (message: Val) => {

@@ -119,15 +119,24 @@ export interface Program extends ProgramExports {
   lines: number[]
   /** Строка Lua → имя свойства, которое на ней читается. */
   keys: Record<number, string>
+  /** Номер функции → строки исходника точек остановки. */
+  pauses: Record<number, number[]>
 }
 
 /** Загрузка скомпилированной программы в песочницу: пустое окружение, только R. */
-export function loadProgram(this: void, lua: string, lines: number[], keys: Record<number, string> = {}): Program | string {
+export function loadProgram(
+  this: void,
+  lua: string,
+  lines: number[],
+  keys: Record<number, string> = {},
+  pauses: Record<number, number[]> = {},
+): Program | string {
   const [chunk, message] = load(lua, "=prog", "t", {})
   if (chunk === undefined) return message ?? "load failed"
   const exports = (chunk as (this: void, r: Val) => Val)(R)
   exports.lines = lines
   exports.keys = keys
+  exports.pauses = pauses
   return exports as Program
 }
 
@@ -290,6 +299,21 @@ export function runSlice(this: void, program: Program, machine: Machine, quantum
   machine.frame = undefined
   machine.status = "done"
   machine.result = r
+}
+
+/** Строка исходника, на которой стоит программа (самый глубокий кадр программы в цепочке). */
+export function pausedLine(this: void, program: Program, machine: Machine): number | undefined {
+  let frame = machine.frame
+  let line: number | undefined
+  while (type(frame) === "table") {
+    const id = frame[3]
+    if (type(id) === "number") {
+      const at = program.pauses[id as number]?.[frame[1] as number]
+      if (at !== undefined) line = at
+    }
+    frame = frame[2]
+  }
+  return line
 }
 
 /** Завершить ожидание блокирующего вызова: результат или ошибка (ActionError и т. п.). */

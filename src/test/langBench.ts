@@ -116,7 +116,7 @@ let printed: string | undefined
 function compiled(source: string): Program {
   const result = compile(source)
   if (!result.ok) error(`бенчмарк не компилируется: ${result.diagnostics[0].code} ${result.diagnostics[0].params.join(",")} @${result.diagnostics[0].line}`)
-  const program = loadProgram(result.lua, result.lines, result.keys)
+  const program = loadProgram(result.lua, result.lines, result.keys, result.pauses)
   if (type(program) === "string") error(`бенчмарк не загружается: ${program}`)
   return program as Program
 }

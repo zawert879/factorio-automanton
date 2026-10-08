@@ -11,6 +11,10 @@ import { adoptUnregisteredRobots, initRegistry, registerRegistryEvents } from ".
 import { registerDebugCommands } from "./debug/commands"
 import { initDemoStorage, registerDemo } from "./demo"
 import { onEvent } from "./events"
+import { registerGuiEvents } from "./gui/common"
+import { registerMachineWindow } from "./gui/machine"
+import { registerProgramsWindow } from "./gui/programs"
+import { registerAlerts } from "./program/alerts"
 import { registerActionApi } from "./program/api"
 import { registerProgramCommands } from "./program/commands"
 import { forgetEntityHandle, initHandles } from "./program/handles"
@@ -55,6 +59,10 @@ registerMachines()
 registerScheduler()
 registerActionApi()
 registerProgramCommands()
+registerAlerts()
+registerGuiEvents()
+registerMachineWindow()
+registerProgramsWindow()
 // Здание исчезло — его обёртка у программ остаётся (valid === false), но из общего списка уходит.
 onEvent(defines.events.on_object_destroyed, (e) => {
   if (e.type === defines.target_type.entity) forgetEntityHandle(e.useful_id)

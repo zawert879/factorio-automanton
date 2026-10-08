@@ -1,5 +1,6 @@
 // Сохраняемое состояние мода. Только простые данные и ссылки на объекты игры: без функций и метатаблиц.
 import type { ActionsState } from "./automaton/actions"
+import type { GuiState } from "./gui/common"
 import type { MovementState } from "./automaton/movement"
 import type { RobotRegistry } from "./automaton/registry"
 import type { HandlesState } from "./program/handles"
@@ -30,5 +31,7 @@ declare global {
     zones: ZonesState
     /** Открытые диалоги имени метки или зоны: по номеру игрока. */
     naming?: Record<number, NamingTarget | undefined>
+    /** Открытые окна мода: по номеру игрока. */
+    gui?: Record<number, GuiState | undefined>
   }
 }

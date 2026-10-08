@@ -62,7 +62,7 @@ class Refuel extends Job {
   run(): void {
     move(this.depot);
     take(this.depot, "coal", 10);
-    me.refuel();
+    refuel();
   }
 }
 

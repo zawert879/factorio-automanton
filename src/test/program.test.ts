@@ -9,16 +9,17 @@ import { markerOf, renameMarker } from "../world/markers"
 import { createZone } from "../world/zones"
 import { describe, expect, test, waitUntil } from "./testing"
 
-/** Чистая площадка 30×30 из травы с машиной в углу (x0 + 2, y0 + 2). */
-function site(x0: number, y0: number): { surface: LuaSurface; robot: RobotRecord } {
+/** Чистая площадка из травы (30×30 и запас margin вокруг) с машиной в углу (x0 + 2, y0 + 2). */
+function site(x0: number, y0: number, margin = 0): { surface: LuaSurface; robot: RobotRecord } {
   const surface = game.get_surface("nauvis")!
   surface.request_to_generate_chunks({ x: x0 + 15, y: y0 + 15 }, 2)
   surface.force_generate_chunk_requests()
-  for (const e of surface.find_entities_filtered({ area: [[x0, y0], [x0 + 30, y0 + 30]] })) {
+  const [left, top, right, bottom] = [x0 - margin, y0 - margin, x0 + 30 + margin, y0 + 30 + margin]
+  for (const e of surface.find_entities_filtered({ area: [[left, top], [right, bottom]] })) {
     if (e.type !== "character") e.destroy()
   }
   const tiles = []
-  for (let x = x0; x < x0 + 30; x++) for (let y = y0; y < y0 + 30; y++) tiles.push({ name: "grass-1", position: { x, y } })
+  for (let x = left; x < right; x++) for (let y = top; y < bottom; y++) tiles.push({ name: "grass-1", position: { x, y } })
   surface.set_tiles(tiles, true, true, true)
   const position = { x: x0 + 2.5, y: y0 + 2.5 }
   surface.create_entity({ name: WORKER_MK1_PLACER, position, force: "player", raise_built: true })
@@ -171,7 +172,8 @@ print(found.length, found[0].position.x)`)
 
 describe("сквозной сценарий 4.10", () => {
   test("разведчик: едет по спирали и отмечает месторождения на карте", (t) => {
-    const { surface, robot } = site(-1100, 100)
+    // Спираль уходит за площадку, а машина видит на 10 клеток: чистим с запасом.
+    const { surface, robot } = site(-1100, 100, 25)
     for (let dx = 0; dx < 2; dx++) surface.create_entity({ name: "copper-ore", position: { x: -1084.5 + dx, y: 103.5 }, amount: 500 })
     robot.fuel.insert({ name: "coal", count: 50 })
     const m = run(

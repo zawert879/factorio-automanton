@@ -33,6 +33,11 @@ export interface CompileResult {
   lines: number[]
   /** Строка Lua → имя читаемого свойства (для текста ошибки «Cannot read properties of undefined»). */
   keys: Record<number, string>
+  /**
+   * Точки остановки: номер функции Lua (кадр[3]) → строки исходника по номерам точек (с 0).
+   * По цепочке кадров видно, на какой строке стоит программа (окно машины).
+   */
+  pauses: Record<number, number[]>
   diagnostics: Diagnostic[]
 }
 
@@ -96,6 +101,10 @@ class LuaFn {
   readonly lines: Line[] = []
   /** Метки точек остановки: номер точки = индекс + 1. */
   readonly pauses: string[] = []
+  /** Строки исходника точек остановки (индекс — номер точки; 0 — вход в функцию). */
+  readonly pauseLines: number[] = []
+  /** Номер функции в кадре: у функций программы — номер прототипа, у тел try — отрицательный. */
+  id = 0
   /** Коды break / continue, уходящие из тела try наружу: номер цели * 2 (+1 у continue). */
   readonly exits = new Set<number>()
   hasReturn = false
@@ -114,12 +123,12 @@ export const MAX_SOURCE_BYTES = 100000
 
 export function compile(source: string): CompileResult {
   if (source.length > MAX_SOURCE_BYTES) {
-    return { ok: false, lua: "", lines: [], keys: {}, diagnostics: [{ code: "program-too-large", params: [MAX_SOURCE_BYTES], line: 1, column: 1 }] }
+    return { ok: false, lua: "", lines: [], keys: {}, pauses: {}, diagnostics: [{ code: "program-too-large", params: [MAX_SOURCE_BYTES], line: 1, column: 1 }] }
   }
   const parsed = parse(source)
-  if (parsed.diagnostics.length > 0) return { ok: false, lua: "", lines: [], keys: {}, diagnostics: parsed.diagnostics }
+  if (parsed.diagnostics.length > 0) return { ok: false, lua: "", lines: [], keys: {}, pauses: {}, diagnostics: parsed.diagnostics }
   const analysis = analyze(parsed.program)
-  if (analysis.diagnostics.length > 0) return { ok: false, lua: "", lines: [], keys: {}, diagnostics: analysis.diagnostics }
+  if (analysis.diagnostics.length > 0) return { ok: false, lua: "", lines: [], keys: {}, pauses: {}, diagnostics: analysis.diagnostics }
   const result = generate(parsed.program, analysis)
   if (!result.ok) return result
   // Пределы Lua (регистры, длина переходов) проверяет сам load: такую программу не публикуем.
@@ -127,7 +136,7 @@ export function compile(source: string): CompileResult {
   if (chunk === undefined) {
     const [luaLine] = string.match(message ?? "", "^prog:(%d+):")
     const line = luaLine !== undefined ? result.lines[tonumber(luaLine)! - 1] ?? 1 : 1
-    return { ok: false, lua: "", lines: [], keys: {}, diagnostics: [{ code: "program-too-complex", params: [], line, column: 1 }] }
+    return { ok: false, lua: "", lines: [], keys: {}, pauses: {}, diagnostics: [{ code: "program-too-complex", params: [], line, column: 1 }] }
   }
   return result
 }
@@ -211,6 +220,8 @@ export function generate(program: A.Program, analysis: Analysis): CompileResult 
   const targetById = new Map<number, Target>()
   /** Метка «результат — undefined» текущей цепочки ?. (если компилируется её часть). */
   let chainNil: string | undefined
+  let tryBodies = 0
+  const pauseTable: Record<number, number[]> = {}
   const numeric = inferNumeric(program, analysis)
 
   function report(code: string, params: (string | number)[], at: A.Loc): void {
@@ -296,13 +307,14 @@ export function generate(program: A.Program, analysis: Analysis): CompileResult 
 
   function registerPause(): { pc: number; label: string } {
     cur.pauses.push(`R${++labelCounter}`)
+    cur.pauseLines[cur.pauses.length] = tsLine
     return { pc: cur.pauses.length, label: cur.pauses[cur.pauses.length - 1] }
   }
 
-  /** Строка «если cond — пауза в точке pc с кадром ребёнка child». */
+  /** Строка «если cond — пауза в точке pc с кадром ребёнка child». Кадр: {точка, ребёнок, номер функции, переменные…}. */
   function emitPause(pc: number, child: string, cond: string): void {
-    if (cur.root !== undefined) emit(`if ${cond} then return Y, {${pc}, ${child}} end`)
-    else emit(`if ${cond} then QD = QD - 1 return Y, {${pc}, ${child}`, `} end`)
+    if (cur.root !== undefined) emit(`if ${cond} then return Y, {${pc}, ${child}, ${cur.id}} end`)
+    else emit(`if ${cond} then QD = QD - 1 return Y, {${pc}, ${child}, ${cur.id}`, `} end`)
   }
 
   /** Квант инструкций: виток цикла. */
@@ -1428,6 +1440,8 @@ export function generate(program: A.Program, analysis: Analysis): CompileResult 
   function compileBody(build: () => void): LuaFn {
     const parent = cur
     const body = new LuaFn(owner(), info, owner().resumable)
+    body.id = -(++tryBodies)
+    pauseTable[body.id] = body.pauseLines
     cur = body
     try {
       build()
@@ -1655,6 +1669,9 @@ export function generate(program: A.Program, analysis: Analysis): CompileResult 
     const lf = new LuaFn(undefined, fn, fn.resumable)
     cur = lf
     tsLine = fn.node?.line ?? fn.cls?.node.line ?? 1
+    lf.id = fn.index
+    lf.pauseLines[0] = tsLine
+    pauseTable[fn.index] = lf.pauseLines
     for (const c of fn.captures) emit(`${c.lua} = e[${fn.envOwner.captures.indexOf(c) + 1}]`)
     let signature: Signature
     if (fn.kind === "constructor") {
@@ -1712,7 +1729,7 @@ export function generate(program: A.Program, analysis: Analysis): CompileResult 
       const entry = `E${fn.index}`
       out.push({ text: `  QD = QD + 1`, ts: line })
       out.push({ text: `  if k then`, ts: line })
-      let slot = 3
+      let slot = 4
       for (const group of chunks(saved, 16)) {
         out.push({ text: `    ${group.join(", ")} = ${group.map(() => `k[${slot++}]`).join(", ")}`, ts: line })
       }
@@ -1721,7 +1738,7 @@ export function generate(program: A.Program, analysis: Analysis): CompileResult 
       for (const l of dispatchLines([entry, ...lf.pauses], 0, "    ")) out.push({ text: l, ts: line })
       out.push({ text: `  end`, ts: line })
       out.push({ text: `  if QD > MAXD then DEPTH() end`, ts: line })
-      out.push({ text: `  QN = QN - 1 if QN <= 0 then QD = QD - 1 return Y, {0, nil, ${savedList}} end`, ts: line })
+      out.push({ text: `  QN = QN - 1 if QN <= 0 then QD = QD - 1 return Y, {0, nil, ${fn.index}, ${savedList}} end`, ts: line })
       out.push({ text: `  ::${entry}::`, ts: line })
     }
     for (const l of lf.lines) {
@@ -1744,8 +1761,8 @@ export function generate(program: A.Program, analysis: Analysis): CompileResult 
   for (const group of chunks(resumableIndexes, 20)) out.push({ text: `for k, v in next, {${group.join(", ")}} do RES[k] = v end`, ts: 0 })
   for (const text of EPILOGUE.split("\n")) out.push({ text, ts: 0 })
 
-  if (diagnostics.length > 0) return { ok: false, lua: "", lines: [], keys: {}, diagnostics }
+  if (diagnostics.length > 0) return { ok: false, lua: "", lines: [], keys: {}, pauses: {}, diagnostics }
   const keys: Record<number, string> = {}
   for (let i = 0; i < out.length; i++) if (out[i].key !== undefined) keys[i + 1] = out[i].key!
-  return { ok: true, lua: out.map((l) => l.text).join("\n"), lines: out.map((l) => l.ts), keys, diagnostics }
+  return { ok: true, lua: out.map((l) => l.text).join("\n"), lines: out.map((l) => l.ts), keys, pauses: pauseTable, diagnostics }
 }

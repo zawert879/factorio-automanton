@@ -2,7 +2,7 @@
 // setting_type: "startup" (меняется только с перезапуском, доступна в data stage),
 // "runtime-global" (общая для карты), "runtime-per-user" (у каждого игрока своя).
 import { SettingsData } from "factorio:common"
-import { BoolSettingDefinition, IntSettingDefinition } from "factorio:settings"
+import { BoolSettingDefinition, IntSettingDefinition, StringSettingDefinition } from "factorio:settings"
 
 declare const data: SettingsData
 
@@ -21,4 +21,11 @@ data.extend([
     minimum_value: 100,
     maximum_value: 10000000,
   } satisfies IntSettingDefinition,
+  {
+    type: "string-setting",
+    name: "automaton-publish-rights",
+    setting_type: "runtime-global",
+    default_value: "everyone",
+    allowed_values: ["everyone", "admins"],
+  } satisfies StringSettingDefinition,
 ])

@@ -11,3 +11,6 @@ build/
 tools/lua/5.2/
 # создаётся tools/test/run.mjs из документации
 tests/lang/examples.generated.ts
+# создаются tools/dts/generate.mjs из docs/API.md
+src/gui/dts.generated.ts
+mod/automaton.d.ts

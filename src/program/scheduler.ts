@@ -12,8 +12,9 @@ import { completeWait, Program, runSlice } from "../lang/runtime"
 import { enter, Q, Val } from "../lang/runtime/core"
 import { actionErrorValue, ActionErrorCode, context } from "./context"
 import { WORKER_MK1_STATS } from "./handles"
+import { alertRobot } from "./alerts"
 import { appendConsole, MachineRecord, onWake } from "./machines"
-import { loadedProgram } from "./store"
+import { loadedProgram, noteLimitError } from "./store"
 
 export interface SchedulerState {
   /** Готовые к исполнению машины (id), по кругу. */
@@ -71,12 +72,28 @@ function quantumOf(_robot: RobotRecord): number {
   return WORKER_MK1_STATS.quantum
 }
 
-/** Ошибка программы: в консоль машины, значок над машиной. */
+/** Ошибки лимитов (5.8): если программа раз за разом в них упирается — карантин. */
+const LIMIT_CODES: Record<string, boolean> = {
+  memory: true,
+  "stack-overflow": true,
+  "callback-too-long": true,
+  "string-too-long": true,
+  "array-too-long": true,
+}
+
+/** Ошибка программы: в консоль машины, значок над машиной, оповещение команде. */
 function reportError(record: MachineRecord, robot: RobotRecord): void {
   const e = record.machine.error
   if (e === undefined) return
-  appendConsole(record, `Ошибка${e.line !== undefined ? ` (строка ${e.line})` : ""}: ${e.name}: ${e.message}`)
-  if (robot.entity.valid) showProblem(robot, problemFor("internal-error"))
+  const text = `${e.name}: ${e.message}`
+  appendConsole(record, `Ошибка${e.line !== undefined ? ` (строка ${e.line})` : ""}: ${text}`)
+  if (!robot.entity.valid) return
+  showProblem(robot, problemFor("internal-error"))
+  alertRobot(robot, "error", e.line !== undefined ? `${e.line}: ${text}` : text)
+  const program = record.programId === undefined ? undefined : storage.programs.byId[record.programId]
+  if (program !== undefined && e.code !== undefined && LIMIT_CODES[e.code] && noteLimitError(program)) {
+    alertRobot(robot, "quarantine", program.name)
+  }
 }
 
 /**
@@ -138,7 +155,7 @@ function runReady(): void {
     state.queued[id] = undefined
     const record = storage.machines[id]
     const robot = storage.robots.byId[id]
-    if (record === undefined || record.parked || record.machine.status !== "ready") continue
+    if (record === undefined || record.parked || record.paused || record.machine.status !== "ready") continue
     if (robot === undefined || !robot.entity.valid) continue
     const quantum = quantumOf(robot)
     const debt = record.machine.debt ?? 0
@@ -151,6 +168,13 @@ function runReady(): void {
     inMachine(record, robot, (program) => runSlice(program, record.machine, quantum))
     if (record.machine.status === "ready") enqueue(id)
   }
+}
+
+/** Шаг отладки: один отрезок с квантом в одну инструкцию (машина на паузе). */
+export function stepMachine(record: MachineRecord): void {
+  const robot = storage.robots.byId[record.robotId]
+  if (robot === undefined || !robot.entity.valid || record.machine.status !== "ready") return
+  inMachine(record, robot, (program) => runSlice(program, record.machine, 1))
 }
 
 // ---------- Конец действий и поездок ----------

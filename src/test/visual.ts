@@ -1,12 +1,17 @@
 // Сцена для снимков экрана (npm run shot): машины во всех позах, затем game.take_screenshot.
 // Подключается из control.ts, только когда включён служебный мод automaton-visual.
 // Снимки — script-output/automaton-visual/*.png; файл done.txt — сигнал, что всё снято.
-import { MapPosition } from "factorio:runtime"
+import { MapPosition, PlayerIndex } from "factorio:runtime"
 import { setActivity } from "../automaton/appearance"
 import { moveRobot } from "../automaton/movement"
 import { say, showProblem } from "../automaton/status"
 import { findRobot, RobotRecord } from "../automaton/registry"
 import { Activity, BODY_DIRECTIONS, WORKER_MK1, WORKER_MK1_PLACER } from "../names"
+import { guiOf } from "../gui/common"
+import { openMachine } from "../gui/machine"
+import { openPrograms, publishFromWindow, showTypes } from "../gui/programs"
+import { assignProgram } from "../program/machines"
+import { publishProgram } from "../program/store"
 
 const CENTER = { x: 300, y: 300 }
 
@@ -38,6 +43,13 @@ function row(activity: Activity, y: number): void {
   for (let direction = 0; direction < BODY_DIRECTIONS; direction++) {
     setActivity(place({ x: CENTER.x - 10.5 + direction * 3, y }), activity, direction)
   }
+}
+
+/** Снимок экрана игрока с интерфейсом (окна мода). */
+function guiShot(name: string): void {
+  const player = game.get_player(1 as PlayerIndex)
+  if (player === undefined) return
+  game.take_screenshot({ player, show_gui: true, resolution: { x: player.display_resolution.width, y: player.display_resolution.height }, zoom: 1, path: `automaton-visual/${name}.png` })
 }
 
 function shot(name: string, position: MapPosition = { x: CENTER.x, y: CENTER.y - 1 }, zoom = 2): void {
@@ -84,6 +96,45 @@ script.on_nth_tick(1, (event) => {
       if (record?.activity === "run") shot(`run-${record.name}`, record.entity.position, 5)
     }
   }
+  // Окна (этап 5): машина с программой, библиотека программ с ошибкой компиляции, типы для VS Code.
+  if (tick === 175) {
+    const robot = place({ x: CENTER.x - 4.5, y: CENTER.y - 12 })
+    robot.cargo.insert({ name: "iron-ore", count: 17 })
+    robot.cargo.insert({ name: "coal", count: 5 })
+    const result = publishProgram(
+      "Шахтёр",
+      `const { ore } = me.args<{ ore: string }>()
+let n = 0
+while (true) {
+  n++
+  print("виток", n, "руда:", me.cargo.count("iron-ore"))
+  wait(0.2)
+}`,
+    )
+    if (result.ok) assignProgram(robot, result.program)
+    storage.machines[robot.id]!.args = { ore: "iron-ore" }
+  }
+  if (tick === 200) {
+    const player = game.get_player(1 as PlayerIndex)
+    const robot = Object.values(storage.robots.byId).find((r) => r !== undefined && storage.machines[r.id] !== undefined)
+    if (player !== undefined && robot !== undefined) openMachine(player, robot)
+  }
+  if (tick === 205) guiShot("machine-window")
+  if (tick === 210) {
+    const player = game.get_player(1 as PlayerIndex)
+    if (player !== undefined) {
+      openPrograms(player, storage.programs.nextId - 1, undefined)
+      const window = guiOf(player).programs!
+      window.code.text = window.code.text + "\nprint(undefinedName)\nlet x = 1 == 2\n"
+      publishFromWindow(player)
+    }
+  }
+  if (tick === 215) guiShot("programs-window")
+  if (tick === 220) {
+    const player = game.get_player(1 as PlayerIndex)
+    if (player !== undefined) showTypes(player)
+  }
+  if (tick === 225) guiShot("types-window")
   if (tick === 240) {
     helpers.write_file("automaton-visual/done.txt", "done", false)
     script.on_nth_tick(1, undefined)
