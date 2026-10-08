@@ -137,6 +137,24 @@ print(time.tick - t0)`)
     })
   })
 
+  test("print: объекты игры понятным текстом, многострочный текст — построчно", (t) => {
+    game.forces.player.technologies[TECH.radio].researched = true
+    const a = robotNamed("печатник")
+    const b = robotNamed("адресат")
+    a.cargo.insert({ name: "coal", count: 7 })
+    const m = start(a, `print(me)
+print(me.cargo)
+print(robot("адресат"))
+print({ who: robot("адресат"), list: [1, 2] })
+print(JSON.stringify({ a: 1 }, null, 2))`)
+    waitUntil(t, "конца программы", finished(m), 120, () => {
+      expect(output(m)).toBe(
+        `Robot(печатник #${a.id})|Inventory { coal: 7 }|Robot(адресат #${b.id})|{ list: [1, 2], who: Robot(адресат #${b.id}) }|{|  "a": 1|}`,
+      )
+      cleanup(a, b)
+    })
+  })
+
   test("отписка и перезапуск: свои подписки снимаются, подписки на машину остаются", (t) => {
     const source = robotNamed("источник")
     const fan = robotNamed("поклонник")

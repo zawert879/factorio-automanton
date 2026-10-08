@@ -141,8 +141,25 @@ interface ItemStack { name: Item; count: number }
 
 ## Вывод
 
+`print` и `console.log` печатают значения как `console.log` в Node: строка — как есть, остальное —
+с содержимым. Многострочный текст (например, `JSON.stringify(x, null, 2)`) — построчно.
+
+| Значение | В консоли |
+|---|---|
+| Массив, объект | `[1, "a", [2, 3]]`, `{ ore: "coal", count: 5 }` (ключи — по алфавиту) |
+| Экземпляр класса | `Route { from: "склад", keep: 20 }` (свой `toString` — его текст) |
+| `Map`, `Set` | `Map(2) { "a" => 1, "b" => 2 }`, `Set(2) { 1, 2 }` |
+| Ошибка | `ActionError: no path (no-path)` |
+| Здание, машина | `Entity(stone-furnace #12 @ 10.5, 5.5)`, `Robot(АМ-7 #7)` (`me` — тоже) |
+| Метка, зона, табло | `Marker(склад)`, `Zone(плавильня)`, `Display(штаб)` |
+| Груз, сообщение, задача | `Inventory { coal: 7 }`, `Message(Robot(АМ-3 #3), "тема": данные)`, `Task(работа #4: данные)` |
+| Функция, класс, цикл | `[Function]`, `[class Route]`, `[Circular]` |
+
+Глубже 4 уровней — кратко (`[Array(5)]`, `{…}`), в массиве и объекте — первые 30 элементов (`…+70`).
+`String(x)` и шаблонные строки — как в JavaScript (`[object Object]`, `1,2,3`).
+
 ```ts
-/** Строка в консоль машины (окно машины, последние 100 строк). Объекты печатаются как JSON. */
+/** Строка в консоль машины (окно машины, последние 100 строк); значения — как console.log в Node. */
 declare function print(...values: unknown[]): void;
 declare const console: { log(...values: unknown[]): void };   // то же, что print
 

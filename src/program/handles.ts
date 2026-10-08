@@ -103,7 +103,7 @@ function inventoryHandle(fields: Val): Val {
   return fields
 }
 
-function resolveInventory(handle: Val): LuaInventory {
+export function resolveInventory(handle: Val): LuaInventory {
   if (handle.__robot !== undefined) {
     const record = storage.robots.byId[handle.__robot]
     if (record === undefined || !record.entity.valid) actionError("invalid-target")
