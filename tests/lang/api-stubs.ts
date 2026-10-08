@@ -1,5 +1,6 @@
 // Заглушки API машины (docs/API.md) для прогона примеров вне игры: правдоподобные значения,
-// блокирующие вызовы завершаются через тик. Дополняют заглушки tests/lang/harness.ts.
+// блокирующие вызовы завершаются через тик. Дополняют заглушки tests/lang/harness.ts (он загружается первым).
+import "./harness"
 import {
   blockingCall,
   defineHostObject,
@@ -48,6 +49,23 @@ hostGetters.entity.name = (o: Val) => o.__name
 hostGetters.entity.valid = () => true
 hostGetters.entity.position = (o: Val) => ({ x: o.__x, y: o.__y })
 hostMethods.entity.count = () => 5
+hostMethods.entity.output = () => inventory(arr({ name: "iron-plate", count: 4 }))
+
+// Инвентарь (груз машины, выход печи): предметы заданы при создании, count — по ним.
+defineHostObject("inventory")
+hostMethods.inventory.count = (o: Val, _k: Val, item: Val) => {
+  let total = 0
+  for (let i = 1; i <= o.__items.__n; i++) if (item === undefined || o.__items[i].name === item) total += o.__items[i].count
+  return total
+}
+hostMethods.inventory.items = (o: Val) => o.__items
+hostMethods.inventory.free = () => 100
+hostMethods.inventory.isEmpty = (o: Val) => o.__items.__n === 0
+hostMethods.inventory.isFull = () => false
+
+function inventory(items: Val): Val {
+  return hostObject("inventory", { __items: items })
+}
 
 defineHostObject("robot")
 hostGetters.robot.id = (o: Val) => o.__id
@@ -84,6 +102,7 @@ const meFields: Record<string, (this: void) => Val> = {
   label: () => "",
   home: () => ({ x: 0, y: 0 }),
   weapon: () => ({ ammo: { count: 30 } }),
+  cargo: () => inventory(arr({ name: "iron-plate", count: 8 })),
 }
 for (const [name, fn] of Object.entries(meFields)) hostGetters.me[name] = fn
 hostSetters.me.label = (_o: Val, v: Val) => log.push(`label ${tostring(v)}`)
@@ -96,7 +115,7 @@ defineHostObject("scan")
 hostMethods.scan.enemies = () => arr()
 hostMethods.scan.entities = () => arr(entity(1, "stone-furnace", 5, 5), entity(2, "stone-furnace", 7, 5))
 hostMethods.scan.robots = () => arr(robot(42, "boss", "Оркестратор"))
-hostMethods.scan.resources = () => arr({ item: "iron-ore", center: { x: 40, y: 70 }, amount: 5000 })
+hostMethods.scan.resources = () => arr({ item: "iron-ore", center: { x: 40, y: 70 }, nearest: { x: 35, y: 60 }, amount: 5000 })
 hostMethods.scan.items = () => arr()
 hostMethods.scan.water = () => arr()
 defineHostObject("map")

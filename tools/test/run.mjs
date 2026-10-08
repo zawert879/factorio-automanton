@@ -29,6 +29,7 @@ if (filter === "--build-only") process.exit(0)
 
 /**
  * tests/lang/examples.generated.ts: программы из блоков ```ts в docs/API.md и docs/language-samples/3-typescript.md
+ * и стартовые программы examples/*.ts
  * (без блоков с объявлениями declare — это описание API, а не программы).
  */
 function generateExamples() {
@@ -41,6 +42,9 @@ function generateExamples() {
       if (/\bdeclare\b/.test(match[1]) || match[1].startsWith("type Item")) continue
       examples.push({ name: `${file} #${index}`, source: match[1] })
     }
+  }
+  for (const file of readdirSync(join(root, "examples")).filter((f) => f.endsWith(".ts")).sort()) {
+    examples.push({ name: `examples/${file}`, source: readFileSync(join(root, "examples", file), "utf8") })
   }
   writeFileSync(
     join(root, "tests", "lang", "examples.generated.ts"),

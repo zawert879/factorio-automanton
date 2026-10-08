@@ -23,6 +23,7 @@ import { initMachines, registerMachines } from "./program/machines"
 import { initScheduler, registerScheduler } from "./program/scheduler"
 import { initPrograms } from "./program/store"
 import { initMarkers, registerMarkers } from "./world/markers"
+import { initStart, registerStart } from "./world/start"
 import { registerNaming } from "./world/naming"
 import { initZones, registerZones } from "./world/zones"
 
@@ -38,6 +39,7 @@ function initStorage(): void {
   initHandles()
   initMarkers()
   initZones()
+  initStart()
 }
 
 script.on_init(() => initStorage())
@@ -65,6 +67,7 @@ registerAlerts()
 registerGuiEvents()
 registerMachineWindow()
 registerProgramsWindow()
+registerStart()
 // Здание исчезло — его обёртка у программ остаётся (valid === false), но из общего списка уходит.
 onEvent(defines.events.on_object_destroyed, (e) => {
   if (e.type === defines.target_type.entity) forgetEntityHandle(e.useful_id)

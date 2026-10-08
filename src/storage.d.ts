@@ -39,5 +39,7 @@ declare global {
     drafts?: Record<number, Draft | undefined>
     /** Программы, которые VS Code передаёт частями (/automaton-sync): по отправителю. */
     sync?: Record<string, SyncBuffer | undefined>
+    /** Команды, которым уже опубликованы стартовые программы (src/world/start.ts). */
+    startersPublished?: Record<string, boolean | undefined>
   }
 }
