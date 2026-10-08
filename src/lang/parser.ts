@@ -69,7 +69,12 @@ const UNSUPPORTED_STATEMENTS: Record<string, string> = {
   with: "with",
 }
 
-export function parse(source: string): ParseResult {
+export interface ParseOptions {
+  /** Режим объявлений (.d.ts): declare function / const / class без тел. */
+  declarations?: boolean
+}
+
+export function parse(source: string, options: ParseOptions = {}): ParseResult {
   const lexed = tokenize(source)
   const tokens = lexed.tokens
   const diagnostics: Diagnostic[] = [...lexed.diagnostics]
@@ -200,18 +205,24 @@ export function parse(source: string): ParseResult {
     return args
   }
 
-  /** Параметры типа в объявлении: <T, U extends X = Y> — нужны только имена. */
-  function parseTypeParameters(): string[] {
-    const names: string[] = []
-    if (!isPunct("<")) return names
+  /** Параметры типа в объявлении: <T, U extends X = Y>. */
+  function parseTypeParamDecls(): A.TypeParamDecl[] {
+    const decls: A.TypeParamDecl[] = []
+    if (!isPunct("<")) return decls
     next()
     do {
-      names.push(identifierName())
-      if (eat("extends")) parseType()
-      if (eat("=")) parseType()
+      const name = identifierName()
+      const constraint = eat("extends") ? parseType() : undefined
+      const fallback = eat("=") ? parseType() : undefined
+      decls.push({ name, constraint, default: fallback })
     } while (eat(","))
     expectCloseAngle()
-    return names
+    return decls
+  }
+
+  /** Только имена параметров типа (функции и классы программы). */
+  function parseTypeParameters(): string[] {
+    return parseTypeParamDecls().map((d) => d.name)
   }
 
   function parseType(): A.TypeNode {
@@ -283,23 +294,30 @@ export function parse(source: string): ParseResult {
     const members: A.TypeMember[] = []
     while (!isPunct("}")) {
       const readonly = is("readonly") && peek(1).kind !== "punctuator" ? (next(), true) : false
-      if (isPunct("[")) {
-        // Индексная сигнатура: [key: string]: T
+      if (isPunct("(") || isPunct("<")) {
+        // Сигнатура вызова: (a: T): R — объект, который можно вызвать.
+        const typeParams = parseTypeParamDecls()
+        const params = parseFunctionTypeParams()
+        const result = eat(":") ? parseType() : { ...loc(), kind: "KeywordType" as const, name: "void" }
+        members.push({ name: "[call]", optional: false, readonly, method: true, type: { ...loc(), kind: "FunctionType", params, result, typeParams } })
+      } else if (isPunct("[")) {
+        // Индексная сигнатура: [key: string]: T; по числу ([i: number]) — только для obj[число].
         next()
         identifierName()
         expect(":")
-        parseType()
+        const keyType = parseType()
         expect("]")
         expect(":")
-        members.push({ name: "[index]", optional: false, readonly, method: false, type: parseType() })
+        const numeric = keyType.kind === "KeywordType" && keyType.name === "number"
+        members.push({ name: numeric ? "[number-index]" : "[index]", optional: false, readonly, method: false, type: parseType() })
       } else {
         const name = peek().kind === "string" ? next().value : propertyName()
         const optional = eat("?")
         if (isPunct("(") || isPunct("<")) {
-          parseTypeParameters()
+          const typeParams = parseTypeParamDecls()
           const params = parseFunctionTypeParams()
           const result = eat(":") ? parseType() : { ...loc(), kind: "KeywordType" as const, name: "void" }
-          members.push({ name, optional, readonly, method: true, type: { ...loc(), kind: "FunctionType", params, result } })
+          members.push({ name, optional, readonly, method: true, type: { ...loc(), kind: "FunctionType", params, result, typeParams } })
         } else {
           expect(":")
           members.push({ name, optional, readonly, method: false, type: parseType() })
@@ -328,10 +346,10 @@ export function parse(source: string): ParseResult {
       return inner
     }
     if (isPunct("<")) {
-      parseTypeParameters()
+      const typeParams = parseTypeParamDecls()
       const params = parseFunctionTypeParams()
       expect("=>")
-      return { ...start, kind: "FunctionType", params, result: parseType() }
+      return { ...start, kind: "FunctionType", params, result: parseType(), typeParams }
     }
     if (isPunct("{")) return { ...start, kind: "ObjectType", members: parseObjectType() }
     if (isPunct("[")) {
@@ -664,7 +682,7 @@ export function parse(source: string): ParseResult {
       if (is("as") && token.kind === "identifier" && !token.newlineBefore && AS_PRECEDENCE > minPrecedence) {
         next()
         if (is("const")) next()
-        else parseType()
+        else left = { ...left, asType: parseType() }
         continue
       }
       if (is("satisfies") && token.kind === "identifier" && !token.newlineBefore && AS_PRECEDENCE > minPrecedence) {
@@ -1064,6 +1082,34 @@ export function parse(source: string): ParseResult {
     return undefined
   }
 
+  /** declare function / const / class — только в режиме объявлений. */
+  function parseDeclaration(start: A.Loc): A.Stmt {
+    next()
+    if (eat("function")) {
+      const name = identifierName()
+      const typeParams = parseTypeParamDecls()
+      const params = parseFunctionTypeParams()
+      const result = eat(":") ? parseType() : { ...loc(), kind: "KeywordType" as const, name: "void" }
+      consumeSemicolon()
+      return { ...start, kind: "DeclareFunction", name, type: { ...start, kind: "FunctionType", params, result, typeParams } }
+    }
+    if (eat("const") || eat("let")) {
+      const name = identifierName()
+      expect(":")
+      const type = parseType()
+      consumeSemicolon()
+      return { ...start, kind: "DeclareVar", name, type }
+    }
+    if (eat("class")) {
+      const name = identifierName()
+      const typeParams = parseTypeParamDecls()
+      const superClass = eat("extends") ? identifierName() : undefined
+      const members = parseObjectType()
+      return { ...start, kind: "DeclareClass", name, typeParams, superClass, members }
+    }
+    return fail("unsupported", ["declare"])
+  }
+
   function parseStatement(): A.Stmt {
     return nested(parseStatementInner)
   }
@@ -1086,23 +1132,25 @@ export function parse(source: string): ParseResult {
       if (token.value === "interface" && peek(1).kind === "identifier") {
         next()
         const name = identifierName()
-        parseTypeParameters()
+        const typeParams = parseTypeParamDecls()
+        const parents: A.TypeNode[] = []
         if (eat("extends")) {
-          do parseType()
+          do parents.push(parseType())
           while (eat(","))
         }
-        parseObjectType()
-        return { ...start, kind: "TypeDecl", name }
+        const members = parseObjectType()
+        return { ...start, kind: "TypeDecl", name, typeParams, members, extends: parents }
       }
       if (token.value === "type" && peek(1).kind === "identifier" && (isPunct("=", 2) || isPunct("<", 2))) {
         next()
         const name = identifierName()
-        parseTypeParameters()
+        const typeParams = parseTypeParamDecls()
         expect("=")
-        parseType()
+        const alias = parseType()
         consumeSemicolon()
-        return { ...start, kind: "TypeDecl", name }
+        return { ...start, kind: "TypeDecl", name, typeParams, alias }
       }
+      if (options.declarations && token.value === "declare") return parseDeclaration(start)
       if (token.value === "abstract" && is("class", 1)) {
         next()
         return { ...start, kind: "ClassDecl", cls: parseClass(start, true, true) }

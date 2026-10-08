@@ -25,6 +25,7 @@ import { Diagnostic } from "./lexer"
 import { inferNumeric, Kind } from "./numeric"
 import { parse } from "./parser"
 import { EPILOGUE, PROLOGUE } from "./prologue"
+import { checkProgram } from "./check"
 
 export interface CompileResult {
   ok: boolean
@@ -121,7 +122,12 @@ class LuaFn {
 /** Предел размера исходника, байт (кириллица — 2 байта на букву). */
 export const MAX_SOURCE_BYTES = 100000
 
-export function compile(source: string): CompileResult {
+export interface CompileOptions {
+  /** Проверка типов (этап 12); выключают тесты рантайма, где ошибка типов — нарочно. */
+  types?: boolean
+}
+
+export function compile(source: string, options: CompileOptions = {}): CompileResult {
   if (source.length > MAX_SOURCE_BYTES) {
     return { ok: false, lua: "", lines: [], keys: {}, pauses: {}, diagnostics: [{ code: "program-too-large", params: [MAX_SOURCE_BYTES], line: 1, column: 1 }] }
   }
@@ -129,6 +135,13 @@ export function compile(source: string): CompileResult {
   if (parsed.diagnostics.length > 0) return { ok: false, lua: "", lines: [], keys: {}, pauses: {}, diagnostics: parsed.diagnostics }
   const analysis = analyze(parsed.program)
   if (analysis.diagnostics.length > 0) return { ok: false, lua: "", lines: [], keys: {}, pauses: {}, diagnostics: analysis.diagnostics }
+  if (options.types !== false) {
+    // Ошибка в самой проверке не мешает публикации: тогда программа просто не проверена.
+    const [checked, typeErrors] = pcall(checkProgram, parsed.program)
+    if (checked && (typeErrors as Diagnostic[]).length > 0) {
+      return { ok: false, lua: "", lines: [], keys: {}, pauses: {}, diagnostics: typeErrors as Diagnostic[] }
+    }
+  }
   const result = generate(parsed.program, analysis)
   if (!result.ok) return result
   // Пределы Lua (регистры, длина переходов) проверяет сам load: такую программу не публикуем.

@@ -71,7 +71,7 @@ type State =
   | { kind: "idle"; cycles: number }; // сколько циклов подряд без работы
 
 const jobs: Job[] = [
-  new Refuel(marker("coal-depot"), 0.2),
+  new Refuel(find("steel-chest", zone("coal-depot"))[0], 0.2),
   new Smelting(
     "iron-ore",
     zone("north-iron"),

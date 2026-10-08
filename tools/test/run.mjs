@@ -22,6 +22,9 @@ if (assets.missing.length > 0) {
   process.exit(1)
 }
 
+// Типы API (automaton.d.ts) — их читает проверка типов компилятора (src/lang/check.ts).
+execFileSync(process.execPath, [join(root, "tools", "dts", "generate.mjs")], { stdio: "inherit" })
+
 // Примеры программ из документации — в тесты (их разбор и компиляция проверяются).
 generateExamples()
 

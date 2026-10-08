@@ -6,7 +6,7 @@ export interface Loc {
   column: number
 }
 
-// ---------- Типы (разбираются; проверка типов — этап 12) ----------
+// ---------- Типы (проверка — src/lang/check.ts) ----------
 
 export type TypeNode = Loc &
   (
@@ -17,12 +17,19 @@ export type TypeNode = Loc &
     | { kind: "TupleType"; elements: TypeNode[] }
     | { kind: "UnionType"; types: TypeNode[] }
     | { kind: "IntersectionType"; types: TypeNode[] }
-    | { kind: "FunctionType"; params: TypeParam[]; result: TypeNode }
+    | { kind: "FunctionType"; params: TypeParam[]; result: TypeNode; typeParams?: TypeParamDecl[] }
     | { kind: "ObjectType"; members: TypeMember[] }
     | { kind: "TypeofType"; name: string }
     | { kind: "KeyofType"; type: TypeNode }
     | { kind: "IndexedType"; object: TypeNode; index: TypeNode }
   )
+
+/** Параметр типа в объявлении: <T extends Constraint = Default>. */
+export interface TypeParamDecl {
+  name: string
+  constraint?: TypeNode
+  default?: TypeNode
+}
 
 export interface TypeParam {
   name: string
@@ -51,8 +58,10 @@ export type ObjectMember =
   | (Loc & { kind: "Property"; key: string; computed?: Expr; value: Expr; shorthand: boolean })
   | Spread
 
-export type Expr = Loc &
-  (
+export type Expr = Loc & {
+  /** x as T — тип приведения (для проверки типов; на код не влияет). */
+  asType?: TypeNode
+} & (
     | { kind: "Number"; value: number }
     | { kind: "String"; value: string }
     | { kind: "Template"; quasis: string[]; expressions: Expr[] }
@@ -150,8 +159,20 @@ export type Stmt = Loc &
     | VarDecl
     | { kind: "FunctionDecl"; fn: FunctionNode }
     | { kind: "ClassDecl"; cls: ClassNode }
-    /** interface и type: разбираются, кода не дают. */
-    | { kind: "TypeDecl"; name: string }
+    /** interface и type: кода не дают, нужны проверке типов. */
+    | {
+        kind: "TypeDecl"
+        name: string
+        typeParams: TypeParamDecl[]
+        /** interface: члены и предки; type: псевдоним. */
+        members?: TypeMember[]
+        extends?: TypeNode[]
+        alias?: TypeNode
+      }
+    /** Объявления (только в режиме declarations — automaton.d.ts и описание библиотеки). */
+    | { kind: "DeclareFunction"; name: string; type: TypeNode }
+    | { kind: "DeclareVar"; name: string; type: TypeNode }
+    | { kind: "DeclareClass"; name: string; typeParams: TypeParamDecl[]; superClass?: string; members: TypeMember[] }
     | { kind: "ExprStmt"; expression: Expr }
     | { kind: "If"; test: Expr; consequent: Stmt; alternate?: Stmt }
     | { kind: "While"; test: Expr; body: Stmt }
