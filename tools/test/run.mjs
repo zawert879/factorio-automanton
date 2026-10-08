@@ -5,6 +5,7 @@ import { existsSync, readFileSync, readdirSync, rmSync, writeFileSync } from "no
 import { join, relative, sep } from "node:path"
 import { fileURLToPath } from "node:url"
 import { checkAssets } from "./assets.mjs"
+import { checkLocale } from "./locale.mjs"
 
 const root = join(fileURLToPath(import.meta.url), "..", "..", "..")
 const lua = join(root, "tools", "lua", "5.2", "bin", "lua")
@@ -24,6 +25,13 @@ if (assets.missing.length > 0) {
 
 // Типы API (automaton.d.ts) — их читает проверка типов компилятора (src/lang/check.ts).
 execFileSync(process.execPath, [join(root, "tools", "dts", "generate.mjs")], { stdio: "inherit" })
+
+// Локаль: ru и en совпадают, ключи из кода есть.
+const locale = checkLocale(root)
+if (locale.problems.length > 0) {
+  console.error(`Локаль:\n  ${locale.problems.join("\n  ")}`)
+  process.exit(1)
+}
 
 // Примеры программ из документации — в тесты (их разбор и компиляция проверяются).
 generateExamples()
@@ -45,7 +53,7 @@ if (filter === "--build-only") process.exit(0)
  */
 function generateExamples() {
   const examples = []
-  for (const file of ["docs/API.md", "docs/language-samples/3-typescript.md"]) {
+  for (const file of ["docs/API.md", "docs/language-samples/3-typescript.md", "docs/PLAYER_GUIDE.md"]) {
     const text = readFileSync(join(root, file), "utf8")
     let index = 0
     for (const match of text.matchAll(/```ts\n([\s\S]*?)```/g)) {

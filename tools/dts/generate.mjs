@@ -16,6 +16,9 @@ const api = readFileSync(join(root, "docs", "API.md"), "utf8")
 const blocks = [...api.matchAll(/```ts\n([\s\S]*?)```/g)].map((m) => m[1])
 const declarations = blocks.filter((b) => /\bdeclare\b/.test(b) || b.startsWith("type Item"))
 const examples = blocks.filter((b) => !declarations.includes(b))
+// Примеры из руководства игрока — тоже программы, они должны проходить tsc.
+const guide = readFileSync(join(root, "docs", "PLAYER_GUIDE.md"), "utf8")
+for (const m of guide.matchAll(/```ts\n([\s\S]*?)```/g)) examples.push(m[1])
 
 const header = `// Типы API автоматонов (мод Automaton для Factorio) — для редактора VS Code.
 // Проще всего: в игре окно «Программы команды» → «Папка для VS Code» — мод запишет готовую папку
@@ -72,7 +75,7 @@ if (process.argv.includes("--check")) {
   writeFileSync(join(dir, "tsconfig.json"), JSON.stringify({ ...JSON.parse(tsconfig), include: ["*.ts"] }))
   try {
     execFileSync(join(root, "node_modules", ".bin", "tsc"), ["-p", join(dir, "tsconfig.json")], { stdio: "pipe" })
-    console.log(`automaton.d.ts: ${examples.length} примеров из API.md и ${starters.length} стартовых программ проходят tsc --strict`)
+    console.log(`automaton.d.ts: ${examples.length} примеров из API.md и руководства и ${starters.length} стартовых программ проходят tsc --strict`)
   } catch (error) {
     console.error(String(error.stdout ?? error))
     process.exit(1)

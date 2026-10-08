@@ -116,11 +116,42 @@ defineHostObject("scan")
 hostMethods.scan.enemies = () => arr()
 hostMethods.scan.entities = () => arr(entity(1, "stone-furnace", 5, 5), entity(2, "stone-furnace", 7, 5))
 hostMethods.scan.robots = () => arr(robot(42, "boss", "Оркестратор"))
-hostMethods.scan.resources = () => arr({ item: "iron-ore", center: { x: 40, y: 70 }, nearest: { x: 35, y: 60 }, amount: 5000 })
+hostMethods.scan.resources = () =>
+  arr({ item: "iron-ore", center: { x: 40, y: 70 }, nearest: { x: 35, y: 60 }, amount: 5000 }, { item: "coal", center: { x: 10, y: 20 }, nearest: { x: 8, y: 18 }, amount: 3000 })
 hostMethods.scan.items = () => arr()
 hostMethods.scan.water = () => arr()
 defineHostObject("map")
 hostMethods.map.tag = () => undefined
+
+// Доска и задачи
+const boardValues: Record<string, Val> = {}
+defineHostObject("board")
+hostMethods.board.get = (_o: Val, _k: Val, key: Val) => boardValues[key]
+hostMethods.board.set = (_o: Val, _k: Val, key: Val, value: Val) => {
+  boardValues[key] = value
+}
+hostMethods.board.delete = (_o: Val, _k: Val, key: Val) => {
+  boardValues[key] = undefined
+}
+hostMethods.board.increment = (_o: Val, _k: Val, key: Val, by: Val) => {
+  boardValues[key] = (boardValues[key] ?? 0) + (by ?? 1)
+  return boardValues[key]
+}
+hostMethods.board.claim = () => true
+hostMethods.board.release = () => undefined
+hostMethods.board.compareAndSet = () => true
+hostMethods.board.keys = () => arr()
+defineHostObject("task")
+hostGetters.task.data = (o: Val) => o.__data
+hostMethods.task.done = () => undefined
+hostMethods.task.fail = () => undefined
+defineHostObject("tasks")
+hostMethods.tasks.push = () => undefined
+hostMethods.tasks.size = () => 0
+hostMethods.tasks.next = (_o: Val, k: Val) => {
+  if (k !== undefined) return k.result
+  return hostObject("task", { __data: { item: "iron-plate", to: "сборка" } })
+}
 
 // Функции API
 const queues: Record<string, Val[]> = {}

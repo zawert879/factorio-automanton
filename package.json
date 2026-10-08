@@ -17,7 +17,8 @@
     "bench:flyers": "node tools/bench/flyers.mjs",
     "test:desync:heavy": "node tools/test/desync.mjs --heavy",
     "test:mp": "node tools/test/mp.mjs",
-    "bench:machines": "node tools/bench/machines.mjs"
+    "bench:machines": "node tools/bench/machines.mjs",
+    "package": "cd mod && npx --yes factoriomod-debug@2.0.14 package && mkdir -p ../dist && mv automaton_*.zip ../dist/"
   },
   "devDependencies": {
     "lua-types": "2.14.1",

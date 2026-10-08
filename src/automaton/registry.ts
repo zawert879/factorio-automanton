@@ -104,6 +104,17 @@ export function registerRobot(entity: LuaEntity, tag?: RobotTag): RobotRecord {
   registry.byId[id] = record
   registry.idByUnit[entity.unit_number!] = id
   applyUpgrades(record)
+  // Боевые — с оружием на виду (значок пулемёта или ракетомёта у плеча; исчезает вместе с машиной).
+  if (model.weapon !== undefined) {
+    rendering.draw_sprite({
+      sprite: model.weapon.type === "gun" ? "item/submachine-gun" : "item/rocket-launcher",
+      target: { entity, offset: [0.22, -0.5] },
+      surface: entity.surface,
+      x_scale: 0.4,
+      y_scale: 0.4,
+      render_layer: "higher-object-under",
+    })
+  }
   script.register_on_object_destroyed(entity)
   for (const listener of registeredListeners) listener(record)
   return record

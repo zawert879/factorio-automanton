@@ -1,10 +1,10 @@
 {
   "name": "automaton",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "title": "Automaton",
   "author": "zawert",
   "factorio_version": "2.0",
-  "description": "Work in progress.",
+  "description": "Overhaul: belts, drills, inserters, logistic robots and the offshore pump are gone — programmable automatons do their work. Write programs in TypeScript right in the game or in VS Code: mining, smelting, fluids, construction, messaging, displays, combat, flying haulers.",
   "dependencies": [
     "base >= 2.0.0"
   ],

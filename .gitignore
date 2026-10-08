@@ -15,3 +15,5 @@ tests/lang/examples.generated.ts
 src/gui/dts.generated.ts
 mod/automaton.d.ts
 src/program/examples.generated.ts
+# собранные архивы мода (npx factoriomod-debug package)
+dist/

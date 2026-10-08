@@ -75,8 +75,9 @@
 - Имена прототипов, настроек и GUI-элементов — с префиксом `automaton-`; в своём TS-коде — camelCase.
 - Инициализацию `storage` делать в `on_init` и повторять в `on_configuration_changed`.
 - В коде мода не использовать `async`/генераторы (TypeScriptToLua делает их на корутинах, а их в Factorio нет).
-- Упаковка — через FMTK (VS Code) или `npx factoriomod-debug package` из `mod/`; перед упаковкой FMTK сам
-  запускает `npm run build`.
+- Упаковка — `npm run package` (FMTK 2.0.14 из `mod/`, архив — в `dist/`); перед упаковкой FMTK сам
+  запускает `npm run build`. Тесты (`mod/test/`) в архив не попадают (`package.ignore` в info.json).
+- Версия мода и `mod/changelog.txt` — при выпуске для друзей; версия схемы storage — `src/migrations.ts`.
 
 ## FMTK
 - Расширение закреплено на версии 2.0.14 (последняя ветки 2.0.x). FMTK 2.1.x запускает игру с `--dap`,

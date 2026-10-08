@@ -1,5 +1,25 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.2.0
+Date: 2026-10-08
+  Major Features:
+    - Belts, drills (including the pumpjack), inserters, logistic robots and chests (except the storage chest) and the offshore pump are removed; recipes and the technology tree are repaired.
+    - Programmable automatons: TypeScript programs compiled in the game, shared team program library, editor with line numbers and error highlighting, publishing from VS Code.
+    - Type checking of programs on publish.
+  Features:
+    - Freeplay start with two automatons, markers and seven example programs.
+    - Fluids: machine tank, pump / fill / drain, crude oil with depleting yield, uranium mining with sulfuric acid.
+    - Worker models Mk2 and Mk3, charging station, 18 upgrade technologies, research-gated API.
+    - setRecipe, build, deconstruct, rotate.
+    - Messaging between machines, shared board, task queues, pixel displays, signal markers for circuit networks.
+    - Combat automatons with machine gun and rocket launcher: attack, guard, patrol, reload.
+    - Flying automatons with calculated straight-line flight.
+    - Tips and tricks for automatons.
+  Optimizations:
+    - Zone and per-tick scan caches, lazy copies of broadcast data: 300 machines with programs add about 0.6 ms per tick, 100 000 flying haulers about 1 ms.
+  Info:
+    - Storage schema version and migrations.
+---------------------------------------------------------------------------------------------------
 Version: 0.1.0
-Date: ????
+Date: 2026-10-08
   Features:
     - Initial mod skeleton.
