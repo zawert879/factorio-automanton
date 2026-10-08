@@ -8,6 +8,7 @@
 // с программами команды, которые импортирует. Новая версия модуля пересобирает зависимые программы
 // (не собралась — остаётся прежняя сборка и предупреждение stale). Используемую библиотеку удалить
 // нельзя; переименование правит пути импорта в зависимых.
+import { trim } from "../lang/runtime/strings"
 import { LuaPlayer } from "factorio:runtime"
 import { compile, CompileResult, MAX_SOURCE_BYTES } from "../lang/codegen"
 import { Diagnostic } from "../lang/lexer"
@@ -94,7 +95,7 @@ export function initPrograms(): void {
  * (пусто, пустая папка, «.» или «..», обратная косая черта, кавычка, слишком длинное).
  */
 export function normalizeProgramName(raw: string): string | undefined {
-  const segments = raw.split("/").map((segment) => segment.trim())
+  const segments = raw.split("/").map((segment) => trim(segment))
   if (segments.some((segment) => segment === "" || segment === "." || segment === "..")) return undefined
   const name = segments.join("/")
   if (name.length > MAX_NAME_LENGTH || name.includes("\\") || name.includes('"')) return undefined

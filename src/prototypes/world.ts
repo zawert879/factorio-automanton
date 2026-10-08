@@ -8,7 +8,7 @@ import {
   ShortcutPrototype,
   SimpleEntityWithOwnerPrototype,
 } from "factorio:prototype"
-import { MARKER, PROGRAMMER, SIGNAL_MARKER } from "../names"
+import { MARKER, MODELS, PROGRAMMER, SIGNAL_MARKER } from "../names"
 
 declare const data: PrototypeData
 
@@ -65,6 +65,9 @@ const programmer: SelectionToolPrototype = {
   stack_size: 1,
   select: { border_color: ACCENT, cursor_box_type: "entity", mode: ["nothing"] },
   alt_select: { border_color: { r: 0.9, g: 0.3, b: 0.2 }, cursor_box_type: "not-allowed", mode: ["nothing"] },
+  // Правой кнопкой — машины в рамке (17.4): выбрать им программу; с Shift — остановить.
+  reverse_select: { border_color: { r: 0.35, g: 0.9, b: 0.4 }, cursor_box_type: "entity", mode: ["same-force", "any-entity"], entity_filters: MODELS.map((m) => m.entity) },
+  alt_reverse_select: { border_color: { r: 0.95, g: 0.45, b: 0.2 }, cursor_box_type: "not-allowed", mode: ["same-force", "any-entity"], entity_filters: MODELS.map((m) => m.entity) },
 }
 
 const shortcut: ShortcutPrototype = {

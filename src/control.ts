@@ -21,6 +21,8 @@ import { onEvent } from "./events"
 import { registerGuiEvents } from "./gui/common"
 import { registerMachineWindow } from "./gui/machine"
 import { registerProgramsWindow } from "./gui/programs"
+import { registerPicker } from "./gui/picker"
+import { registerAssignTools } from "./gui/assignTools"
 import { registerAlerts } from "./program/alerts"
 import { registerActionApi } from "./program/api"
 import { registerProgramCommands } from "./program/commands"
@@ -90,6 +92,8 @@ registerAlerts()
 registerGuiEvents()
 registerMachineWindow()
 registerProgramsWindow()
+registerPicker()
+registerAssignTools()
 registerStart()
 registerComms()
 registerBoard()

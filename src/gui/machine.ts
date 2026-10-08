@@ -1,9 +1,10 @@
 // Окно машины (5.1–5.3, 5.7): открывается кликом по машине. Программа и управление (запуск, стоп, пауза,
 // шаг), состояние и текущая строка, ошибка, консоль, груз и топливо, настройки: имя, дом, параметры (args).
+// Программа выбирается в окне выбора (src/gui/picker.ts): кнопка с её именем.
+import { trim } from "../lang/runtime/strings"
 import { formatLine } from "../lang/modules"
 import {
   ButtonGuiElement,
-  DropDownGuiElement,
   FlowGuiElement,
   FrameGuiElement,
   LabelGuiElement,
@@ -24,11 +25,12 @@ import { pausedLine } from "../lang/runtime"
 import { lib } from "../lang/runtime/library"
 import { modelOf } from "../names"
 import { robotState } from "../program/handles"
-import { assignProgram, machineOf, restartMachine, stopMachine, wake } from "../program/machines"
+import { machineOf, restartMachine, stopMachine, wake } from "../program/machines"
 import { stepMachine } from "../program/scheduler"
-import { loadedProgram, ProgramRecord, programsOf } from "../program/store"
+import { loadedProgram } from "../program/store"
 import { formatValue } from "../program/api/output"
-import { guiOf, titlebar, onGuiClick, onGuiConfirm, onGuiSelection } from "./common"
+import { guiOf, titlebar, onGuiClick, onGuiConfirm } from "./common"
+import { closePicker, onProgramPicked, openPicker } from "./picker"
 import { closePrograms, openPrograms } from "./programs"
 
 const FRAME = "automaton-machine"
@@ -41,7 +43,7 @@ export interface MachineWindow {
   robotId: number
   frame: FrameGuiElement
   title: LuaGuiElement
-  program: DropDownGuiElement
+  program: ButtonGuiElement
   pause: ButtonGuiElement
   state: LabelGuiElement
   line: LabelGuiElement
@@ -80,8 +82,9 @@ export function openMachine(player: LuaPlayer, robot: RobotRecord): void {
   const programRow = body.add({ type: "flow", direction: "horizontal" })
   programRow.style.vertical_align = "center"
   label(programRow, "program")
-  const program = programRow.add({ type: "drop-down", tags: { action: "machine-program" } })
+  const program = programRow.add({ type: "button", caption: "", tags: { action: "machine-pick" }, tooltip: ["automaton-gui.pick-tooltip"] })
   program.style.minimal_width = 240
+  program.style.horizontal_align = "left"
   button(programRow, "library", "machine-library")
   const controls = body.add({ type: "flow", direction: "horizontal" })
   button(controls, "run", "machine-run", "green_button")
@@ -171,19 +174,11 @@ function argsText(args: unknown): string {
   return ok && json !== undefined ? (json as string) : "{}"
 }
 
-/** Программы, которые можно запустить на машине: без библиотек. */
-function runnablePrograms(force: string): ProgramRecord[] {
-  return programsOf(force).filter((p) => !p.library)
-}
-
-/** Список программ команды в выпадающем списке (первый пункт — «нет»). */
+/** Кнопка программы: её имя (клик открывает окно выбора). */
 function fillPrograms(window: MachineWindow, robot: RobotRecord): void {
-  const programs = runnablePrograms(robot.entity.force.name)
   const current = machineOf(robot.id).programId
-  window.program.items = [["automaton-gui.no-program"], ...programs.map((p) => p.name)]
-  let index = 1
-  for (let i = 0; i < programs.length; i++) if (programs[i].id === current) index = i + 2
-  window.program.selected_index = index
+  const program = current === undefined ? undefined : storage.programs.byId[current]
+  window.program.caption = program === undefined ? ["", ["automaton-gui.no-program"], "  ▾"] : `${program.name}  ▾`
 }
 
 export function closeMachine(player: LuaPlayer): void {
@@ -283,19 +278,21 @@ export function registerMachineWindow(): void {
     const player = game.get_player(e.player_index)!
     if (e.element.name === FRAME) closeMachine(player)
     else if (e.element.name === "automaton-programs") closePrograms(player)
+    else if (e.element.name === "automaton-picker") closePicker(player)
   })
   onTick((tick) => {
     if (tick % REFRESH_TICKS === 0) refreshAll()
   })
 
   onGuiClick("machine-close", (player) => closeMachine(player))
-  onGuiSelection("machine-program", (player, element) => {
+  onGuiClick("machine-pick", (player) => {
+    const found = windowRobot(player)
+    if (found !== undefined) openPicker(player, [found.robot.id])
+  })
+  onProgramPicked((player) => {
     const found = windowRobot(player)
     if (found === undefined) return
-    const programs = runnablePrograms(found.robot.entity.force.name)
-    const selected = (element as DropDownGuiElement).selected_index
-    const program = selected >= 2 ? programs[selected - 2] : undefined
-    assignProgram(found.robot, program)
+    fillPrograms(found.window, found.robot)
     refreshMachine(found.window)
   })
   onGuiClick("machine-library", (player) => {
@@ -336,7 +333,7 @@ export function registerMachineWindow(): void {
   onGuiConfirm("machine-name", (player, element) => {
     const found = windowRobot(player)
     if (found === undefined) return
-    const name = string.sub((element as TextFieldGuiElement).text.trim(), 1, 40)
+    const name = string.sub(trim((element as TextFieldGuiElement).text), 1, 40)
     if (name === "") return
     found.robot.name = name
     if (found.robot.label.valid) found.robot.label.text = name
@@ -357,7 +354,7 @@ export function registerMachineWindow(): void {
   onGuiClick("machine-args", (player) => {
     const found = windowRobot(player)
     if (found === undefined) return
-    const text = found.window.args.text.trim()
+    const text = trim(found.window.args.text)
     const [ok, value] = pcall(lib.JSON.parse, text === "" ? "{}" : text)
     if (!ok || type(value) !== "table") {
       found.window.argsError.caption = ["automaton-gui.args-error", ok ? "{…}" : formatValue((value as { message?: unknown })?.message ?? value)]

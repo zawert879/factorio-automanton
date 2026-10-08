@@ -2,8 +2,10 @@
 // сборка, запрет удаления используемой библиотеки, переименование с правкой импортов, библиотека на машине.
 import { findRobot, RobotRecord } from "../automaton/registry"
 import { WORKER_MK1, WORKER_MK1_PLACER } from "../names"
-import { assignProgram } from "../program/machines"
-import { deleteProgram, findProgram, normalizeProgramName, publish } from "../program/store"
+import { copySettings, pasteSettings, stopRobots } from "../gui/assignTools"
+import { programTree } from "../gui/tree"
+import { assignProgram, machineOf } from "../program/machines"
+import { deleteProgram, findProgram, normalizeProgramName, programsOf, publish } from "../program/store"
 import { describe, expect, test, waitUntil } from "./testing"
 
 function robotAt(x: number, y: number): RobotRecord {
@@ -37,6 +39,9 @@ function cleanup(...names: string[]): void {
 describe("модули команды", () => {
   test("имена с папками", () => {
     expect(normalizeProgramName(" Логистика / Перевозчик ")).toBe("Логистика/Перевозчик")
+    // Буквы, которые портил s.trim() TSTL (концы л, п, Р — байты BB, BF, A0).
+    expect(normalizeProgramName("lib/Котёл ")).toBe("lib/Котёл")
+    expect(normalizeProgramName("Суп/ВЕТЕР")).toBe("Суп/ВЕТЕР")
     expect(normalizeProgramName("a//b")).toBe(undefined)
     expect(normalizeProgramName("../x")).toBe(undefined)
     expect(normalizeProgramName("a/")).toBe(undefined)
@@ -110,5 +115,43 @@ describe("модули команды", () => {
     expect(record.machine.status).toBe("ready")
     robot.entity.destroy()
     cleanup("m4/lib")
+  })
+
+  test("копирование настроек: программа и параметры, библиотеку не вставить, остановка рамкой", () => {
+    const a = robotAt(-1360, 140)
+    const b = robotAt(-1366, 140)
+    const program = published("m5/работа", `const { n } = me.args<{ n: number }>()\nwhile (true) wait(n)`).program
+    expect(copySettings(99, a)).toBe(undefined)
+    machineOf(a.id).args = { n: 3, route: { item: "coal" } }
+    assignProgram(a, program)
+    expect(copySettings(99, a)).toBe("m5/работа")
+    expect(pasteSettings(99, b)).toBe("m5/работа")
+    const copied = machineOf(b.id)
+    expect(copied.programId).toBe(program.id)
+    expect((copied.args as { route: { item: string } }).route.item).toBe("coal")
+    // Копия, а не та же таблица.
+    ;(machineOf(a.id).args as { n: number }).n = 5
+    expect((copied.args as { n: number }).n).toBe(3)
+    // Программа стала библиотекой — вставлять нечего.
+    published("m5/работа", `export const n = 1`)
+    expect(pasteSettings(99, b)).toBe(undefined)
+    published("m5/работа", `while (true) wait(1)`)
+    expect(stopRobots([a, b])).toBe(2)
+    expect(machineOf(a.id).machine.status).toBe("done")
+    a.entity.destroy()
+    b.entity.destroy()
+    storage.clipboard![99] = undefined
+    cleanup("m5/работа")
+  })
+
+  test("дерево программ: папки первыми, поиск без учёта регистра", () => {
+    published("m6/Б/Вторая", `print(2)`)
+    published("m6/Первая", `print(1)`)
+    const ours = programsOf("player").filter((p) => p.name.startsWith("m6/"))
+    const rows = programTree(ours, "")
+    expect(rows.map((r) => `${r.indent}${r.short}`).join("|")).toBe("m6|    Б|        Вторая|    Первая")
+    expect(programTree(ours, "ВТОР").filter((r) => r.program !== undefined).map((r) => r.short).join(",")).toBe("Вторая")
+    expect(programTree(ours, "", { "m6/Б": true }).map((r) => r.short).join(",")).toBe("m6,Б,Первая")
+    cleanup("m6/Б/Вторая", "m6/Первая")
   })
 })

@@ -2,12 +2,16 @@
 import { FrameGuiElement, LocalisedString, LuaGuiElement, LuaPlayer, PlayerIndex } from "factorio:runtime"
 import { onEvent } from "../events"
 import type { MachineWindow } from "./machine"
+import type { PickerWindow } from "./picker"
 import type { ProgramsWindow } from "./programs"
 
 /** Открытые окна игрока (в storage: ссылки на элементы GUI переживают сохранение). */
 export interface GuiState {
   machine?: MachineWindow
   programs?: ProgramsWindow
+  picker?: PickerWindow
+  /** Недавно выбранные программы (окно выбора), новые первыми. */
+  recent?: number[]
 }
 
 export function guiOf(player: LuaPlayer): GuiState {

@@ -12,6 +12,14 @@ export function isAscii(this: void, s: string): boolean {
   return position === undefined
 }
 
+/**
+ * Пробелы по краям (ASCII). В коде мода вместо s.trim(): TSTL убирает класс байтов [%s\u00A0\uFEFF],
+ * то есть отдельные байты C2 A0 EF BB BF, — и съедает конец букв «л», «п», «Р» (D0 BB, D0 BF, D0 A0).
+ */
+export function trim(this: void, s: string): string {
+  return string.match(s, "^%s*(.-)%s*$")[0] as string
+}
+
 /** Длина в символах. */
 export function ulen(this: void, s: string): number {
   if (isAscii(s)) return s.length

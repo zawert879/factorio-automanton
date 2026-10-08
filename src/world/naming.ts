@@ -1,5 +1,6 @@
 // Диалог имени метки, табло или зоны: появляется сразу после установки или выделения зоны;
 // переименовать потом — /am-name, наведя курсор на метку или табло.
+import { trim } from "../lang/runtime/strings"
 import { LuaEntity, LuaPlayer, PlayerIndex } from "factorio:runtime"
 import { onEvent } from "../events"
 
@@ -51,7 +52,7 @@ function confirm(player: LuaPlayer): void {
   const frame = player.gui.screen[FRAME]
   if (frame === undefined) return
   const field = frame[FIELD] as unknown as { text: string } | undefined
-  const name = (field?.text ?? "").trim()
+  const name = trim(field?.text ?? "")
   const target = targets()[player.index]
   frame.destroy()
   targets()[player.index] = undefined

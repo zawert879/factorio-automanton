@@ -1,5 +1,6 @@
 // Сохраняемое состояние мода. Только простые данные и ссылки на объекты игры: без функций и метатаблиц.
 import type { ActionsState } from "./automaton/actions"
+import type { CopiedSettings } from "./gui/assignTools"
 import type { GuiState } from "./gui/common"
 import type { Draft } from "./gui/programs"
 import type { SyncBuffer } from "./program/sync"
@@ -47,6 +48,8 @@ declare global {
     gui?: Record<number, GuiState | undefined>
     /** Неопубликованный текст в редакторе: по номеру игрока. */
     drafts?: Record<number, Draft | undefined>
+    /** Скопированные настройки машины у игрока (Shift+ПКМ по машине). */
+    clipboard?: Record<number, CopiedSettings | undefined>
     /** Программы, которые VS Code передаёт частями (/automaton-sync): по отправителю. */
     sync?: Record<string, SyncBuffer | undefined>
     /** Команды, которым уже опубликованы стартовые программы (src/world/start.ts). */

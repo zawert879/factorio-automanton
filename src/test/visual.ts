@@ -10,7 +10,8 @@ import { Activity, BODY_DIRECTIONS, CHARGING_STATION, DISPLAYS, MODELS, TECH, WO
 import { renameDisplay } from "../world/displays"
 import { guiOf } from "../gui/common"
 import { openMachine } from "../gui/machine"
-import { openPrograms, publishFromWindow, showTypes } from "../gui/programs"
+import { closePrograms, openPrograms, publishFromWindow, showTypes } from "../gui/programs"
+import { openPicker } from "../gui/picker"
 import { assignProgram } from "../program/machines"
 import { publish, publishProgram } from "../program/store"
 import { writeVsCodeFolder } from "../program/sync"
@@ -195,6 +196,17 @@ for (let x = 10; x < 86; x++) c.pixel(x, 54, x % 2 === 0 ? "green" : "red")`,
     const player = game.get_player(1 as PlayerIndex)
     if (player !== undefined) writeVsCodeFolder(player)
   }
+  // Окно выбора программы (17.4): из рамки «Программатора» — для нескольких машин.
+  if (tick === 232) {
+    const player = game.get_player(1 as PlayerIndex)
+    const ids = Object.values(storage.robots.byId).filter((r) => r !== undefined).map((r) => r!.id).slice(0, 3)
+    if (player !== undefined) {
+      player.gui.screen["automaton-types"]?.destroy()
+      closePrograms(player)
+      openPicker(player, ids, true)
+    }
+  }
+  if (tick === 235) guiShot("picker")
   // Дерево технологий (этап 6): технологии автоматонов на месте «Логистики». Экран технологий в одиночной
   // игре ставит её на паузу — поэтому снимок последний, в том же тике (shot.mjs ждёт файлы ещё пару секунд).
   if (tick === 240) {

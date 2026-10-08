@@ -6,6 +6,7 @@ import { join, relative, sep } from "node:path"
 import { fileURLToPath } from "node:url"
 import { checkAssets } from "./assets.mjs"
 import { checkLocale } from "./locale.mjs"
+import { checkSource } from "./source.mjs"
 
 const root = join(fileURLToPath(import.meta.url), "..", "..", "..")
 const lua = join(root, "tools", "lua", "5.2", "bin", "lua")
@@ -30,6 +31,13 @@ execFileSync(process.execPath, [join(root, "tools", "dts", "generate.mjs")], { s
 const locale = checkLocale(root)
 if (locale.problems.length > 0) {
   console.error(`Локаль:\n  ${locale.problems.join("\n  ")}`)
+  process.exit(1)
+}
+
+// Ловушки TSTL в коде мода (например, s.trim() на кириллице).
+const traps = checkSource(root)
+if (traps.length > 0) {
+  console.error(`Код мода:\n  ${traps.join("\n  ")}`)
   process.exit(1)
 }
 

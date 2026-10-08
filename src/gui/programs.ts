@@ -24,12 +24,13 @@ import {
   TextFieldGuiElement,
 } from "factorio:runtime"
 import { Diagnostic } from "../lang/lexer"
-import { mapCase, ulen } from "../lang/runtime/strings"
+import { ulen } from "../lang/runtime/strings"
 import { assignProgram } from "../program/machines"
 import { deleteProgram, dependentsOf, findProgram, notePublish, ProgramRecord, programsOf, publish, publishDenied } from "../program/store"
 import { writeVsCodeFolder } from "../program/sync"
 import { guiOf, onGuiChange, onGuiClick, onGuiSelection, titlebar } from "./common"
 import { DTS } from "./dts.generated"
+import { folderItem, LIBRARY_COLOR, programTree, TreeEntry } from "./tree"
 
 const FRAME = "automaton-programs"
 const TYPES_FRAME = "automaton-types"
@@ -46,14 +47,12 @@ while (true) {
 }
 `
 
-/** Строка дерева в списке: папка (полный путь) или программа. */
-export type ListEntry = { folder: string } | { id: number }
 
 export interface ProgramsWindow {
   frame: FrameGuiElement
   search: TextFieldGuiElement
   list: ListBoxGuiElement
-  entries: ListEntry[]
+  entries: TreeEntry[]
   /** Свёрнутые папки (полный путь). */
   collapsed: Record<string, boolean | undefined>
   name: TextFieldGuiElement
@@ -193,14 +192,6 @@ function windowOf(player: LuaPlayer): ProgramsWindow | undefined {
   return window !== undefined && window.frame.valid ? window : undefined
 }
 
-const FOLDER_COLOR = "#f3d9a6"
-const LIBRARY_COLOR = "#9fd4ff"
-
-interface FolderNode {
-  folders: Map<string, FolderNode>
-  programs: ProgramRecord[]
-}
-
 /** Строка программы в списке: последняя часть имени, версия, пометки. */
 function programItem(p: ProgramRecord, indent: string): LocalisedString {
   const short = p.name.split("/").pop()!
@@ -210,45 +201,10 @@ function programItem(p: ProgramRecord, indent: string): LocalisedString {
 }
 
 function refreshList(window: ProgramsWindow, player: LuaPlayer): void {
-  const filter = mapCase(window.search.text.trim(), false)
-  const root: FolderNode = { folders: new Map(), programs: [] }
-  for (const p of programsOf(player.force.name)) {
-    if (filter !== "" && !mapCase(p.name, false).includes(filter)) continue
-    const parts = p.name.split("/")
-    let node = root
-    for (let i = 0; i < parts.length - 1; i++) {
-      let child = node.folders.get(parts[i])
-      if (child === undefined) {
-        child = { folders: new Map(), programs: [] }
-        node.folders.set(parts[i], child)
-      }
-      node = child
-    }
-    node.programs.push(p)
-  }
-  const entries: ListEntry[] = []
-  const items: LocalisedString[] = []
-  // Папки — первыми (как в VS Code), найденное поиском — раскрыто.
-  const walk = (node: FolderNode, path: string, indent: string): void => {
-    const names: string[] = []
-    for (const [name] of node.folders) names.push(name)
-    table.sort(names)
-    for (const name of names) {
-      const full = path === "" ? name : `${path}/${name}`
-      const open = filter !== "" || !window.collapsed[full]
-      entries.push({ folder: full })
-      items.push(`${indent}${open ? "▾" : "▸"} [color=${FOLDER_COLOR}]${name}[/color]`)
-      if (open) walk(node.folders.get(name)!, full, `${indent}    `)
-    }
-    for (const p of node.programs) {
-      entries.push({ id: p.id })
-      items.push(programItem(p, indent))
-    }
-  }
-  walk(root, "", "")
-  window.entries = entries
-  window.list.items = items
-  const index = window.programId === undefined ? -1 : entries.findIndex((e) => "id" in e && e.id === window.programId)
+  const rows = programTree(programsOf(player.force.name), window.search.text, window.collapsed)
+  window.entries = rows.map((row) => row.entry)
+  window.list.items = rows.map((row) => (row.program === undefined ? folderItem(row) : programItem(row.program, row.indent)))
+  const index = window.programId === undefined ? -1 : window.entries.findIndex((e) => "id" in e && e.id === window.programId)
   window.list.selected_index = index >= 0 ? index + 1 : 0
 }
 

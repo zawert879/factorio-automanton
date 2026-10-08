@@ -17,7 +17,24 @@ const open: CustomInputPrototype = {
 const codeFont: FontPrototype = { type: "font", name: "automaton-code", from: "automaton-mono", size: 14 }
 const consoleFont: FontPrototype = { type: "font", name: "automaton-console", from: "automaton-mono", size: 13 }
 
-data.extend([open, codeFont, consoleFont])
+// Копирование и вставка настроек машины (программа и параметры) — теми же клавишами, что у зданий
+// (по умолчанию Shift+ПКМ и Shift+ЛКМ): игра сама настройки машин не копирует.
+const copySettings: CustomInputPrototype = {
+  type: "custom-input",
+  name: "automaton-copy-settings",
+  key_sequence: "",
+  linked_game_control: "copy-entity-settings",
+  consuming: "none",
+}
+const pasteSettings: CustomInputPrototype = {
+  type: "custom-input",
+  name: "automaton-paste-settings",
+  key_sequence: "",
+  linked_game_control: "paste-entity-settings",
+  consuming: "none",
+}
+
+data.extend([open, copySettings, pasteSettings, codeFont, consoleFont])
 
 const styles = data.raw["gui-style"]!.default as Record<string, unknown>
 // Редактор кода: размер задаётся по экрану игрока; отступы фиксированы — номера строк рядом
