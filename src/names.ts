@@ -17,3 +17,37 @@ export const BODY_DIRECTIONS = 8
 export function bodyAnimationName(activity: Activity, direction: number): string {
   return `${WORKER_MK1}-${activity}-${direction}`
 }
+
+/** Технологии автоматонов (6.3): открывают возможности API и модели машин (таблица — docs/API.md, «Исследования»). */
+export const TECH = {
+  radio: "automaton-radio",
+  display: "automaton-display",
+  tuning: "automaton-tuning",
+  fluids: "automaton-fluids",
+  construction: "automaton-construction",
+  circuits: "automaton-circuits",
+  sensors1: "automaton-sensors-1",
+  sensors2: "automaton-sensors-2",
+  sensors3: "automaton-sensors-3",
+  mk2: "automaton-mk2",
+  mk3: "automaton-mk3",
+  combat1: "automaton-combat-1",
+  combat2: "automaton-combat-2",
+  flying1: "automaton-flying-1",
+  flying2: "automaton-flying-2",
+} as const
+
+/** Типы сущностей, которые убирает мод (src/prototypes/removal.ts; логистические сундуки — кроме сундука хранения). */
+export const REMOVED_ENTITY_TYPES = [
+  "transport-belt",
+  "underground-belt",
+  "splitter",
+  "loader",
+  "loader-1x1",
+  "linked-belt",
+  "lane-splitter",
+  "inserter",
+  "mining-drill",
+  "logistic-robot",
+  "offshore-pump",
+]
