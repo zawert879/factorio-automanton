@@ -108,14 +108,23 @@ export function fileName(name: string): string {
   return safe
 }
 
-/** Имя карты для папки VS Code: при создании карты (или при добавлении мода в старое сохранение). */
-export function initSync(): void {
+/**
+ * Имя карты для папки VS Code. Задаётся при создании карты, а в сохранении, где его ещё нет (мод обновили
+ * без смены версии — on_configuration_changed не было), — при первом обращении: обращаются только
+ * обработчики событий, одинаковые у всех участников, поэтому запись в storage десинка не даёт.
+ */
+export function mapName(): string {
   storage.mapName ??= `карта-${game.get_surface("nauvis")?.map_gen_settings.seed ?? 0}`
+  return storage.mapName
+}
+
+export function initSync(): void {
+  mapName()
 }
 
 /** Папка программ команды этой карты в script-output. */
 export function syncFolder(force: string): string {
-  return `automaton/${fileName(storage.mapName ?? "карта")}/${fileName(force)}`
+  return `automaton/${fileName(mapName())}/${fileName(force)}`
 }
 
 /** Путь файла программы: папки из имени — подпапки (lib/Помощники → lib/Помощники.ts). */
@@ -131,8 +140,8 @@ function diagnosticsJson(diagnostics: Diagnostic[]): unknown[] {
 function handle(request: Request, sender: string, player: LuaPlayer | undefined): Record<string, unknown> {
   const force = request.force ?? player?.force.name ?? "player"
   // Папка другой карты (VS Code открыт не на той папке): ничего не публиковать и не отдавать.
-  if (request.map !== undefined && request.map !== storage.mapName) {
-    return { ok: false, error: "wrong-map", map: storage.mapName, folderMap: request.map }
+  if (request.map !== undefined && request.map !== mapName()) {
+    return { ok: false, error: "wrong-map", map: mapName(), folderMap: request.map }
   }
   if (player !== undefined && (request.cmd === "begin" || request.cmd === "end")) {
     const denied = publishDenied(player)
@@ -218,7 +227,7 @@ export function writeVsCodeFolder(player: LuaPlayer): string {
   write("automaton-sync.mjs", SYNC_TOOL)
   write(".vscode/tasks.json", TASKS)
   write("README.txt", README)
-  write(".automaton-map.json", helpers.table_to_json({ map: storage.mapName ?? "", force: player.force.name }))
+  write(".automaton-map.json", helpers.table_to_json({ map: mapName(), force: player.force.name }))
   for (const program of programsOf(player.force.name)) write(programPath(program.name), program.source)
   return dir
 }
