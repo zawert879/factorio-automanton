@@ -190,6 +190,44 @@ export type Stmt = Loc &
     | { kind: "Empty" }
   )
 
+// ---------- Модули ----------
+
+/** import { imported as local }; import local from — imported "default". */
+export interface ImportSpec extends Loc {
+  imported: string
+  local: string
+  typeOnly: boolean
+}
+
+export interface ImportDecl extends Loc {
+  /** Путь как написан: "./Помощники". */
+  source: string
+  specs: ImportSpec[]
+  /** import * as namespace. */
+  namespace?: string
+  /** import type { … }: только типы. */
+  typeOnly: boolean
+}
+
+/** export { local as exported }; у реэкспорта (from) local — имя в исходном модуле. */
+export interface ExportSpec extends Loc {
+  local: string
+  exported: string
+  typeOnly: boolean
+}
+
+export interface ExportDecl extends Loc {
+  /** Реэкспорт из другого модуля: export { a } from "./x", export * from "./x". */
+  source?: string
+  /** export * from — всё, кроме default. */
+  all?: boolean
+  specs: ExportSpec[]
+}
+
 export interface Program {
   body: Stmt[]
+  /** import (исполняются до тела, как в ES-модулях; в body их нет). */
+  imports?: ImportDecl[]
+  /** export: объявления остаются в body, сюда — что и под каким именем экспортируется. */
+  exports?: ExportDecl[]
 }

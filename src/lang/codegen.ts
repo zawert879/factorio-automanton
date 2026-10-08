@@ -11,7 +11,7 @@
 // - тело try — вложенная функция под pcall с собственными точками остановки; return / break / continue
 //   изнутри возвращают коды 1 / 2 и обрабатываются снаружи.
 import * as A from "./ast"
-import { analyze, Analysis, ClassInfo, FnInfo, Resolution, VarInfo } from "./analyze"
+import { analyze, Analysis, ClassInfo, FnInfo, Resolution, rewriteNamespaceMembers, VarInfo } from "./analyze"
 import {
   ARRAY_METHODS,
   BLOCKING_HOST_METHODS,
@@ -26,6 +26,7 @@ import { inferNumeric, Kind } from "./numeric"
 import { parse } from "./parser"
 import { EPILOGUE, PROLOGUE } from "./prologue"
 import { checkProgram } from "./check"
+import { decodeDiagnostics, isLibrary, link, ModuleResolver } from "./modules"
 
 export interface CompileResult {
   ok: boolean
@@ -40,6 +41,10 @@ export interface CompileResult {
    */
   pauses: Record<number, number[]>
   diagnostics: Diagnostic[]
+  /** Модули по номеру в кодировке строк (0 — сама программа; src/lang/modules.ts). */
+  modules?: string[]
+  /** Библиотека: только объявления и есть экспорт — машине не назначается. */
+  library?: boolean
 }
 
 /** В Lua 5.2 не больше 200 локальных переменных на функцию; запас — служебным. */
@@ -125,32 +130,49 @@ export const MAX_SOURCE_BYTES = 100000
 export interface CompileOptions {
   /** Проверка типов (этап 12); выключают тесты рантайма, где ошибка типов — нарочно. */
   types?: boolean
+  /** Полное имя программы (с папками): от него считаются пути импорта. */
+  name?: string
+  /** Другие программы команды — для import. Без него импорт любого модуля — ошибка. */
+  resolve?: ModuleResolver
+}
+
+function failed(diagnostics: Diagnostic[], modules?: string[]): CompileResult {
+  return { ok: false, lua: "", lines: [], keys: {}, pauses: {}, diagnostics: modules === undefined ? diagnostics : decodeDiagnostics(diagnostics, modules), modules }
 }
 
 export function compile(source: string, options: CompileOptions = {}): CompileResult {
-  if (source.length > MAX_SOURCE_BYTES) {
-    return { ok: false, lua: "", lines: [], keys: {}, pauses: {}, diagnostics: [{ code: "program-too-large", params: [MAX_SOURCE_BYTES], line: 1, column: 1 }] }
-  }
+  if (source.length > MAX_SOURCE_BYTES) return failed([{ code: "program-too-large", params: [MAX_SOURCE_BYTES], line: 1, column: 1 }])
   const parsed = parse(source)
-  if (parsed.diagnostics.length > 0) return { ok: false, lua: "", lines: [], keys: {}, pauses: {}, diagnostics: parsed.diagnostics }
-  const analysis = analyze(parsed.program)
-  if (analysis.diagnostics.length > 0) return { ok: false, lua: "", lines: [], keys: {}, pauses: {}, diagnostics: analysis.diagnostics }
+  if (parsed.diagnostics.length > 0) return failed(parsed.diagnostics)
+  // Модули (этап 17): программа и всё, что она импортирует, — в порядке исполнения.
+  const linked = link(parsed.program, options.name ?? "", options.resolve)
+  const modules = linked.modules
+  if (linked.diagnostics.length > 0) return failed(linked.diagnostics, modules)
+  const units = linked.units
+  // Каждый модуль — блок главной функции; программа без импортов — как раньше, без обёртки.
+  const program: A.Program =
+    units.length === 1
+      ? parsed.program
+      : { body: units.map((u): A.Stmt => ({ kind: "Block", body: u.program.body, line: u.program.body[0]?.line ?? 1, column: 1 })) }
+  const analysis = analyze(program, units.length === 1 ? undefined : units)
+  if (analysis.diagnostics.length > 0) return failed(analysis.diagnostics, modules)
   if (options.types !== false) {
     // Ошибка в самой проверке не мешает публикации: тогда программа просто не проверена.
-    const [checked, typeErrors] = pcall(checkProgram, parsed.program)
-    if (checked && (typeErrors as Diagnostic[]).length > 0) {
-      return { ok: false, lua: "", lines: [], keys: {}, pauses: {}, diagnostics: typeErrors as Diagnostic[] }
-    }
+    const [checked, typeErrors] = pcall(checkProgram, parsed.program, units)
+    if (checked && (typeErrors as Diagnostic[]).length > 0) return failed(typeErrors as Diagnostic[], modules)
   }
-  const result = generate(parsed.program, analysis)
-  if (!result.ok) return result
+  rewriteNamespaceMembers(analysis)
+  const result = generate(program, analysis)
+  if (!result.ok) return failed(result.diagnostics, modules)
   // Пределы Lua (регистры, длина переходов) проверяет сам load: такую программу не публикуем.
   const [chunk, message] = load(result.lua, "=prog", "t", {})
   if (chunk === undefined) {
     const [luaLine] = string.match(message ?? "", "^prog:(%d+):")
     const line = luaLine !== undefined ? result.lines[tonumber(luaLine)! - 1] ?? 1 : 1
-    return { ok: false, lua: "", lines: [], keys: {}, pauses: {}, diagnostics: [{ code: "program-too-complex", params: [], line, column: 1 }] }
+    return failed([{ code: "program-too-complex", params: [], line, column: 1 }], modules)
   }
+  result.modules = modules
+  result.library = isLibrary(parsed.program)
   return result
 }
 
@@ -1743,7 +1765,9 @@ export function generate(program: A.Program, analysis: Analysis): CompileResult 
     for (const c of fn.captures) locals.push(c.lua)
     for (let i = 1; i <= lf.maxTemp; i++) locals.push(`t${i}`)
     if (luaParams.length + locals.length + 2 > MAX_LOCALS) {
-      report("function-too-large", [fn.name], { line, column: 0 })
+      // Объявления верхнего уровня программы и всех её модулей — переменные одной главной функции.
+      if (fn.kind === "main") report("too-many-top-level", [MAX_LOCALS - 10], { line: 1, column: 1 })
+      else report("function-too-large", [fn.name], { line, column: 0 })
     }
     const saved = ["e", ...(fn.thisVar !== undefined ? [thisName] : []), ...signature.params, ...locals]
     const savedList = saved.join(", ")

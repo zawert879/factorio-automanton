@@ -232,7 +232,7 @@ describe("парсер: ошибки", () => {
     expect(parse("async function f() {}").diagnostics[0].params[0]).toBe("async")
     expect(parse("for (const k in obj) {}").diagnostics[0].params[0]).toBe("for-in")
     expect(parse("const r = /ab+/").diagnostics[0].params[0]).toBe("regex")
-    expect(parse("import x from 'y'").diagnostics[0].params[0]).toBe("import")
+    expect(parse("if (x) { import y from './y' }").diagnostics[0].params[0]).toBe("import-nested")
     expect(parse("enum E { A }").diagnostics[0].params[0]).toBe("enum")
   })
 

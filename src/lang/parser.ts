@@ -72,10 +72,12 @@ const UNSUPPORTED_STATEMENTS: Record<string, string> = {
 export interface ParseOptions {
   /** Режим объявлений (.d.ts): declare function / const / class без тел. */
   declarations?: boolean
+  /** Сдвиг номеров строк (модули программы, src/lang/modules.ts). */
+  lineBase?: number
 }
 
 export function parse(source: string, options: ParseOptions = {}): ParseResult {
-  const lexed = tokenize(source)
+  const lexed = tokenize(source, options.lineBase ?? 0)
   const tokens = lexed.tokens
   const diagnostics: Diagnostic[] = [...lexed.diagnostics]
   let pos = 0
@@ -1124,6 +1126,20 @@ export function parse(source: string, options: ParseOptions = {}): ParseResult {
       consumeSemicolon()
       return decl
     }
+    if (token.kind === "keyword" && (token.value === "import" || token.value === "export")) {
+      if (token.value === "import" && (isPunct("(", 1) || isPunct(".", 1))) fail("unsupported", ["dynamic-import"])
+      // depth 1 — инструкция верхнего уровня (parseStatement уже вошёл в nested).
+      if (depth !== 1 || options.declarations) {
+        // Разобрать целиком (одна понятная ошибка вместо лавины), но не учитывать.
+        report("unsupported", ["import-nested"], token)
+        const [importCount, exportCount] = [imports.length, exports.length]
+        const stmt = token.value === "import" ? parseImport(start) : parseExport(start)
+        imports.splice(importCount)
+        exports.splice(exportCount)
+        return stmt
+      }
+      return token.value === "import" ? parseImport(start) : parseExport(start)
+    }
     const unsupported = UNSUPPORTED_STATEMENTS[token.value]
     if (unsupported !== undefined && (token.kind === "keyword" || (token.kind === "identifier" && peek(1).kind === "identifier"))) {
       fail("unsupported", [unsupported])
@@ -1234,6 +1250,168 @@ export function parse(source: string, options: ParseOptions = {}): ParseResult {
     return { ...start, kind: "ExprStmt", expression }
   }
 
+  // ---------- Модули ----------
+
+  const imports: A.ImportDecl[] = []
+  const exports: A.ExportDecl[] = []
+
+  /** Путь модуля: строка после from. */
+  function moduleSource(): string {
+    const token = peek()
+    if (token.kind !== "string") fail("expected-token", ["\"./модуль\"", describe(token)])
+    next()
+    return token.value
+  }
+
+  /** Имя в списке { … }: любое слово (в том числе default). */
+  function moduleName(): string {
+    return propertyName()
+  }
+
+  /** { a, b as c, type T } — для import (imported → local) и export (local → exported). */
+  function specList(): { first: string; second: string; typeOnly: boolean; at: A.Loc }[] {
+    expect("{")
+    const list: { first: string; second: string; typeOnly: boolean; at: A.Loc }[] = []
+    while (!isPunct("}")) {
+      const at = loc()
+      // { type T } — но { type } и { type as x } — имя «type».
+      const typeOnly = is("type") && !isPunct(",", 1) && !isPunct("}", 1) && !is("as", 1)
+      if (typeOnly) next()
+      const first = moduleName()
+      const second = eat("as") ? moduleName() : first
+      list.push({ first, second, typeOnly, at })
+      if (!eat(",")) break
+    }
+    expect("}")
+    return list
+  }
+
+  function parseImport(start: A.Loc): A.Stmt {
+    expect("import")
+    const decl: A.ImportDecl = { ...start, source: "", specs: [], typeOnly: false }
+    if (peek().kind === "string") {
+      // import "./x" — только исполнить модуль.
+      decl.source = moduleSource()
+      consumeSemicolon()
+      imports.push(decl)
+      return { ...start, kind: "Empty" }
+    }
+    if (is("type") && (isPunct("{", 1) || isPunct("*", 1) || (peek(1).kind === "identifier" && !is("from", 1)))) {
+      next()
+      decl.typeOnly = true
+    }
+    if (peek().kind === "identifier" && !isPunct("=", 1)) {
+      const at = loc()
+      const local = identifierName()
+      decl.specs.push({ ...at, imported: "default", local, typeOnly: decl.typeOnly })
+      if (!eat(",")) {
+        expect("from")
+        decl.source = moduleSource()
+        consumeSemicolon()
+        imports.push(decl)
+        return { ...start, kind: "Empty" }
+      }
+    } else if (peek().kind === "identifier") {
+      fail("unsupported", ["import-require"])
+    }
+    if (eat("*")) {
+      expect("as")
+      decl.namespace = identifierName()
+    } else {
+      for (const spec of specList()) {
+        if (spec.second.startsWith("__")) report("reserved-name", [spec.second])
+        decl.specs.push({ ...spec.at, imported: spec.first, local: spec.second, typeOnly: decl.typeOnly || spec.typeOnly })
+      }
+    }
+    expect("from")
+    decl.source = moduleSource()
+    consumeSemicolon()
+    imports.push(decl)
+    return { ...start, kind: "Empty" }
+  }
+
+  /** Имена, которые объявляет шаблон (export const { a, b } = …). */
+  function patternNames(pattern: A.Pattern, out: string[]): string[] {
+    if (pattern.kind === "IdentifierPattern") out.push(pattern.name)
+    else if (pattern.kind === "ObjectPattern") {
+      for (const prop of pattern.properties) patternNames(prop.value, out)
+      if (pattern.rest !== undefined) out.push(pattern.rest)
+    } else {
+      for (const element of pattern.elements) if (element.value !== undefined) patternNames(element.value, out)
+      if (pattern.rest !== undefined) patternNames(pattern.rest, out)
+    }
+    return out
+  }
+
+  function exportLocal(at: A.Loc, local: string, typeOnly: boolean, exported = local): void {
+    exports.push({ ...at, specs: [{ ...at, local, exported, typeOnly }] })
+  }
+
+  function parseExport(start: A.Loc): A.Stmt {
+    expect("export")
+    if (isPunct("=")) fail("unsupported", ["export-assignment"])
+    if (eat("default")) {
+      if (is("function")) {
+        next()
+        const name = peek().kind === "identifier" ? identifierName() : "default"
+        exportLocal(start, name, false, "default")
+        return { ...start, kind: "FunctionDecl", fn: parseFunctionRest(start, name) }
+      }
+      if (is("class") || (is("abstract") && is("class", 1))) {
+        const isAbstract = eat("abstract")
+        const cls = parseClass(start, isAbstract, false)
+        cls.name ??= "default"
+        exportLocal(start, cls.name, false, "default")
+        return { ...start, kind: "ClassDecl", cls }
+      }
+      if (is("async")) fail("unsupported", ["async"])
+      // export default выражение — константа с именем default (такое имя в программе не напишешь).
+      const value = parseAssignment()
+      consumeSemicolon()
+      exportLocal(start, "default", false)
+      return { ...start, kind: "VarDecl", declKind: "const", declarations: [{ ...start, target: { ...start, kind: "IdentifierPattern", name: "default" }, init: value }] }
+    }
+    if (isPunct("*")) {
+      next()
+      if (is("as")) fail("unsupported", ["export-star-as"])
+      expect("from")
+      exports.push({ ...start, source: moduleSource(), all: true, specs: [] })
+      consumeSemicolon()
+      return { ...start, kind: "Empty" }
+    }
+    const typeList = is("type") && isPunct("{", 1)
+    if (typeList) next()
+    if (isPunct("{")) {
+      const specs = specList()
+      const source = eat("from") ? moduleSource() : undefined
+      consumeSemicolon()
+      exports.push({
+        ...start,
+        source,
+        specs: specs.map((spec) => ({ ...spec.at, local: spec.first, exported: spec.second, typeOnly: typeList || spec.typeOnly })),
+      })
+      return { ...start, kind: "Empty" }
+    }
+    const stmt = parseStatementInner()
+    switch (stmt.kind) {
+      case "VarDecl":
+        for (const decl of stmt.declarations) for (const name of patternNames(decl.target, [])) exportLocal(decl, name, false)
+        break
+      case "FunctionDecl":
+        exportLocal(stmt, stmt.fn.name!, false)
+        break
+      case "ClassDecl":
+        exportLocal(stmt, stmt.cls.name!, false)
+        break
+      case "TypeDecl":
+        exportLocal(stmt, stmt.name, true)
+        break
+      default:
+        report("unexpected-token", ["export"], tokens[math.max(0, pos - 1)])
+    }
+    return stmt
+  }
+
   /** Пропустить токены до границы инструкции после ошибки. */
   function synchronize(): void {
     while (peek().kind !== "eof") {
@@ -1261,5 +1439,5 @@ export function parse(source: string, options: ParseOptions = {}): ParseResult {
   }
 
   const body = parseStatementsUntil("")
-  return { program: { body }, diagnostics }
+  return { program: { body, imports, exports }, diagnostics }
 }

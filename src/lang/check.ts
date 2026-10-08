@@ -6,6 +6,7 @@
 // Сужение (12.3): === null / !== undefined, typeof, instanceof, поле-дискриминант, ранний выход из блока.
 import * as A from "./ast"
 import { Diagnostic } from "./lexer"
+import { ExportTarget, ModuleUnit } from "./modules"
 import { parse } from "./parser"
 import { STDLIB } from "./stdlib"
 import { DTS } from "../gui/dts.generated"
@@ -59,6 +60,11 @@ type TypeContext = {
   params: Map<string, Type>
   /** Тип значения по имени — для typeof x. */
   valueOf?: (this: void, name: string) => Type | undefined
+  /**
+   * Имена типов модуля → имена в общей таблице типов: импортированные типы и типы модулей-зависимостей
+   * (у них имя уточняется модулем, если такое уже занято: «lib/Маршруты.Route»).
+   */
+  alias?: Map<string, string>
 }
 
 let globals: Globals | undefined
@@ -172,8 +178,9 @@ function toType(node: A.TypeNode | undefined, ctx: TypeContext): Type {
         case "NonNullable":
           return args[0] ?? ANY
       }
-      if (!ctx.types.has(node.name)) return ANY
-      return { k: "ref", name: node.name, args }
+      const name = ctx.alias?.get(node.name) ?? node.name
+      if (!ctx.types.has(name)) return ANY
+      return { k: "ref", name, args }
     }
   }
 }
@@ -220,8 +227,13 @@ function resolve(t: Type, types: Map<string, TypeDef>, depth = 0): Type {
 }
 
 /** Определение интерфейса: члены, предки и параметры. */
-function interfaceDef(decl: Extract<A.Stmt, { kind: "TypeDecl" }>, types: Map<string, TypeDef>, valueOf?: (this: void, name: string) => Type | undefined): TypeDef {
-  const outer: TypeContext = { types, params: new Map(), valueOf }
+function interfaceDef(
+  decl: Extract<A.Stmt, { kind: "TypeDecl" }>,
+  types: Map<string, TypeDef>,
+  valueOf?: (this: void, name: string) => Type | undefined,
+  alias?: Map<string, string>,
+): TypeDef {
+  const outer: TypeContext = { types, params: new Map(), valueOf, alias }
   const tparams = tparamsOf(decl.typeParams, outer)
   return {
     name: decl.name,
@@ -229,7 +241,7 @@ function interfaceDef(decl: Extract<A.Stmt, { kind: "TypeDecl" }>, types: Map<st
     cache: new Map(),
     build: (args) => {
       const params = bindParams(tparams, args)
-      const ctx: TypeContext = { types, params, valueOf }
+      const ctx: TypeContext = { types, params, valueOf, alias }
       if (decl.alias !== undefined) return toType(decl.alias, ctx)
       // Свойства предков — сначала, свои их перекрывают.
       const base = new Map<string, Prop>()
@@ -343,7 +355,11 @@ interface FunctionContext {
   thisType?: Type
 }
 
-export function checkProgram(program: A.Program): Diagnostic[] {
+/**
+ * Проверить программу. units — её модули в порядке исполнения (src/lang/modules.ts); без них —
+ * одна программа без импортов.
+ */
+export function checkProgram(program: A.Program, units?: ModuleUnit[]): Diagnostic[] {
   // Ключи объектных типов нумеруются заново — кэши раскрытых типов библиотеки тоже чистим.
   resetTypeKeys()
   const g = checkGlobals()
@@ -356,6 +372,26 @@ export function checkProgram(program: A.Program): Diagnostic[] {
   const functions: FunctionContext[] = []
   let valueScope: Scope = root
   const ctx: TypeContext = { types, params: new Map(), valueOf: (name) => valueScope.lookup(name) }
+  /** Занятые имена в общей таблице типов: библиотека, типы программы, уже выданные модулям. */
+  const claimed = new Set<string>(g.types.keys())
+  /** Проверяется модуль-зависимость (не сама программа): его типы получают имена в общей таблице. */
+  let inDependency = false
+  let currentModule = ""
+
+  /** Имя объявляемого типа в общей таблице. */
+  function declareTypeName(local: string): string {
+    const alias = ctx.alias
+    if (!inDependency || alias === undefined) return local
+    const existing = alias.get(local)
+    if (existing !== undefined) return existing
+    const unique = claimed.has(local) ? `${currentModule}.${local}` : local
+    claimed.add(unique)
+    alias.set(local, unique)
+    return unique
+  }
+
+  /** Имя типа, на который ссылаются в текущем модуле. */
+  const typeName = (local: string): string => ctx.alias?.get(local) ?? local
 
   function report(node: A.Loc, code: string, params: (string | number)[]): void {
     if (diagnostics.length >= MAX_TYPE_ERRORS) return
@@ -981,25 +1017,31 @@ export function checkProgram(program: A.Program): Diagnostic[] {
         return BOOLEAN
       case "Array":
         return e.elements.length === 0 ? { k: "array", el: ANY } : { k: "array", el: widen(union(e.elements.map((x) => (x.kind === "Spread" ? ANY : initializerType(x))))) }
-      case "New":
-        return e.callee.kind === "Identifier" && types.has(e.callee.name) ? { k: "ref", name: e.callee.name, args: e.typeArgs.map((a) => toType(a, ctx)) } : ANY
+      case "New": {
+        if (e.callee.kind !== "Identifier") return ANY
+        const name = typeName(e.callee.name)
+        return types.has(name) ? { k: "ref", name, args: e.typeArgs.map((a) => toType(a, ctx)) } : ANY
+      }
     }
     return ANY
   }
 
   function classDeclaration(cls: A.ClassNode, scope: Scope): void {
     const name = cls.name ?? "(class)"
-    const cctx = withParams(ctx, cls.typeParams)
-    const instanceRef: Type = { k: "ref", name, args: [] }
+    const typeKeyName = cls.name === undefined ? name : declareTypeName(cls.name)
+    // Копия контекста: типы класса строятся позже, когда проверяется уже другой модуль.
+    const cctx = { ...withParams(ctx, cls.typeParams) }
+    const instanceRef: Type = { k: "ref", name: typeKeyName, args: [] }
     const superName = cls.superClass?.kind === "Identifier" ? cls.superClass.name : undefined
-    types.set(name, {
+    const superType = superName === undefined ? undefined : typeName(superName)
+    types.set(typeKeyName, {
       name,
       tparams: [],
       cache: new Map(),
       build: () => {
         const props = new Map<string, Prop>()
         if (superName !== undefined) {
-          const parent = resolve({ k: "ref", name: superName, args: [] }, types)
+          const parent = resolve({ k: "ref", name: superType!, args: [] }, types)
           if (parent.k === "obj") for (const [n, p] of parent.o.props) props.set(n, p)
         }
         for (const member of cls.members) {
@@ -1016,7 +1058,7 @@ export function checkProgram(program: A.Program): Diagnostic[] {
           } else if (member.kind === "AbstractMethod") props.set(member.name, { t: ANY, opt: false })
         }
         // Неизвестный предок (не класс программы) — свойства не знаем: открытый объект.
-        const open = superName !== undefined && !types.has(superName)
+        const open = superType !== undefined && !types.has(superType)
         return obj({ props, name, open })
       },
     })
@@ -1040,7 +1082,7 @@ export function checkProgram(program: A.Program): Diagnostic[] {
   }
 
   function checkClassBodies(cls: A.ClassNode, scope: Scope): void {
-    const name = cls.name ?? "(class)"
+    const name = cls.name === undefined ? "(class)" : typeName(cls.name)
     const instance: Type = { k: "ref", name, args: [] }
     const saved = ctx.params
     ctx.params = withParams(ctx, cls.typeParams).params
@@ -1202,7 +1244,8 @@ export function checkProgram(program: A.Program): Diagnostic[] {
 
   // ---------- Инструкции ----------
 
-  function walkBlock(body: A.Stmt[], scope: Scope): void {
+  /** Результат — область, где видны объявления блока (после сужений вроде if (…) return). */
+  function walkBlock(body: A.Stmt[], scope: Scope): Scope {
     // Подъём: функции и классы видны во всём блоке.
     for (const stmt of body) {
       if (stmt.kind === "FunctionDecl" && stmt.fn.name !== undefined) scope.vars.set(stmt.fn.name, declaredSignature(stmt.fn))
@@ -1219,6 +1262,7 @@ export function checkProgram(program: A.Program): Diagnostic[] {
         current = rest
       }
     }
+    return current
   }
 
   function walk(stmt: A.Stmt, scope: Scope): void {
@@ -1339,17 +1383,52 @@ export function checkProgram(program: A.Program): Diagnostic[] {
     }
   }
 
-  // Программа: типы (interface, type) — на всю программу; потом инструкции.
+  // Модуль: типы (interface, type) — на весь модуль; потом инструкции.
   const collectTypes = (body: A.Stmt[]) => {
     for (const stmt of body) {
-      if (stmt.kind === "TypeDecl") types.set(stmt.name, interfaceDef(stmt, types, (name) => valueScope.lookup(name)))
+      if (stmt.kind === "TypeDecl") types.set(declareTypeName(stmt.name), interfaceDef(stmt, types, (name) => valueScope.lookup(name), ctx.alias))
       else if (stmt.kind === "Block") collectTypes(stmt.body)
     }
   }
-  collectTypes(program.body)
-  const programScope = new Scope(root)
-  valueScope = programScope
-  walkBlock(program.body, programScope)
+
+  // Модули по порядку исполнения: у импортированного модуля типы и значения уже известны.
+  const list = units ?? [{ name: "", program, imports: new Map(), namespaces: new Map(), types: new Set<string>() } as unknown as ModuleUnit]
+  const mainUnit = list[list.length - 1]
+  // Типы самой программы сохраняют имена: модули-зависимости их не займут.
+  const claimTypes = (body: A.Stmt[]): void => {
+    for (const stmt of body) {
+      if (stmt.kind === "TypeDecl") claimed.add(stmt.name)
+      else if (stmt.kind === "ClassDecl" && stmt.cls.name !== undefined) claimed.add(stmt.cls.name)
+      else if (stmt.kind === "Block") claimTypes(stmt.body)
+    }
+  }
+  claimTypes(mainUnit.program.body)
+  const aliases = new Map<ModuleUnit, Map<string, string>>()
+  const moduleScopes = new Map<ModuleUnit, Scope>()
+  const exportType = (target: ExportTarget): Type => moduleScopes.get(target.unit)?.lookup(target.local) ?? ANY
+  for (const unit of list) {
+    inDependency = unit !== mainUnit
+    currentModule = unit.name
+    const alias = new Map<string, string>()
+    for (const [local, binding] of unit.imports) {
+      if (binding.target.type) alias.set(local, aliases.get(binding.target.unit)?.get(binding.target.local) ?? binding.target.local)
+    }
+    ctx.alias = alias
+    aliases.set(unit, alias)
+    if (inDependency) for (const name of unit.types) declareTypeName(name)
+    collectTypes(unit.program.body)
+    const scope = new Scope(root)
+    for (const [local, binding] of unit.imports) {
+      if (binding.target.value && !binding.typeOnly) scope.vars.set(local, exportType(binding.target))
+    }
+    for (const [local, namespace] of unit.namespaces) {
+      const props = new Map<string, Prop>()
+      for (const [exported, target] of namespace.exports) if (target.value) props.set(exported, { t: exportType(target), opt: false })
+      scope.vars.set(local, obj({ props, name: `typeof import("${namespace.name}")` }))
+    }
+    valueScope = scope
+    moduleScopes.set(unit, walkBlock(unit.program.body, scope))
+  }
   return diagnostics
 }
 

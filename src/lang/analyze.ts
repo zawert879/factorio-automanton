@@ -13,6 +13,7 @@
 import * as A from "./ast"
 import { BLOCKING_HOST_METHODS, Builtin, BUILTINS, HIGHER_ORDER_METHODS } from "./builtins"
 import { Diagnostic } from "./lexer"
+import { ModuleUnit } from "./modules"
 
 export type VarKind = "let" | "const" | "param" | "function" | "class" | "catch" | "this"
 
@@ -105,25 +106,41 @@ export interface Analysis {
   declOf: Map<A.Stmt, VarInfo>
   /** Имена свойств, которым где-то присваивают (obj.имя = …): метод с таким именем может быть подменён. */
   assignedProperties: Set<string>
+  /** ns.имя для import * as ns: узел Member → переменная модуля (см. rewriteNamespaceMembers). */
+  namespaceMembers: Map<A.Expr, VarInfo>
   diagnostics: Diagnostic[]
+}
+
+/** import * as ns: имя в области видимости модуля. */
+interface NamespaceEntry {
+  namespace: ModuleUnit
 }
 
 class Scope {
   readonly vars = new Map<string, VarInfo>()
+  /** Область модуля: импортированные имена (переменные других модулей) и пространства имён. */
+  imports?: Map<string, VarInfo | NamespaceEntry>
   constructor(
     readonly fn: FnInfo,
     readonly parent?: Scope,
   ) {}
 
-  lookup(name: string): VarInfo | undefined {
+  /** Ближайшее объявление имени; imported — найдено среди импортов модуля. */
+  lookupEntry(name: string): { entry: VarInfo | NamespaceEntry; imported: boolean } | undefined {
     let scope: Scope | undefined = this
     while (scope !== undefined) {
       const found = scope.vars.get(name)
-      if (found !== undefined) return found
+      if (found !== undefined) return { entry: found, imported: false }
+      const imported = scope.imports?.get(name)
+      if (imported !== undefined) return { entry: imported, imported: true }
       scope = scope.parent
     }
     return undefined
   }
+}
+
+function isNamespace(entry: VarInfo | NamespaceEntry): entry is NamespaceEntry {
+  return (entry as NamespaceEntry).namespace !== undefined
 }
 
 /** Имя для Lua: латиница и цифры из исходного имени плюс номер (русские имена → v_<номер>). */
@@ -137,7 +154,12 @@ function luaName(name: string, id: number): string {
   return `${ascii.length > 0 && ascii.length <= 20 ? ascii : "v"}_${id}`
 }
 
-export function analyze(program: A.Program): Analysis {
+/**
+ * Анализ программы. units — модули программы в порядке исполнения (src/lang/modules.ts): тогда
+ * у каждого модуля своя область видимости в главной функции, а импорты указывают на переменные
+ * модулей, из которых они импортированы.
+ */
+export function analyze(program: A.Program, units?: ModuleUnit[]): Analysis {
   const diagnostics: Diagnostic[] = []
   const functions: FnInfo[] = []
   const classes: ClassInfo[] = []
@@ -148,6 +170,9 @@ export function analyze(program: A.Program): Analysis {
   const assignedProperties = new Set<string>()
   /** Функции-значения свойств объектов и присваиваний obj.имя = функция. */
   const propertyFns: { name: string; fn: FnInfo }[] = []
+  const namespaceMembers = new Map<A.Expr, VarInfo>()
+  /** Область видимости каждого модуля (для импортов и ns.имя). */
+  const moduleScopes = new Map<ModuleUnit, Scope>()
   let nextVarId = 1
   /** Счётчик моментов обхода: инициализации переменных и создания замыканий в порядке исполнения. */
   let gen = 0
@@ -407,8 +432,41 @@ export function analyze(program: A.Program): Analysis {
     walkBlock(stmt.kind === "Block" ? stmt.body : [stmt], new Scope(scope.fn, scope))
   }
 
+  /** Переменная, которую модуль экспортирует под именем name (undefined — нет такого значения). */
+  function exportedVar(unit: ModuleUnit, name: string): VarInfo | undefined {
+    const target = unit.exports.get(name)
+    if (target === undefined || !target.value) return undefined
+    return moduleScopes.get(target.unit)?.vars.get(target.local)
+  }
+
+  /** Пространство имён, если выражение — имя из import * as. */
+  function namespaceOf(expr: A.Expr, scope: Scope): ModuleUnit | undefined {
+    if (expr.kind !== "Identifier") return undefined
+    const found = scope.lookupEntry(expr.name)
+    return found !== undefined && isNamespace(found.entry) ? found.entry.namespace : undefined
+  }
+
+  /** ns.имя: переменная модуля (узел позже станет обычным именем — rewriteNamespaceMembers). */
+  function namespaceMember(expr: A.Expr, unit: ModuleUnit, scope: Scope): VarInfo | undefined {
+    const member = expr as Extract<A.Expr, { kind: "Member" }>
+    const info = exportedVar(unit, member.property)
+    if (info === undefined) {
+      report("no-export", [member.property, unit.name], expr)
+      return undefined
+    }
+    use(info, scope.fn)
+    resolutions.set(expr, { var: info })
+    namespaceMembers.set(expr, info)
+    return info
+  }
+
   function resolveName(node: object, name: string, scope: Scope, at: A.Loc): Resolution | undefined {
-    const info = scope.lookup(name)
+    const found = scope.lookupEntry(name)
+    if (found !== undefined && isNamespace(found.entry)) {
+      report("namespace-as-value", [name], at)
+      return undefined
+    }
+    const info = found?.entry as VarInfo | undefined
     if (info !== undefined) {
       use(info, scope.fn)
       const resolution = { var: info }
@@ -432,6 +490,10 @@ export function analyze(program: A.Program): Analysis {
 
   function walkAssignTarget(target: A.Pattern | A.Expr, scope: Scope): void {
     if (target.kind === "IdentifierPattern" || target.kind === "Identifier") {
+      if (scope.lookupEntry(target.name)?.imported) {
+        report("assign-to-import", [target.name], target)
+        return
+      }
       const resolution = resolveName(target, target.name, scope, target)
       if (resolution !== undefined && "var" in resolution) markAssigned(resolution.var, target)
       else if (resolution !== undefined) report("assign-to-builtin", [target.name], target)
@@ -452,6 +514,10 @@ export function analyze(program: A.Program): Analysis {
       }
       if (target.rest !== undefined) walkAssignTarget(target.rest, scope)
     } else {
+      if (target.kind === "Member" && namespaceOf(target.object, scope) !== undefined) {
+        report("assign-to-import", [`${(target.object as Extract<A.Expr, { kind: "Identifier" }>).name}.${target.property}`], target)
+        return
+      }
       if (target.kind === "Member") assignedProperties.add(target.property)
       if (target.kind === "Index" && target.index.kind === "String") assignedProperties.add(target.index.value)
       walkExpr(target as A.Expr, scope)
@@ -512,6 +578,14 @@ export function analyze(program: A.Program): Analysis {
     }
     if (callee.kind === "Member") {
       const object = callee.object
+      const namespace = namespaceOf(object, scope)
+      if (namespace !== undefined) {
+        // ns.f(…) — как вызов импортированной функции по имени.
+        const info = namespaceMember(callee, namespace, scope)
+        if (info?.fn !== undefined && !info.assigned) fn.directCallees.push(info.fn)
+        else fn.callsUnknown = true
+        return
+      }
       if (object.kind === "Identifier") {
         const resolution = resolveName(object, object.name, scope, object)
         if (resolution !== undefined && "builtin" in resolution) {
@@ -619,9 +693,12 @@ export function analyze(program: A.Program): Analysis {
         }
         return
       }
-      case "Member":
-        walkExpr(expr.object, scope)
+      case "Member": {
+        const namespace = namespaceOf(expr.object, scope)
+        if (namespace !== undefined) namespaceMember(expr, namespace, scope)
+        else walkExpr(expr.object, scope)
         return
+      }
       case "Index":
         walkExpr(expr.object, scope)
         walkExpr(expr.index, scope)
@@ -696,7 +773,14 @@ export function analyze(program: A.Program): Analysis {
   function walkClass(info: ClassInfo, scope: Scope): void {
     const node = info.node
     if (node.superClass !== undefined) {
-      if (node.superClass.kind === "Identifier") {
+      const namespace = node.superClass.kind === "Member" ? namespaceOf(node.superClass.object, scope) : undefined
+      if (namespace !== undefined) {
+        // extends ns.Класс
+        const parent = namespaceMember(node.superClass, namespace, scope)
+        info.superClass = parent === undefined ? undefined : { var: parent }
+        info.superInfo = parent?.cls
+        if (parent !== undefined && (info.superInfo === undefined || parent.assigned)) report("unsupported", ["dynamic-extends"], node.superClass)
+      } else if (node.superClass.kind === "Identifier") {
         const resolution = resolveName(node.superClass, node.superClass.name, scope, node.superClass)
         info.superClass = resolution
         if (resolution !== undefined && "var" in resolution) {
@@ -733,7 +817,22 @@ export function analyze(program: A.Program): Analysis {
   // ---------- Обход программы ----------
 
   const main = newFn("main", "main", undefined)
-  walkBlock(program.body, new Scope(main))
+  if (units === undefined) walkBlock(program.body, new Scope(main))
+  else {
+    for (const unit of units) {
+      const scope = new Scope(main)
+      scope.imports = new Map()
+      for (const [local, binding] of unit.imports) {
+        // Типы (interface, type) — дело проверки типов; import type — тоже не значение.
+        if (!binding.target.value || binding.typeOnly) continue
+        const info = moduleScopes.get(binding.target.unit)?.vars.get(binding.target.local)
+        if (info !== undefined) scope.imports.set(local, info)
+      }
+      for (const [local, namespace] of unit.namespaces) scope.imports.set(local, { namespace })
+      moduleScopes.set(unit, scope)
+      walkBlock(unit.program.body, scope)
+    }
+  }
 
   for (const info of classes) {
     if (info.superInfo !== undefined) info.ctor.directCallees.push(info.superInfo.ctor)
@@ -749,7 +848,32 @@ export function analyze(program: A.Program): Analysis {
   const resumableMethodNames = classify(functions, classes, propertyFns)
   for (const fn of functions) for (const v of fn.vars) v.cell = v.captured && (v.assigned || v.unsafeCapture)
   main.resumable = true
-  return { main, functions, classes, resolutions, fnOf, classOf, resumableMethodNames, memberFunctionNames, declOf, assignedProperties, diagnostics }
+  return {
+    main,
+    functions,
+    classes,
+    resolutions,
+    fnOf,
+    classOf,
+    resumableMethodNames,
+    memberFunctionNames,
+    declOf,
+    assignedProperties,
+    namespaceMembers,
+    diagnostics,
+  }
+}
+
+/**
+ * ns.имя → имя переменной модуля: генератор кода видит обычное имя (разрешение узла уже указывает
+ * на переменную). Вызывается после проверки типов: ей нужен исходный вид ns.имя.
+ */
+export function rewriteNamespaceMembers(analysis: Analysis): void {
+  for (const [node, info] of analysis.namespaceMembers) {
+    const rewritten = node as unknown as { kind: string; name: string }
+    rewritten.kind = "Identifier"
+    rewritten.name = info.name
+  }
 }
 
 /** Возобновляемость: исходные признаки, затем распространение по вызовам до неподвижной точки. */

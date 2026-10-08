@@ -40,6 +40,8 @@ export interface Diagnostic {
   params: (string | number)[]
   line: number
   column: number
+  /** Модуль, в котором ошибка (имя программы), если не в самой программе. */
+  module?: string
 }
 
 export const KEYWORDS = new Set([
@@ -122,12 +124,13 @@ export interface LexResult {
   diagnostics: Diagnostic[]
 }
 
-export function tokenize(source: string): LexResult {
+/** lineBase — сдвиг номеров строк: так строки модуля программы кодируют его номер (src/lang/modules.ts). */
+export function tokenize(source: string, lineBase = 0): LexResult {
   const tokens: Token[] = []
   const diagnostics: Diagnostic[] = []
   const length = source.length
   let i = 0
-  let line = 1
+  let line = 1 + lineBase
   let column = 1
   let newlineBefore = false
   /** Стек скобок: "{" — обычная, "${" — подстановка в шаблоне (её "}" продолжает шаблон). */

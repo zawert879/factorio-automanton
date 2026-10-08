@@ -40,6 +40,10 @@ defineHostObject("console")
 hostMethods.console.log = (_o: Val, _k: Val, ...args: Val[]) => printArgs(...args)
 
 export interface RunOptions {
+  /** Другие программы команды (полное имя → исходник) — для import. */
+  modules?: Record<string, string>
+  /** Полное имя самой программы (от него считаются пути импорта). */
+  name?: string
   quantum?: number
   maxTicks?: number
   /** Копировать состояние машины на каждой паузе (как сохранение и загрузка игры). */
@@ -74,7 +78,11 @@ function copyMachine(machine: Machine): Machine {
 
 export function run(source: string, options: RunOptions = {}): RunResult {
   output = []
-  const compiled = compile(source)
+  const modules = options.modules ?? {}
+  const compiled = compile(source, {
+    name: options.name ?? "main",
+    resolve: (name) => (modules[name] === undefined ? undefined : { name, source: modules[name] }),
+  })
   if (!compiled.ok) {
     const error = compiled.diagnostics.map((d) => `${d.code}(${d.params.join(",")})@${d.line}`).join("; ")
     return { output, status: "compile-error", error, ticks: 0 }
