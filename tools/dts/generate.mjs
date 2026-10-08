@@ -35,6 +35,8 @@ const tsconfig = JSON.stringify(
   {
     // module / moduleResolution: import "../lib/Помощники" находит соседний файл без расширения (этап 17).
     compilerOptions: { strict: true, target: "es2020", lib: ["es2020"], noEmit: true, moduleDetection: "force", module: "preserve", moduleResolution: "bundler", types: [] },
+    // Программы — в src (рядом — служебные файлы); старые файлы в корне папки не мешают.
+    include: ["automaton.d.ts", "src"],
   },
   null,
   2,

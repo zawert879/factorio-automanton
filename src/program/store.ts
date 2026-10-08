@@ -141,6 +141,13 @@ export function onProgramPublished(listener: (this: void, program: ProgramRecord
   publishedListeners.push(listener)
 }
 
+const renamedListeners: Array<(this: void, program: ProgramRecord, oldName: string) => void> = []
+
+/** Программу переименовали (новое имя уже у записи; новая версия уже опубликована). */
+export function onProgramRenamed(listener: (this: void, program: ProgramRecord, oldName: string) => void): void {
+  renamedListeners.push(listener)
+}
+
 /** Программу удалили или отправили в карантин (машины с ней останавливаются). */
 export function onProgramRemoved(listener: (this: void, program: ProgramRecord) => void): void {
   removedListeners.push(listener)
@@ -277,6 +284,7 @@ export function publish(request: PublishRequest): PublishResult {
   }
   program.name = name
   applyBuild(program, compiled, source, request.author)
+  if (oldName !== undefined) for (const listener of renamedListeners) listener(program, oldName)
   const { rebuilt, stale } = rebuildDependents(program, oldName, request.author)
   return { ok: true, program, rebuilt, stale }
 }
@@ -297,10 +305,17 @@ export function deleteProgram(id: number): { ok: true } | { ok: false; usedBy: s
   return { ok: true }
 }
 
-/** Может ли игрок публиковать (настройка карты «кто может публиковать», частота). */
-export function publishDenied(player: LuaPlayer): string | undefined {
+/** Может ли игрок менять программы команды (настройка карты «кто может публиковать»). */
+export function rightsDenied(player: LuaPlayer): string | undefined {
   const rights = settings.global["automaton-publish-rights"]?.value as string | undefined
   if (rights === "admins" && game.is_multiplayer() && !player.admin) return "publish-admins-only"
+  return undefined
+}
+
+/** Может ли игрок публиковать (права и частота). */
+export function publishDenied(player: LuaPlayer): string | undefined {
+  const denied = rightsDenied(player)
+  if (denied !== undefined) return denied
   const last = storage.programs.lastPublish[player.index]
   if (last !== undefined && game.tick - last < PUBLISH_INTERVAL_TICKS) return "publish-too-often"
   return undefined

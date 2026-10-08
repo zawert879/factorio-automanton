@@ -7,15 +7,32 @@
 // - RCON (выделенный сервер): команда /automaton-sync <json>, ответ — rcon.print.
 // Большая программа передаётся частями с номерами (повтор потерянного пакета не задваивает текст). Части
 // копятся в storage: запросы исполняют все участники, и подключившийся посреди передачи получит тот же текст.
-// Каждая опубликованная программа выгружается в script-output/automaton/<карта>/<команда>/<имя>.ts (только на
-// сервере); папки в имени программы (этап 17) — подпапки. У каждой карты своя папка: имя карты — по номеру
+// Папка src — зеркало программ команды в обе стороны:
+// - игра → файлы: опубликованная программа выгружается в script-output/automaton/<карта>/<команда>/src/<имя>.ts
+//   у каждого участника (у каждого своя папка для VS Code); удалённая — удаляется, переименованная — переезжает
+//   (импорты зависимых игра правит сама, их файлы переписываются вместе с новыми версиями);
+// - файлы → игра: утилита публикует сохранённый файл, удалённый — удаляет (delete), перенесённый — переименовывает
+//   (rename). Изменения, которые сделала сама игра, утилита видит как свои — игра отвечает «уже так».
+// Папки в имени программы (этап 17) — подпапки; служебные файлы (типы, tsconfig, утилита) — рядом с src. У каждой карты своя папка: имя карты — по номеру
 // (seed), запоминается в сохранении. В папке лежит .automaton-map.json — утилита передаёт имя карты, и игра
 // не принимает файлы из папки другой карты.
 import { CustomCommandData, LuaPlayer, PlayerIndex } from "factorio:runtime"
 import { onEvent, onTick } from "../events"
 import { Diagnostic } from "../lang/lexer"
 import { DTS, SYNC_TOOL, TSCONFIG } from "../gui/dts.generated"
-import { findProgram, notePublish, onProgramPublished, programsOf, publish, publishDenied } from "./store"
+import {
+  deleteProgram,
+  findProgram,
+  notePublish,
+  onProgramPublished,
+  onProgramRemoved,
+  onProgramRenamed,
+  programsOf,
+  publish,
+  publishDenied,
+  PublishResult,
+  rightsDenied,
+} from "./store"
 
 /** Задача VS Code: при открытии папки следить за ней и публиковать сохранённые программы (ошибки — в коде). */
 // (JSON.stringify в Lua Factorio нет — готовая строка.)
@@ -67,8 +84,10 @@ const README = `Папка программ автоматонов для VS Cod
 1. Откройте эту папку в VS Code (Файл → Открыть папку) и разрешите автоматическую задачу
    «Automaton: публиковать при сохранении» (нужен Node.js 18+).
 2. Запускайте игру с параметром «--enable-lua-udp 27155» (Steam: Factorio → Свойства → Параметры запуска).
-3. Сохранили файл .ts — программа опубликована в игре; ошибки подчёркнуты в коде.
-   Имя программы — путь файла без .ts: lib/Помощники.ts — программа «lib/Помощники».
+3. Программы лежат в папке src. Сохранили файл .ts — программа опубликована в игре; ошибки подчёркнуты
+   в коде. Удалили файл — программа удалена и в игре; переименовали или перенесли — переименована (импорты
+   в других программах поправятся). Имя программы — путь файла в src без .ts: src/lib/Помощники.ts —
+   программа «lib/Помощники».
    Импорт между программами — как между файлами: import { nearMarker } from "../lib/Помощники".
    Новые программы из игры: «node automaton-sync.mjs pull».
 Выделенный сервер: RCON — «node automaton-sync.mjs watch . --rcon --port … --password …».
@@ -87,6 +106,8 @@ export interface SyncBuffer {
 interface Request {
   id?: number
   cmd?: string
+  /** rename: новое имя программы (старое — name). */
+  to?: string
   /** Имя карты из .automaton-map.json папки: файлы другой карты не принимаются. */
   map?: string
   name?: string
@@ -132,6 +153,15 @@ export function programPath(name: string): string {
   return `${name.split("/").map((part) => fileName(part)).join("/")}.ts`
 }
 
+/** Ответ на публикацию: версия, пересобранные зависимые и те, что не собрались (их ошибки — в их файлах). */
+function publishReply(result: PublishResult, force: string): Record<string, unknown> {
+  if (!result.ok) return { ok: false, errors: diagnosticsJson(result.diagnostics) }
+  // Тот же текст — новой версии нет (например, файл записала сама игра).
+  if (result.rebuilt === undefined) return { ok: true, version: result.program.version, unchanged: true }
+  const stale = (result.stale ?? []).map((name) => ({ name, errors: diagnosticsJson(findProgram(name, force)?.stale?.diagnostics ?? []) }))
+  return { ok: true, version: result.program.version, rebuilt: result.rebuilt, stale }
+}
+
 function diagnosticsJson(diagnostics: Diagnostic[]): unknown[] {
   return diagnostics.map((d) => ({ line: d.line, column: d.column, code: d.code, params: d.params.map((p) => tostring(p)), module: d.module }))
 }
@@ -145,6 +175,11 @@ function handle(request: Request, sender: string, player: LuaPlayer | undefined)
   }
   if (player !== undefined && (request.cmd === "begin" || request.cmd === "end")) {
     const denied = publishDenied(player)
+    if (denied !== undefined) return { ok: false, errors: [{ line: 0, column: 0, code: denied, params: [] }] }
+  }
+  if (player !== undefined && (request.cmd === "delete" || request.cmd === "rename")) {
+    // Удаление и переименование — без ограничения частоты (файлы удаляют пачками), но по правам.
+    const denied = rightsDenied(player)
     if (denied !== undefined) return { ok: false, errors: [{ line: 0, column: 0, code: denied, params: [] }] }
   }
   switch (request.cmd) {
@@ -169,11 +204,23 @@ function handle(request: Request, sender: string, player: LuaPlayer | undefined)
       }
       buffers()[sender] = undefined
       if (player !== undefined) notePublish(player)
-      const result = publish({ name: buffer.name, source: parts.join(""), force: buffer.force, author: player?.name ?? "VS Code" })
-      if (!result.ok) return { ok: false, errors: diagnosticsJson(result.diagnostics) }
-      // Зависимые программы: пересобраны или не собрались (их ошибки утилита покажет в их файлах).
-      const stale = (result.stale ?? []).map((name) => ({ name, errors: diagnosticsJson(findProgram(name, buffer.force)?.stale?.diagnostics ?? []) }))
-      return { ok: true, version: result.program.version, rebuilt: result.rebuilt, stale }
+      return publishReply(publish({ name: buffer.name, source: parts.join(""), force: buffer.force, author: player?.name ?? "VS Code" }), buffer.force)
+    }
+    case "delete": {
+      // Файл удалён: программы нет — уже удалена; используемую библиотеку игра не удаляет.
+      const program = typeof request.name === "string" ? findProgram(request.name, force) : undefined
+      // Нет — уже удалена (например, в игре: файл удалила сама игра) — тихо.
+      if (program === undefined) return { ok: true, already: true }
+      const deleted = deleteProgram(program.id)
+      return deleted.ok ? { ok: true } : { ok: false, error: "in-use", usedBy: deleted.usedBy }
+    }
+    case "rename": {
+      // Файл переименован или перенесён: та же программа под новым именем (импорты зависимых правятся).
+      const program = typeof request.name === "string" ? findProgram(request.name, force) : undefined
+      if (typeof request.to !== "string") return { ok: false, error: "bad request" }
+      // Уже переименована (в игре: файлы перенесла сама игра) — тихо.
+      if (program === undefined) return findProgram(request.to, force) !== undefined ? { ok: true, already: true } : { ok: false, error: "no program" }
+      return publishReply(publish({ id: program.id, name: request.to, source: program.source, force, author: player?.name ?? "VS Code" }), force)
     }
     case "list":
       return { ok: true, programs: programsOf(force).map((p) => ({ name: p.name, version: p.version })) }
@@ -228,7 +275,7 @@ export function writeVsCodeFolder(player: LuaPlayer): string {
   write(".vscode/tasks.json", TASKS)
   write("README.txt", README)
   write(".automaton-map.json", helpers.table_to_json({ map: mapName(), force: player.force.name }))
-  for (const program of programsOf(player.force.name)) write(programPath(program.name), program.source)
+  for (const program of programsOf(player.force.name)) write(`src/${programPath(program.name)}`, program.source)
   return dir
 }
 
@@ -251,8 +298,15 @@ export function registerSync(): void {
     const text = reply(request, request === undefined ? { ok: false, error: "bad request" } : handle(request, sender, player))
     helpers.send_udp(e.source_port, text, e.player_index)
   })
-  // Выгрузка опубликованных программ — только на сервере (в одиночной игре — у игрока).
+  // Зеркало программ в папке VS Code — у каждого участника (без for_player — на всех экземплярах игры).
   onProgramPublished((program) => {
-    helpers.write_file(`${syncFolder(program.force)}/${programPath(program.name)}`, program.source, false, 0)
+    helpers.write_file(`${syncFolder(program.force)}/src/${programPath(program.name)}`, program.source, false)
+  })
+  onProgramRenamed((program, oldName) => {
+    helpers.remove_path(`${syncFolder(program.force)}/src/${programPath(oldName)}`)
+  })
+  onProgramRemoved((program) => {
+    // Удалена (а не в карантине): записи больше нет.
+    if (storage.programs.byId[program.id] === undefined) helpers.remove_path(`${syncFolder(program.force)}/src/${programPath(program.name)}`)
   })
 }

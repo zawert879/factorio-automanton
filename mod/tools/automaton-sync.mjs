@@ -1,12 +1,16 @@
 #!/usr/bin/env node
 // Automaton: синхронизация программ между VS Code и игрой (через RCON). Нужен Node.js 18+, зависимостей нет.
 //
-//   node automaton-sync.mjs [watch] [папка]   — следить за папкой: сохранили файл .ts — программа опубликована
+//   node automaton-sync.mjs [watch] [папка]   — следить за папкой: сохранили файл .ts — программа опубликована,
+//                                               удалили — удалена, переименовали или перенесли — переименована
+//                                               (обратно игра сама: удалили или переименовали в игре — файл тоже)
 //   node automaton-sync.mjs push файл.ts…     — опубликовать файлы один раз
+//   node automaton-sync.mjs delete файл.ts…   — удалить программы этих файлов в игре
 //   node automaton-sync.mjs pull [папка]      — скачать программы команды из игры в папку
 //
-// Имя программы — путь файла от папки программ без .ts, папки через «/»: lib/Помощники.ts → «lib/Помощники»
-// (или первая строка «// @program Имя»). Импорт между программами — как между файлами: "../lib/Помощники".
+// Программы лежат в папке src (рядом — служебные файлы). Имя программы — путь файла в src без .ts, папки
+// через «/»: src/lib/Помощники.ts → «lib/Помощники» (или первая строка «// @program Имя»). Импорт между
+// программами — как между файлами: "../lib/Помощники". В старой папке без src программы — прямо в ней.
 // Связь с игрой:
 //   UDP (по умолчанию; игра с окном — одиночная или по сети): параметр запуска игры «--enable-lua-udp 27155»
 //     (в Steam: Свойства → Параметры запуска); утилита: --udp 27155 (по умолчанию);
@@ -33,8 +37,8 @@ for (let i = 0; i < argv.length; i++) {
   else if (argv[i].startsWith("--")) options[argv[i].slice(2)] = argv[++i]
   else positional.push(argv[i])
 }
-const mode = ["watch", "push", "pull"].includes(positional[0]) ? positional.shift() : "watch"
-const folder = resolve(mode === "push" ? "." : (positional[0] ?? "."))
+const mode = ["watch", "push", "pull", "delete"].includes(positional[0]) ? positional.shift() : "watch"
+const folder = resolve(mode === "push" || mode === "delete" ? "." : (positional[0] ?? "."))
 const configFile = join(folder, ".automaton-sync.json")
 const config = existsSync(configFile) ? JSON.parse(readFileSync(configFile, "utf8")) : {}
 const useRcon = options.rcon === true || config.rcon === true
@@ -207,9 +211,9 @@ class Udp {
 
 // ---------- Публикация и загрузка ----------
 
-/** Корень папки программ: в watch и pull — папка; у push — ближайшая выше с tsconfig.json или automaton.d.ts. */
+/** Корень папки: в watch и pull — папка; у push и delete — ближайшая выше с tsconfig.json или automaton.d.ts. */
 function rootOf(file) {
-  if (mode !== "push") return folder
+  if (mode !== "push" && mode !== "delete") return folder
   let dir = dirname(file)
   for (;;) {
     if (["tsconfig.json", "automaton.d.ts", ".automaton-sync.json"].some((f) => existsSync(join(dir, f)))) return dir
@@ -219,15 +223,26 @@ function rootOf(file) {
   }
 }
 
+/** Где лежат программы: папка src, а в старой папке без src — сама папка. */
+function programsDir(root) {
+  const src = join(root, "src")
+  return existsSync(src) ? src : root
+}
+
 function programName(file, source) {
   const marker = /^\/\/\s*@program\s+(.+)$/m.exec(source.split("\n")[0] ?? "")
   if (marker) return marker[1].trim()
-  return relative(rootOf(file), file).split(sep).join("/").replace(/\.ts$/, "")
+  return relative(programsDir(rootOf(file)), file).split(sep).join("/").replace(/\.ts$/, "")
 }
 
 /** Файл программы по имени: папки — подпапки, запрещённые в путях символы — «_». */
 function fileOf(root, name) {
-  return join(root, ...name.split("/").map((part) => part.replace(/[\\:*?"<>|]/g, "_"))) + ".ts"
+  return join(programsDir(root), ...name.split("/").map((part) => part.replace(/[\\:*?"<>|]/g, "_"))) + ".ts"
+}
+
+/** Текст без путей импорта: перенос файла в другую папку меняет пути, но это та же программа. */
+function withoutImportPaths(source) {
+  return source.replace(/\b(from|import)(\s*)(["'])[^"']*\3/g, "$1$2$3$3")
 }
 
 /** Имя карты папки (из .automaton-map.json, его пишет «Папка для VS Code»); нет файла — без проверки. */
@@ -285,7 +300,8 @@ async function push(link, file, force = false) {
   const root = rootOf(file)
   if (result.ok) {
     synced.set(file, source)
-    console.log(`automaton: «${name}» опубликована, v${result.version}`)
+    // Тот же текст уже в игре (файл записала сама игра) — молча.
+    if (!result.unchanged) console.log(`automaton: «${name}» опубликована, v${result.version}`)
     if (list(result.rebuilt).length > 0) console.log(`automaton: пересобраны: ${result.rebuilt.join(", ")}`)
     // Зависимые, которые с новой версией не собрались, — ошибки в их файлах (в игре работает прежняя сборка).
     for (const stale of list(result.stale)) {
@@ -295,6 +311,46 @@ async function push(link, file, force = false) {
   }
   for (const error of result.errors ?? [{ line: 1, column: 1, code: result.error ?? "error" }]) printError(root, file, error)
   return false
+}
+
+/** Удалить программу файла в игре (файл удалён). Используемую библиотеку игра не удаляет. */
+async function remove(link, file, source) {
+  const root = rootOf(file)
+  const name = programName(file, source ?? "")
+  const reply = await link.request({ cmd: "delete", name, map: mapOf(root) })
+  if (reply.ok) {
+    synced.delete(file)
+    // already — программу уже удалили в игре (и файл удалила игра).
+    if (!reply.already) console.log(`automaton: «${name}» удалена`)
+    return true
+  }
+  if (wrongMap(reply)) console.log(`${file}:1:1: error: ${wrongMap(reply)}`)
+  else if (reply.error === "in-use") {
+    // Файла уже нет — ошибки показываем в тех, кто импортирует: программа в игре осталась.
+    for (const user of list(reply.usedBy)) {
+      console.log(`${fileOf(root, user)}:1:1: error: импортирует «${name}», файл которой удалён: в игре она осталась — уберите импорт или верните файл`)
+    }
+  } else for (const error of list(reply.errors)) printError(root, file, error)
+  return false
+}
+
+/** Переименовать программу (файл перенесли или переименовали): импорты зависимых игра поправит сама. */
+async function rename(link, from, to, source) {
+  const root = rootOf(to)
+  const oldName = programName(from, source)
+  const newName = programName(to, source)
+  if (oldName === newName) return true
+  const reply = await link.request({ cmd: "rename", name: oldName, to: newName, map: mapOf(root) })
+  if (!reply.ok) {
+    if (wrongMap(reply)) console.log(`${to}:1:1: error: ${wrongMap(reply)}`)
+    else for (const error of reply.errors ?? [{ line: 1, column: 1, code: reply.error ?? "error" }]) printError(root, to, error)
+    return false
+  }
+  synced.delete(from)
+  if (reply.already) return true
+  console.log(`automaton: «${oldName}» → «${newName}»`)
+  if (list(reply.rebuilt).length > 0) console.log(`automaton: пересобраны: ${reply.rebuilt.join(", ")}`)
+  return true
 }
 
 async function pull(link) {
@@ -310,6 +366,8 @@ async function pull(link) {
       text += part.text
       from = part.next
     }
+    // Новая папка — сразу с src.
+    mkdirSync(join(folder, "src"), { recursive: true })
     const file = fileOf(folder, program.name)
     mkdirSync(dirname(file), { recursive: true })
     synced.set(file, text)
@@ -328,36 +386,75 @@ async function main() {
     rcon.close()
     return
   }
-  if (mode === "push") {
+  if (mode === "push" || mode === "delete") {
     let ok = true
-    for (const file of positional) ok = (await push(rcon, resolve(file), true)) && ok
+    for (const file of positional) {
+      const path = resolve(file)
+      ok = (mode === "push" ? await push(rcon, path, true) : await remove(rcon, path, existsSync(path) ? readFileSync(path, "utf8") : undefined)) && ok
+    }
     rcon.close()
     process.exitCode = ok ? 0 : 1
     return
   }
   // watch: начало и конец каждой публикации отмечены — по ним VS Code обновляет список ошибок.
   // Файлы, которые уже лежат в папке (и подпапках), считаются синхронными (иначе запуск опубликовал бы все разом).
-  for (const file of programFiles(folder)) synced.set(file, readFileSync(file, "utf8").replace(/\r\n/g, "\n"))
-  console.log(`automaton: слежу за ${folder} (Ctrl+C — выход)`)
+  const programs = programsDir(folder)
+  for (const file of programFiles(programs)) synced.set(file, readFileSync(file, "utf8").replace(/\r\n/g, "\n"))
+  console.log(`automaton: слежу за ${programs} (Ctrl+C — выход)`)
   const timers = new Map()
+  /** Удалённые файлы ждут немного: если появится такой же файл в другом месте — это перенос, а не удаление. */
+  const pendingDeletes = new Map()
   let queue = Promise.resolve()
+  const run = (job) => {
+    queue = queue.then(async () => {
+      console.log("automaton: публикация начата")
+      try {
+        await job()
+      } catch (error) {
+        console.log(`automaton: ${error.message}`)
+      }
+      console.log("automaton: публикация закончена")
+    })
+  }
+  /** Файл исчез, а его текст (без путей импорта) совпадает с новым — перенос. */
+  const movedFrom = (source) => {
+    const key = withoutImportPaths(source)
+    for (const [old, pending] of pendingDeletes) if (withoutImportPaths(pending.source) === key) return old
+    for (const [old, text] of synced) if (!existsSync(old) && withoutImportPaths(text) === key) return old
+    return undefined
+  }
   const onChange = (_event, file) => {
     if (file === null || !file.endsWith(".ts") || file.endsWith(".d.ts") || file.split(/[\\/]/).some((part) => part.startsWith(".") || part === "node_modules")) return
-    clearTimeout(timers.get(file))
+    const path = join(folder, file)
+    if (programs !== folder && !path.startsWith(programs + sep)) return
+    clearTimeout(timers.get(path))
     timers.set(
-      file,
+      path,
       setTimeout(() => {
-        const path = join(folder, file)
-        if (!existsSync(path)) return
-        queue = queue.then(async () => {
-          console.log("automaton: публикация начата")
-          try {
-            await push(rcon, path)
-          } catch (error) {
-            console.log(`automaton: ${error.message}`)
+        if (existsSync(path)) {
+          const source = readFileSync(path, "utf8").replace(/\r\n/g, "\n")
+          const from = synced.has(path) ? undefined : movedFrom(source)
+          if (from !== undefined) {
+            const pending = pendingDeletes.get(from)
+            if (pending !== undefined) clearTimeout(pending.timer)
+            pendingDeletes.delete(from)
+            const oldSource = pending?.source ?? synced.get(from)
+            run(async () => {
+              if (await rename(rcon, from, path, oldSource)) await push(rcon, path)
+            })
+            return
           }
-          console.log("automaton: публикация закончена")
-        })
+          run(() => push(rcon, path))
+        } else if (synced.has(path)) {
+          const source = synced.get(path)
+          pendingDeletes.set(path, {
+            source,
+            timer: setTimeout(() => {
+              pendingDeletes.delete(path)
+              if (!existsSync(path) && synced.has(path)) run(() => remove(rcon, path, source))
+            }, 1000),
+          })
+        }
       }, 300),
     )
   }

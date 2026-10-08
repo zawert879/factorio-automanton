@@ -3,7 +3,7 @@
 //    в формате для VS Code, pull (тот же текст), выгрузка в script-output.
 // 2) Игра с окном (одиночная, на несколько секунд) с --enable-lua-udp: публикация и pull по UDP.
 import { spawn, spawnSync } from "node:child_process"
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs"
 import { createConnection } from "node:net"
 import { join } from "node:path"
 import { buildMod, createMap, prepareWork, root, scriptError } from "./factorio.mjs"
@@ -85,7 +85,7 @@ if (!pushOut.includes(`${join(programs, "Ошибка.ts")}:2:11: error: «==» 
 if (push.status !== 1) fail(`код выхода с ошибкой компиляции — ${push.status}, ожидался 1`)
 
 const pull = spawnSync("node", [tool, "pull", pulled, ...rconArgs], { encoding: "utf8" })
-const pulledFile = join(pulled, "Привет.ts")
+const pulledFile = join(pulled, "src", "Привет.ts")
 if (!existsSync(pulledFile)) fail(`pull не скачал программу:\n${pull.stdout}${pull.stderr}`)
 if (readFileSync(pulledFile, "utf8") !== longProgram) fail("pull скачал другой текст")
 if (!existsSync(join(pulled, "automaton.d.ts"))) fail("pull не положил automaton.d.ts")
@@ -95,16 +95,16 @@ const maps = existsSync(join(env.data, "script-output", "automaton")) ? readdirS
 if (maps.length !== 1 || !maps[0].startsWith("карта-")) fail(`папка карты: ${maps.join(", ")}`)
 const mapName = maps[0]
 const mapFolder = join(env.data, "script-output", "automaton", mapName, "player")
-const exported = join(mapFolder, "Привет.ts")
+const exported = join(mapFolder, "src", "Привет.ts")
 if (!existsSync(exported) || readFileSync(exported, "utf8") !== longProgram) fail(`нет выгрузки в ${exported}`)
 
-// Модули в папках (этап 17): имя — путь от папки с tsconfig.json; ошибки зависимой — в её файле.
+// Модули в папках (этап 17): программы — в src папки с tsconfig.json, имя — путь в src; ошибки зависимой — в её файле.
 const project = join(env.work, "project")
-mkdirSync(join(project, "lib"), { recursive: true })
-mkdirSync(join(project, "app"), { recursive: true })
+mkdirSync(join(project, "src", "lib"), { recursive: true })
+mkdirSync(join(project, "src", "app"), { recursive: true })
 writeFileSync(join(project, "tsconfig.json"), "{}")
-const libFile = join(project, "lib", "Счёт.ts")
-const appFile = join(project, "app", "Главная.ts")
+const libFile = join(project, "src", "lib", "Счёт.ts")
+const appFile = join(project, "src", "app", "Главная.ts")
 writeFileSync(libFile, "export function twice(x: number): number {\n  return x * 2\n}\n")
 writeFileSync(appFile, 'import { twice } from "../lib/Счёт"\nprint(twice(2))\n')
 const modulesPush = spawnSync("node", [tool, "push", libFile, appFile, ...rconArgs], { encoding: "utf8" })
@@ -116,8 +116,8 @@ const breakOut = breakPush.stdout + breakPush.stderr
 if (!breakOut.includes(`${appFile}:1:10: error: в «lib/Счёт» нет экспорта «twice»`)) fail(`ошибка зависимой — не в её файле:\n${breakOut}`)
 const modulesPulled = join(env.work, "pulled-modules")
 spawnSync("node", [tool, "pull", modulesPulled, ...rconArgs], { encoding: "utf8" })
-if (!existsSync(join(modulesPulled, "lib", "Счёт.ts")) || !existsSync(join(modulesPulled, "app", "Главная.ts"))) fail("pull не разложил программы по папкам")
-if (!existsSync(join(mapFolder, "lib", "Счёт.ts"))) fail("выгрузка не разложила программы по папкам")
+if (!existsSync(join(modulesPulled, "src", "lib", "Счёт.ts")) || !existsSync(join(modulesPulled, "src", "app", "Главная.ts"))) fail("pull не разложил программы по папкам")
+if (!existsSync(join(mapFolder, "src", "lib", "Счёт.ts"))) fail("выгрузка не разложила программы по папкам")
 
 // Папка другой карты: игра ничего не принимает, утилита объясняет, в чём дело.
 writeFileSync(join(project, ".automaton-map.json"), JSON.stringify({ map: "карта-999", force: "player" }))
@@ -125,12 +125,45 @@ const wrongPush = spawnSync("node", [tool, "push", appFile, ...rconArgs], { enco
 const wrongOut = wrongPush.stdout + wrongPush.stderr
 if (!wrongOut.includes(`эта папка — для карты «карта-999», а в игре открыта «${mapName}»`)) fail(`папка другой карты:\n${wrongOut}`)
 writeFileSync(join(project, ".automaton-map.json"), JSON.stringify({ map: mapName, force: "player" }))
+writeFileSync(appFile, 'import { triple } from "../lib/Счёт"\nprint(triple(2))\n')
 const rightPush = spawnSync("node", [tool, "push", appFile, ...rconArgs], { encoding: "utf8" })
 if (!(rightPush.stdout + rightPush.stderr).includes("«app/Главная» опубликована")) fail(`папка своей карты:\n${rightPush.stdout}${rightPush.stderr}`)
 
+// Зеркало в обе стороны: утилита следит за src — перенос файла переименовывает программу, удаление удаляет;
+// а игра повторяет это в своей выгрузке (так же, как при удалении и переименовании в окне программ).
+async function waitFor(check, what, ms = 30000) {
+  const started = Date.now()
+  while (!check()) {
+    if (Date.now() - started > ms) fail(`не дождались: ${what}\n${watchOut}`)
+    await new Promise((r) => setTimeout(r, 200))
+  }
+}
+const watcher = spawn("node", [tool, "watch", project, ...rconArgs], { stdio: ["ignore", "pipe", "pipe"] })
+let watchOut = ""
+watcher.stdout.on("data", (chunk) => (watchOut += chunk))
+watcher.stderr.on("data", (chunk) => (watchOut += chunk))
+await waitFor(() => watchOut.includes("слежу"), "старта слежения")
+const exportedOf = (...parts) => join(mapFolder, "src", ...parts)
+mkdirSync(join(project, "src", "common"), { recursive: true })
+renameSync(libFile, join(project, "src", "common", "Счёт.ts"))
+await waitFor(() => watchOut.includes("«lib/Счёт» → «common/Счёт»"), "переименования программы")
+await waitFor(() => existsSync(exportedOf("common", "Счёт.ts")) && !existsSync(exportedOf("lib", "Счёт.ts")), "переезда файла в выгрузке")
+await waitFor(() => readFileSync(exportedOf("app", "Главная.ts"), "utf8").includes("../common/Счёт"), "правки импорта у зависимой")
+unlinkSync(join(project, "src", "common", "Счёт.ts"))
+await waitFor(() => watchOut.includes("импортирует «common/Счёт»"), "отказа удалить используемую библиотеку")
+if (!existsSync(exportedOf("common", "Счёт.ts"))) fail("используемая библиотека пропала из выгрузки")
+mkdirSync(join(project, "src", "tmp"), { recursive: true })
+writeFileSync(join(project, "src", "tmp", "Лишняя.ts"), 'print("лишняя")\n')
+await waitFor(() => watchOut.includes("«tmp/Лишняя» опубликована"), "публикации нового файла")
+await waitFor(() => existsSync(exportedOf("tmp", "Лишняя.ts")), "выгрузки нового файла")
+unlinkSync(join(project, "src", "tmp", "Лишняя.ts"))
+await waitFor(() => watchOut.includes("«tmp/Лишняя» удалена"), "удаления программы")
+await waitFor(() => !existsSync(exportedOf("tmp", "Лишняя.ts")), "удаления файла из выгрузки")
+watcher.kill()
+
 // Временную папку не удаляем: сервер ещё дописывает файлы после остановки (её чистит следующий запуск).
 server.kill()
-console.log("RCON (выделенный сервер): публикация частями, ошибки, pull, выгрузка, модули в папках, папка своей карты — ок")
+console.log("RCON (выделенный сервер): публикация частями, ошибки, pull, выгрузка, модули в папках, папка своей карты, зеркало src в обе стороны — ок")
 
 // ---------- UDP: игра с окном ----------
 const gui = prepareWork("automaton-sync-udp", "automaton-sync-udp")
@@ -153,7 +186,7 @@ while (!udpOut.includes("«Привет» опубликована, v1")) {
 }
 const udpPull = spawnSync("node", [tool, "pull", udpPulled, ...udpArgs], { encoding: "utf8" })
 game.kill()
-if (!existsSync(join(udpPulled, "Привет.ts")) || readFileSync(join(udpPulled, "Привет.ts"), "utf8") !== longProgram) {
+if (!existsSync(join(udpPulled, "src", "Привет.ts")) || readFileSync(join(udpPulled, "src", "Привет.ts"), "utf8") !== longProgram) {
   fail(`pull по UDP:\n${udpPull.stdout}${udpPull.stderr}`)
 }
 console.log("UDP (игра с окном): публикация и pull — ок")
