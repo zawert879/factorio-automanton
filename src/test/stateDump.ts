@@ -8,7 +8,7 @@ import { startAction } from "../automaton/actions"
 import { moveRobot } from "../automaton/movement"
 import { replacePlacer } from "../automaton/placement"
 import { findRobot, tagFromInventory, tagMinedRobot } from "../automaton/registry"
-import { TECH, WORKER_MK1, WORKER_MK1_PLACER } from "../names"
+import { MODELS, TECH, WORKER_MK1, WORKER_MK1_PLACER } from "../names"
 import { assignProgram } from "../program/machines"
 import { publishProgram } from "../program/store"
 
@@ -123,6 +123,17 @@ const steps: Record<number, () => void> = {
       if (math.abs(worker.position.x - 144.5) < 2 && math.abs(worker.position.y - 40.5) < 2) assignProgram(record, pong.program)
     }
   },
+  // Бой (этап 10): боевая машина патрулирует два поста — команды движку переживают сохранение.
+  97: () => {
+    game.forces.player.technologies[TECH.combat1].researched = true
+    const patrol = publishProgram("патруль", `while (true) patrol([{ x: 150, y: 60 }, { x: 160, y: 70 }], () => false)`)
+    if (!patrol.ok) error("программа патруля не компилируется")
+    const position = nauvis().find_non_colliding_position(MODELS[3].entity, { x: 150, y: 60 }, 20, 0.5)!
+    nauvis().create_entity({ name: MODELS[3].placer, position, force: "player", raise_built: true })
+    const robot = findRobot(nauvis().find_entities_filtered({ name: MODELS[3].entity, position, radius: 0.5 })[0])!
+    robot.weapon!.insert({ name: "firearm-magazine", count: 10 })
+    assignProgram(robot, patrol.program)
+  },
   120: () => workers()[0].die(),
   200: () => {
     const target = workers()[0]
@@ -164,6 +175,11 @@ function stable(value: unknown, seen: LuaSet<object> = new LuaSet()): unknown {
     return `<${object.object_name}>`
   }
   if (type(value) !== "table") return value
+  // Метка паузы Y (src/lang/runtime/core.ts) остаётся во временной переменной кадра ожидания:
+  // до сохранения это одна таблица, после загрузки — копии. На исполнение не влияет (при продолжении
+  // переменная перезаписывается), поэтому в снимке — всегда одинаково.
+  const fields = value as Record<string, unknown>
+  if (fields.pause === true && next(fields, next(fields)[0])[0] === undefined) return "<Y>"
   if (seen.has(value as object)) return "<ссылка>"
   seen.add(value as object)
   const copy: Record<string, unknown> = {}

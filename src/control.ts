@@ -8,6 +8,7 @@ import "./automaton/transfer"
 import "./automaton/fluids"
 import "./automaton/charging"
 import "./automaton/construction"
+import { registerCombat } from "./automaton/combat"
 import { initMovement, registerMovement } from "./automaton/movement"
 import { registerModels } from "./automaton/models"
 import { registerPlacement } from "./automaton/placement"
@@ -61,6 +62,7 @@ script.on_configuration_changed(() => {
 registerDemo()
 registerPlacement()
 registerModels()
+registerCombat()
 registerRegistryEvents()
 registerMovement()
 registerAppearance()

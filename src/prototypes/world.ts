@@ -98,7 +98,7 @@ const signalMarker = deepcopy(data.raw["constant-combinator"]!["constant-combina
 signalMarker.name = SIGNAL_MARKER
 signalMarker.icons = [
   { icon: FLAG, icon_size: 64, tint: ACCENT },
-  { icon: "__base__/graphics/icons/signal/signal-red.png", icon_size: 64, scale: 0.25, shift: [8, 8] },
+  { icon: "__base__/graphics/icons/red-wire.png", icon_size: 64, scale: 0.25, shift: [8, 8] },
 ]
 signalMarker.icon = undefined
 signalMarker.minable = { mining_time: 0.1, result: SIGNAL_MARKER }

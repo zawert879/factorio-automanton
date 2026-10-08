@@ -83,6 +83,9 @@ script.on_nth_tick(1, (event) => {
     nauvis().create_entity({ name: MODELS[1].placer, position: { x: CENTER.x - 7.5, y: CENTER.y - 3 }, force: "player", raise_built: true })
     nauvis().create_entity({ name: MODELS[2].placer, position: { x: CENTER.x - 4.5, y: CENTER.y - 3 }, force: "player", raise_built: true })
     nauvis().create_entity({ name: CHARGING_STATION, position: { x: CENTER.x - 1, y: CENTER.y - 3 }, force: "player" })
+    // Боевые Mk1 и Mk2 (этап 10).
+    nauvis().create_entity({ name: MODELS[3].placer, position: { x: CENTER.x + 2.5, y: CENTER.y - 3 }, force: "player", raise_built: true })
+    nauvis().create_entity({ name: MODELS[4].placer, position: { x: CENTER.x + 5.5, y: CENTER.y - 3 }, force: "player", raise_built: true })
     // Здание: машина за ним (должна закрываться им) и перед ним (должна его закрывать).
     nauvis().create_entity({ name: "assembling-machine-1", position: { x: CENTER.x + 2.5, y: CENTER.y + 4.5 }, force: "player" })
     place({ x: CENTER.x + 2.5, y: CENTER.y + 2.6 })
@@ -95,7 +98,7 @@ script.on_nth_tick(1, (event) => {
   if (tick === 150) shot("a")
   if (tick === 155) shot("building", { x: CENTER.x + 2.5, y: CENTER.y + 4.5 }, 4)
   if (tick === 158) shot("status", { x: CENTER.x + 1, y: CENTER.y + 8 }, 3)
-  if (tick === 159) shot("models", { x: CENTER.x - 6, y: CENTER.y - 3.5 }, 4)
+  if (tick === 159) shot("models", { x: CENTER.x - 2, y: CENTER.y - 3.5 }, 3)
   if (tick === 160) shot("b")
   // Крупно: бегущие на восток (AM-17) и на север (AM-18).
   if (tick === 170) {

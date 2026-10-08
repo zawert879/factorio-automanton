@@ -9,6 +9,7 @@ import "./comms"
 import "./board"
 import "./display"
 import "./signals"
+import "./combat"
 import { registerActionApi } from "./actions"
 import "./research"
 

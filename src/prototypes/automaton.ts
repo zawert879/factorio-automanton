@@ -12,7 +12,19 @@ import {
   SimpleEntityWithOwnerPrototype,
   UnitPrototype,
 } from "factorio:prototype"
-import { ACTIVITIES, Activity, BODY_DIRECTIONS, bodyAnimationName, MODELS, ModelSpec, WORKER_MK1, WORKER_MK2 } from "../names"
+import {
+  ACTIVITIES,
+  Activity,
+  BODY_DIRECTIONS,
+  bodyAnimationName,
+  COMBAT_MK1,
+  COMBAT_MK2,
+  MODELS,
+  ModelSpec,
+  SHOT_EFFECT,
+  WORKER_MK1,
+  WORKER_MK2,
+} from "../names"
 
 declare const data: PrototypeData
 
@@ -113,10 +125,62 @@ const RECIPES: Record<string, RecipePrototype["ingredients"]> = {
     { type: "item", name: "advanced-circuit", amount: 10 },
     { type: "item", name: "steel-plate", amount: 10 },
   ],
+  [COMBAT_MK1]: [
+    { type: "item", name: WORKER_MK1, amount: 1 },
+    { type: "item", name: "submachine-gun", amount: 1 },
+    { type: "item", name: "steel-plate", amount: 10 },
+  ],
+  [COMBAT_MK2]: [
+    { type: "item", name: COMBAT_MK1, amount: 1 },
+    { type: "item", name: "rocket-launcher", amount: 1 },
+    { type: "item", name: "steel-plate", amount: 10 },
+    { type: "item", name: "electronic-circuit", amount: 10 },
+  ],
+}
+
+/**
+ * Атака юнита. Рабочие: ближний бой без урона (юниту атака обязательна, бой не начинается — команды
+ * с distraction = none). Боевые: мгновенное попадание с эффектом скрипта — урон и расход патронов
+ * считает мод по заряженным патронам (src/automaton/combat.ts), сам выстрел урона не наносит.
+ */
+function attackParameters(model: ModelSpec): UnitPrototype["attack_parameters"] {
+  const weapon = model.weapon
+  if (weapon === undefined) {
+    return {
+      type: "projectile",
+      range: 0.5,
+      cooldown: 60,
+      ammo_category: "melee",
+      ammo_type: { action: { type: "direct", action_delivery: { type: "instant" } } },
+      animation: INVISIBLE,
+    }
+  }
+  const hit = weapon.category === "rocket" ? "big-explosion" : "explosion-hit"
+  return {
+    type: "projectile",
+    range: weapon.range,
+    cooldown: weapon.cooldown,
+    ammo_category: weapon.category,
+    ammo_type: {
+      target_type: "entity",
+      action: {
+        type: "direct",
+        action_delivery: {
+          type: "instant",
+          target_effects: [
+            { type: "script", effect_id: SHOT_EFFECT },
+            { type: "create-entity", entity_name: hit },
+          ],
+        },
+      },
+    },
+    sound: [{ filename: weapon.category === "rocket" ? "__base__/sound/fight/rocket-launcher.ogg" : "__base__/sound/fight/submachine-gunshot-1.ogg", volume: 0.4 }],
+    animation: INVISIBLE,
+  }
 }
 
 function modelPrototypes(model: ModelSpec, index: number): object[] {
-  const icons = modelIcons(model, index + 1)
+  const icons = modelIcons(model, model.digit)
   const animations: AnimationPrototype[] = []
   for (const activity of ACTIVITIES) {
     const [source, frameSpeed] = BODY_SOURCES[activity]
@@ -145,19 +209,17 @@ function modelPrototypes(model: ModelSpec, index: number): object[] {
     movement_speed: model.speed,
     distance_per_frame: 1,
     run_animation: INVISIBLE,
-    // Юниту обязательно нужна атака; рабочему она ни к чему — нулевой урон, бой не начинается
-    // (команды отдаются с distraction = none).
-    attack_parameters: {
-      type: "projectile",
-      range: 0.5,
-      cooldown: 60,
-      ammo_category: "melee",
-      ammo_type: { action: { type: "direct", action_delivery: { type: "instant" } } },
-      animation: INVISIBLE,
-    },
-    vision_distance: 10,
+    attack_parameters: attackParameters(model),
+    resistances:
+      model.resistances === undefined
+        ? undefined
+        : [
+            { type: "physical", percent: model.resistances.physical, decrease: 2 },
+            { type: "explosion", percent: model.resistances.explosion },
+          ],
+    vision_distance: model.weapon === undefined ? 10 : model.weapon.range + 5,
     distraction_cooldown: 300,
-    max_pursue_distance: 10,
+    max_pursue_distance: model.weapon === undefined ? 10 : 30,
     ai_settings: { destroy_when_commands_fail: false, allow_try_return_to_spawner: false, do_separation: true },
     has_belt_immunity: true,
     dying_explosion: "explosion",

@@ -12,7 +12,13 @@ function robotAt(x: number, y: number): RobotRecord {
   const surface = game.get_surface("nauvis")!
   surface.request_to_generate_chunks({ x, y }, 1)
   surface.force_generate_chunk_requests()
-  const position = surface.find_non_colliding_position(WORKER_MK1, { x, y }, 20, 0.5)!
+  // Своя чистая площадка: find_non_colliding_position на некоторых картах попадал в воду.
+  const area = { left_top: { x: x - 2, y: y - 2 }, right_bottom: { x: x + 3, y: y + 3 } }
+  for (const e of surface.find_entities_filtered({ area })) if (e.type !== "character") e.destroy()
+  const tiles = []
+  for (let tx = x - 2; tx < x + 3; tx++) for (let ty = y - 2; ty < y + 3; ty++) tiles.push({ name: "grass-1", position: { x: tx, y: ty } })
+  surface.set_tiles(tiles, true, true, true)
+  const position = { x: math.floor(x) + 0.5, y: math.floor(y) + 0.5 }
   surface.create_entity({ name: WORKER_MK1_PLACER, position, force: "player", raise_built: true })
   return findRobot(surface.find_entities_filtered({ name: WORKER_MK1, position, radius: 0.5 })[0])!
 }

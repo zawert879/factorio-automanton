@@ -6,7 +6,7 @@
 // возят машины, а без электричества не работают лаборатории — иначе не исследовать вообще ничего.
 import { PrototypeData } from "factorio:common"
 import { Color, IconData, TechnologyPrototype } from "factorio:prototype"
-import { CHARGING_STATION, DISPLAYS, SIGNAL_MARKER, TECH, UPGRADE_LEVELS, UPGRADES, WORKER_MK2, WORKER_MK3 } from "../names"
+import { CHARGING_STATION, COMBAT_MK1, COMBAT_MK2, DISPLAYS, SIGNAL_MARKER, TECH, UPGRADE_LEVELS, UPGRADES, WORKER_MK2, WORKER_MK3 } from "../names"
 
 declare const data: PrototypeData
 
@@ -87,6 +87,7 @@ const SPECS: Spec[] = [
     prerequisites: ["military-2"],
     count: 100,
     packs: GREEN,
+    unlocks: [COMBAT_MK1],
   },
   // Синяя и дальше.
   { name: TECH.sensors3, overlay: ICON + "night-vision-equipment.png", prerequisites: [TECH.sensors2, "chemical-science-pack"], count: 250, packs: BLUE, upgrade: true },
@@ -101,9 +102,10 @@ const SPECS: Spec[] = [
   {
     name: TECH.combat2,
     overlay: ICON + "rocket-launcher.png",
-    prerequisites: [TECH.combat1, "military-3"],
+    prerequisites: [TECH.combat1, "military-3", "rocketry"],
     count: 200,
     packs: [...BLUE, "military-science-pack"],
+    unlocks: [COMBAT_MK2],
   },
   { name: TECH.flying1, overlay: ICON + "flying-robot-frame.png", prerequisites: [TECH.mk3, "robotics"], count: 300, packs: BLUE },
   {

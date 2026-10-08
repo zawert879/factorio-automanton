@@ -4,6 +4,7 @@ import { execFileSync, spawnSync } from "node:child_process"
 import { existsSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs"
 import { join, relative, sep } from "node:path"
 import { fileURLToPath } from "node:url"
+import { checkAssets } from "./assets.mjs"
 
 const root = join(fileURLToPath(import.meta.url), "..", "..", "..")
 const lua = join(root, "tools", "lua", "5.2", "bin", "lua")
@@ -12,6 +13,13 @@ const filter = process.argv[2] ?? ""
 
 if (!existsSync(lua)) {
   execFileSync(join(root, "tools", "lua", "build.sh"), { stdio: "inherit" })
+}
+
+// Файлы игры, на которые ссылаются прототипы, существуют (тесты без окна графику не грузят).
+const assets = checkAssets(root)
+if (assets.missing.length > 0) {
+  console.error(`Нет файлов игры, на которые ссылается мод:\n  ${assets.missing.join("\n  ")}`)
+  process.exit(1)
 }
 
 // Примеры программ из документации — в тесты (их разбор и компиляция проверяются).

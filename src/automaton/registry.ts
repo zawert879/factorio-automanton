@@ -24,6 +24,8 @@ export interface RobotRecord {
   /** Груз (скриптовый инвентарь) и топливный слот. */
   cargo: LuaInventory
   fuel: LuaInventory
+  /** Оружейный слот (патроны) — у боевых моделей. */
+  weapon?: LuaInventory
   /** Запас энергии, Дж: тратится на путь и действия, пополняется сжиганием топлива. */
   energy: number
   /** Бак для жидкости (src/automaton/fluids.ts). */
@@ -95,6 +97,7 @@ export function registerRobot(entity: LuaEntity, tag?: RobotTag): RobotRecord {
     direction,
     cargo: game.create_inventory(model.cargoSlots),
     fuel: game.create_inventory(1),
+    weapon: model.weapon === undefined ? undefined : game.create_inventory(1),
     energy: tag?.energy ?? model.battery ?? START_ENERGY,
     tank: tag?.tank ?? { amount: 0, temperature: 15 },
   }
@@ -118,6 +121,7 @@ function forgetUnit(unitNumber: number, reason: "mined" | "destroyed"): void {
     if (record.body?.valid) record.body.destroy()
     if (record.cargo?.valid) record.cargo.destroy()
     if (record.fuel?.valid) record.fuel.destroy()
+    if (record.weapon?.valid) record.weapon.destroy()
     delete registry.byId[id]
   }
 }
@@ -141,6 +145,7 @@ function releaseItems(record: RobotRecord, to: LuaInventory | undefined): void {
   const { surface, position } = record.entity
   moveAll(record.cargo, to, surface, position)
   moveAll(record.fuel, to, surface, position)
+  if (record.weapon !== undefined) moveAll(record.weapon, to, surface, position)
 }
 
 export function robotTag(record: RobotRecord): RobotTag {
@@ -206,6 +211,7 @@ export function adoptUnregisteredRobots(): void {
     record.model ??= record.entity.name
     if (!record.cargo?.valid) record.cargo = game.create_inventory(CARGO_SLOTS)
     if (!record.fuel?.valid) record.fuel = game.create_inventory(1)
+    if (modelOf(record.model)?.weapon !== undefined && !record.weapon?.valid) record.weapon = game.create_inventory(1)
     record.energy ??= START_ENERGY
     record.tank ??= { amount: 0, temperature: 15 }
     applyUpgrades(record)

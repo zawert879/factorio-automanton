@@ -10,7 +10,7 @@ import { cancelMove } from "./movement"
 import { RobotRecord } from "./registry"
 import { problemFor, showProblem } from "./status"
 
-export type ActionKind = "wait" | "mine" | "take" | "put" | "pickup" | "drop" | "give" | "repair" | "refuel" | "pump" | "fill" | "drain" | "charge" | "set-recipe" | "build" | "deconstruct" | "rotate"
+export type ActionKind = "wait" | "mine" | "take" | "put" | "pickup" | "drop" | "give" | "repair" | "refuel" | "pump" | "fill" | "drain" | "charge" | "set-recipe" | "build" | "deconstruct" | "rotate" | "reload" | "attack"
 
 export type ActionError =
   | "out-of-reach"
@@ -21,6 +21,8 @@ export type ActionError =
   | "target-full"
   | "no-fuel"
   | "cancelled"
+  | "no-ammo"
+  | "out-of-sight"
   /** Ошибка в коде мода при выполнении действия (записана в лог); машина продолжает работать. */
   | "internal-error"
 

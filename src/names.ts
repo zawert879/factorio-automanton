@@ -3,6 +3,10 @@ export const WORKER_MK1 = "automaton-worker-mk1"
 export const WORKER_MK1_PLACER = "automaton-worker-mk1-placer"
 export const WORKER_MK2 = "automaton-worker-mk2"
 export const WORKER_MK3 = "automaton-worker-mk3"
+export const COMBAT_MK1 = "automaton-combat-mk1"
+export const COMBAT_MK2 = "automaton-combat-mk2"
+/** Выстрел боевой машины: событие скрипта, по которому мод тратит патрон и наносит урон (src/automaton/combat.ts). */
+export const SHOT_EFFECT = "automaton-shot"
 /** Зарядная станция машин Mk2+ (8.2). */
 export const CHARGING_STATION = "automaton-charging-station"
 export const ROBOT_TAG = "automaton"
@@ -39,7 +43,9 @@ export interface Rgb {
  */
 export interface ModelSpec {
   /** Имя модели для программ (Robot.model). */
-  id: "worker-mk1" | "worker-mk2" | "worker-mk3"
+  id: "worker-mk1" | "worker-mk2" | "worker-mk3" | "combat-mk1" | "combat-mk2"
+  /** Цифра на значке. */
+  digit: number
   entity: string
   placer: string
   /** Технология, которая открывает рецепт (нет — доступна сразу). */
@@ -57,13 +63,26 @@ export interface ModelSpec {
   miningSpeed: number
   /** Ёмкость аккумулятора, Дж (Mk2+); у Mk1 — нет (топливо). */
   battery?: number
+  /** Оружие боевых моделей (этап 10). */
+  weapon?: WeaponSpec
+  /** Сопротивления (боевые модели): физический и взрывной урон, процент. */
+  resistances?: { physical: number; explosion: number }
   steel: Rgb
   accent: Rgb
+}
+
+/** Оружие модели: вид (для программ), категория патронов, дальность (клеток), перезарядка (тиков). */
+export interface WeaponSpec {
+  type: "gun" | "rocket"
+  category: "bullet" | "rocket"
+  range: number
+  cooldown: number
 }
 
 export const MODELS: readonly ModelSpec[] = [
   {
     id: "worker-mk1",
+    digit: 1,
     entity: WORKER_MK1,
     placer: WORKER_MK1_PLACER,
     speed: 0.1,
@@ -78,6 +97,7 @@ export const MODELS: readonly ModelSpec[] = [
   },
   {
     id: "worker-mk2",
+    digit: 2,
     entity: WORKER_MK2,
     placer: `${WORKER_MK2}-placer`,
     tech: "automaton-mk2",
@@ -94,6 +114,7 @@ export const MODELS: readonly ModelSpec[] = [
   },
   {
     id: "worker-mk3",
+    digit: 3,
     entity: WORKER_MK3,
     placer: `${WORKER_MK3}-placer`,
     tech: "automaton-mk3",
@@ -107,6 +128,42 @@ export const MODELS: readonly ModelSpec[] = [
     battery: 25_000_000,
     steel: { r: 0.85, g: 0.86, b: 0.9 },
     accent: { r: 0.95, g: 0.25, b: 0.45 },
+  },
+  {
+    id: "combat-mk1",
+    digit: 1,
+    entity: COMBAT_MK1,
+    placer: `${COMBAT_MK1}-placer`,
+    tech: "automaton-combat-1",
+    speed: 0.12,
+    health: 350,
+    cargoSlots: 5,
+    tank: 0,
+    quantum: 50,
+    memory: 20000,
+    miningSpeed: 0.5,
+    weapon: { type: "gun", category: "bullet", range: 15, cooldown: 10 },
+    resistances: { physical: 20, explosion: 10 },
+    steel: { r: 0.42, g: 0.46, b: 0.36 },
+    accent: { r: 0.9, g: 0.2, b: 0.15 },
+  },
+  {
+    id: "combat-mk2",
+    digit: 2,
+    entity: COMBAT_MK2,
+    placer: `${COMBAT_MK2}-placer`,
+    tech: "automaton-combat-2",
+    speed: 0.13,
+    health: 700,
+    cargoSlots: 5,
+    tank: 0,
+    quantum: 100,
+    memory: 40000,
+    miningSpeed: 0.5,
+    weapon: { type: "rocket", category: "rocket", range: 24, cooldown: 60 },
+    resistances: { physical: 30, explosion: 30 },
+    steel: { r: 0.3, g: 0.31, b: 0.35 },
+    accent: { r: 1, g: 0.5, b: 0.1 },
   },
 ]
 
