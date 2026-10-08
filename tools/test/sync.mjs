@@ -191,7 +191,7 @@ const oldTool = join(env.work, "old-tool", "automaton-sync.mjs")
 mkdirSync(join(env.work, "old-tool"), { recursive: true })
 writeFileSync(oldTool, readFileSync(tool, "utf8") + "\n// старая версия\n")
 const oldPush = spawnSync("node", [oldTool, "push", appFile, ...rconArgs], { encoding: "utf8" })
-if (!(oldPush.stdout + oldPush.stderr).includes("утилита синхронизации другой версии, чем мод")) fail(`утилита другой версии:\n${oldPush.stdout}${oldPush.stderr}`)
+if (!(oldPush.stdout + oldPush.stderr).includes("утилита синхронизации устарела")) fail(`утилита другой версии:\n${oldPush.stdout}${oldPush.stderr}`)
 
 // Временную папку не удаляем: сервер ещё дописывает файлы после остановки (её чистит следующий запуск).
 server.kill()
@@ -217,8 +217,17 @@ while (!udpOut.includes("«Привет» опубликована, v1")) {
   udpOut = udpPush.stdout + udpPush.stderr
 }
 const udpPull = spawnSync("node", [tool, "pull", udpPulled, ...udpArgs], { encoding: "utf8" })
+// Устаревшая утилита стучится от игрока: игра сама пишет ему в папку новую утилиту (и плагин).
+const udpOld = spawnSync("node", [oldTool, "push", join(programs, "Привет.ts"), ...udpArgs], { encoding: "utf8" })
+const guiMaps = join(gui.data, "script-output", "automaton")
+const guiFolder = existsSync(guiMaps) ? join(guiMaps, readdirSync(guiMaps)[0] ?? "", "player") : ""
+const started2 = Date.now()
+while (!existsSync(join(guiFolder, "automaton-sync.mjs")) && Date.now() - started2 < 10000) await new Promise((r) => setTimeout(r, 200))
 game.kill()
+if (!(udpOld.stdout + udpOld.stderr).includes("утилита синхронизации устарела")) fail(`устаревшая утилита по UDP:\n${udpOld.stdout}${udpOld.stderr}`)
+if (!existsSync(join(guiFolder, "automaton-sync.mjs")) || readFileSync(join(guiFolder, "automaton-sync.mjs"), "utf8") !== readFileSync(tool, "utf8")) fail(`игра не обновила утилиту в папке игрока ${guiFolder}`)
+if (!existsSync(join(guiFolder, ".automaton", "node_modules", "automaton-ts-plugin", "index.js"))) fail("игра не положила плагин в папку игрока")
 if (!existsSync(join(udpPulled, "src", "Привет.ts")) || readFileSync(join(udpPulled, "src", "Привет.ts"), "utf8") !== longProgram) {
   fail(`pull по UDP:\n${udpPull.stdout}${udpPull.stderr}`)
 }
-console.log("UDP (игра с окном): публикация и pull — ок")
+console.log("UDP (игра с окном): публикация, pull, обновление папки при устаревшей утилите — ок")

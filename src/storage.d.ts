@@ -54,6 +54,10 @@ declare global {
     sync?: Record<string, SyncBuffer | undefined>
     /** Имя карты для папки VS Code (script-output/automaton/<имя>/<команда>): своя у каждой карты. */
     mapName?: string
+    /** «Обновить из папки»: игрок → тик нажатия, пока утилита не ответила. */
+    refreshPending?: Record<number, number | undefined>
+    /** Папку игрока переписали из-за устаревшей утилиты: игрок → тик (не чаще раза в минуту). */
+    syncFolderUpdated?: Record<number, number | undefined>
     /** Команды, которым уже опубликованы стартовые программы (src/world/start.ts). */
     startersPublished?: Record<string, boolean | undefined>
     /** Сообщения между машинами (src/program/comms.ts). */

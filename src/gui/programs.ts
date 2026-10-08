@@ -40,7 +40,7 @@ import {
   publishDenied,
   rightsDenied,
 } from "../program/store"
-import { onRefreshResult, requestRefresh, writeVsCodeFolder } from "../program/sync"
+import { onRefreshResult, onRefreshTimeout, requestRefresh, writeVsCodeFolder } from "../program/sync"
 import { guiOf, onGuiChange, onGuiClick, onGuiSelection, titlebar } from "./common"
 import { DTS } from "./dts.generated"
 import { folderItem, LIBRARY_COLOR, programTree, TreeEntry } from "./tree"
@@ -392,6 +392,13 @@ function askDeleteMissing(player: LuaPlayer, missing: string[]): void {
 export function registerProgramsWindow(): void {
   registerAssign()
   onRefreshResult((player, published, failed, missing) => showRefreshResult(player, published, failed, missing))
+  onRefreshTimeout((player) => {
+    player.print(["automaton-gui.refresh-timeout"])
+    const window = windowOf(player)
+    if (window === undefined) return
+    window.errors.clear()
+    note(window, ["automaton-gui.refresh-timeout"], { r: 1, g: 0.75, b: 0.3 })
+  })
   // Программы изменились (публикация, удаление — в игре, из VS Code, товарищем) — списки в открытых окнах тоже.
   const refreshOpen = () => {
     for (const player of game.connected_players) {

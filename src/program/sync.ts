@@ -184,11 +184,19 @@ export const TOOL_PORT = 27154
  * (результат вызова не используется: он у участников разный, а состояние игры — общее).
  */
 export function requestRefresh(player: LuaPlayer): void {
+  storage.refreshPending ??= {}
+  storage.refreshPending[player.index] = game.tick
   pcall(() => helpers.send_udp(TOOL_PORT, helpers.table_to_json({ cmd: "refresh", map: mapName(), force: player.force.name }), player.index))
 }
 
 type RefreshListener = (this: void, player: LuaPlayer, published: string[], failed: string[], missing: string[]) => void
 const refreshListeners: RefreshListener[] = []
+const timeoutListeners: Array<(this: void, player: LuaPlayer) => void> = []
+
+/** Утилита не ответила на «Обновить из папки» (задача не запущена, старая утилита, игра без UDP). */
+export function onRefreshTimeout(listener: (this: void, player: LuaPlayer) => void): void {
+  timeoutListeners.push(listener)
+}
 
 /** Утилита сверила src с игрой (окно программ показывает итог и спрашивает про программы без файлов). */
 export function onRefreshResult(listener: RefreshListener): void {
@@ -204,7 +212,23 @@ const VSCODE_SETTINGS = `{
 
 /** Утилита другой версии, чем мод (её запустили до обновления): что сделать — текстом (старая утилита его покажет). */
 const OUTDATED_TOOL =
-  "утилита синхронизации другой версии, чем мод: в игре нажмите «Программы…» → «Папка для VS Code» и перезапустите задачу синхронизации в VS Code"
+  "утилита синхронизации устарела: игра записала новую в папку (или нажмите «Программы…» → «Папка для VS Code») — перезапустите задачу синхронизации в VS Code (Cmd/Ctrl+Shift+P → Tasks: Restart Running Task)"
+
+/** Сколько ждать ответа утилиты на «Обновить из папки», тиков. */
+const REFRESH_TIMEOUT = 180
+
+/**
+ * Устаревшая утилита постучалась от игрока: переписать его папку (новая утилита, плагин, настройки) —
+ * не чаще раза в минуту — и сказать, что задачу нужно перезапустить.
+ */
+function updateOutdatedFolder(player: LuaPlayer): void {
+  storage.syncFolderUpdated ??= {}
+  const last = storage.syncFolderUpdated[player.index]
+  if (last !== undefined && game.tick - last < 3600) return
+  storage.syncFolderUpdated[player.index] = game.tick
+  writeVsCodeFolder(player)
+  player.print(["automaton-gui.tool-updated"])
+}
 
 /** Контрольная сумма текста (байты UTF-8) — та же считается в утилите: сверить файлы с игрой, не скачивая. */
 export function checksum(text: string): number {
@@ -215,7 +239,10 @@ export function checksum(text: string): number {
 
 /** Обработать запрос утилиты; sender — ключ передачи (кто шлёт), player — игрок (нет — сервер). */
 function handle(request: Request, sender: string, player: LuaPlayer | undefined): Record<string, unknown> {
-  if (request.tool !== SYNC_TOOL_HASH) return { ok: false, error: OUTDATED_TOOL, outdated: true }
+  if (request.tool !== SYNC_TOOL_HASH) {
+    if (player !== undefined) updateOutdatedFolder(player)
+    return { ok: false, error: OUTDATED_TOOL, outdated: true }
+  }
   const force = request.force ?? player?.force.name ?? "player"
   // Папка другой карты (VS Code открыт не на той папке): ничего не публиковать и не отдавать.
   if (request.map !== undefined && request.map !== mapName()) {
@@ -270,6 +297,10 @@ function handle(request: Request, sender: string, player: LuaPlayer | undefined)
       if (program === undefined) return findProgram(request.to, force) !== undefined ? { ok: true, already: true } : { ok: false, error: "no program" }
       return publishReply(publish({ id: program.id, name: request.to, source: program.source, force, author: player?.name ?? "VS Code" }), force)
     }
+    case "refresh-started":
+      // Утилита получила «Обновить из папки» — ждать её ответа больше не нужно.
+      if (player !== undefined && storage.refreshPending !== undefined) storage.refreshPending[player.index] = undefined
+      return { ok: true }
     case "refresh-done":
       // Итог кнопки «Обновить из папки» — тому, кто нажал (пакет пришёл с его экземпляра игры).
       if (player !== undefined) for (const listener of refreshListeners) listener(player, request.published ?? [], request.failed ?? [], request.missing ?? [])
@@ -337,6 +368,16 @@ export function writeVsCodeFolder(player: LuaPlayer): string {
 
 export function registerSync(): void {
   commands.add_command("automaton-sync", ["automaton.sync-help"], (command) => onCommand(command))
+  // «Обновить из папки» без ответа утилиты — подсказка, что не так.
+  onTick((tick) => {
+    if (tick % 30 !== 0 || storage.refreshPending === undefined) return
+    for (const [index, at] of pairs(storage.refreshPending)) {
+      if (tick - at < REFRESH_TIMEOUT) continue
+      storage.refreshPending[index] = undefined
+      const player = game.get_player(index as PlayerIndex)
+      if (player !== undefined) for (const listener of timeoutListeners) listener(player)
+    }
+  })
   // UDP: пакеты, полученные игрой, — событием у всех участников; ответ — с того же экземпляра игры.
   onTick((tick) => {
     if (tick % UDP_POLL_TICKS !== 0) return
