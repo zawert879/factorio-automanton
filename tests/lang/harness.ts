@@ -87,7 +87,9 @@ export function run(source: string, options: RunOptions = {}): RunResult {
   const maxTicks = options.maxTicks ?? 20000
   while (ticks < maxTicks) {
     ticks++
-    if (machine.status === "waiting") {
+    if ((machine.debt ?? 0) > 0) {
+      machine.debt = math.max(0, machine.debt! - (options.quantum ?? 1000))
+    } else if (machine.status === "waiting") {
       const waiting = machine.waiting
       if ((waiting.ticks ?? 0) > 1) waiting.ticks--
       else completeWait(machine, waiting.value, waiting.fail)

@@ -310,7 +310,7 @@ export const stringMethods: Record<string, Fn> = {
 
 export const numberMethods: Record<string, Fn> = {
   toFixed(n: number, _k: Val, digits: Val): string {
-    const d = math.min(math.max(integer(digits, 0), 0), 100)
+    const d = math.min(math.max(integer(digits, 0), 0), 20)
     if (n !== n) return "NaN"
     if (math.abs(n) >= 1e21) return formatNumber(n)
     return string.format(`%.${d}f`, n)

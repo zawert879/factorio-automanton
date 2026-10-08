@@ -41,6 +41,10 @@ export const LIMITS = {
   array: 100000,
   /** Единиц памяти за отрезок исполнения. */
   allocations: 200000,
+  /** Живых единиц памяти у программы (таблица — 1, элемент — 1/8, 256 байт строк — 1). */
+  memory: 20000,
+  /** Вложенность структур в JSON и строковом представлении. */
+  nesting: 100,
 }
 
 /** Экспорт скомпилированной программы (src/lang/prologue.ts, EPILOGUE). */
@@ -90,7 +94,8 @@ export function newArray(this: void): Val {
 export const classes: Record<string, Val> = {}
 
 function builtinClass(name: string, parent?: Val): Val {
-  const cls = { __k: name, __builtin: name, __name: name, __s: parent, __m: {}, __g: {} }
+  // __t: встроенные классы общие для всех программ — записывать в них нельзя (SET → ошибка).
+  const cls = { __k: name, __builtin: name, __name: name, __s: parent, __m: {}, __g: {}, __t: "builtin" }
   classes[name] = cls
   return cls
 }

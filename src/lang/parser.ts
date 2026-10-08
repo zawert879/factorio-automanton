@@ -12,6 +12,8 @@ export interface ParseResult {
 }
 
 const MAX_DIAGNOSTICS = 30
+/** Предел вложенности выражений, инструкций и типов: глубже — ошибка, а не переполнение стека. */
+const MAX_DEPTH = 150
 
 /** Брошенный при ошибке маркер: разбор инструкции прерывается и продолжается со следующей. */
 const FAILURE = { failure: true }
@@ -72,6 +74,18 @@ export function parse(source: string): ParseResult {
   const tokens = lexed.tokens
   const diagnostics: Diagnostic[] = [...lexed.diagnostics]
   let pos = 0
+  let depth = 0
+
+  /** Рекурсивный шаг разбора с проверкой глубины. */
+  function nested<T>(parseFn: () => T): T {
+    if (depth >= MAX_DEPTH) fail("too-deeply-nested", [MAX_DEPTH])
+    depth++
+    try {
+      return parseFn()
+    } finally {
+      depth--
+    }
+  }
 
   // ---------- Токены ----------
 
@@ -156,6 +170,7 @@ export function parse(source: string): ParseResult {
   /** Пробный разбор: при неудаче позиция и ошибки откатываются, результат — undefined. */
   function attempt<T>(parseFn: () => T): T | undefined {
     const savedPos = pos
+    const savedDepth = depth
     const savedDiagnostics = diagnostics.length
     const savedTokens = new Map<number, Token>()
     // «>>» мог быть разделён — запомнить токены, чтобы вернуть.
@@ -165,6 +180,7 @@ export function parse(source: string): ParseResult {
     } catch (error) {
       if (error !== FAILURE) throw error
       pos = savedPos
+      depth = savedDepth
       while (diagnostics.length > savedDiagnostics) diagnostics.pop()
       for (const [k, token] of savedTokens) tokens[k] = token
       return undefined
@@ -199,6 +215,10 @@ export function parse(source: string): ParseResult {
   }
 
   function parseType(): A.TypeNode {
+    return nested(parseTypeInner)
+  }
+
+  function parseTypeInner(): A.TypeNode {
     const start = loc()
     eat("|")
     const first = parseIntersectionType()
@@ -602,6 +622,10 @@ export function parse(source: string): ParseResult {
   }
 
   function parseAssignment(): A.Expr {
+    return nested(parseAssignmentInner)
+  }
+
+  function parseAssignmentInner(): A.Expr {
     const arrow = parseArrowFunction()
     if (arrow !== undefined) return arrow
     if (is("async") && (is("function", 1) || isPunct("(", 1) || peek(1).kind === "identifier")) fail("unsupported", ["async"])
@@ -666,6 +690,10 @@ export function parse(source: string): ParseResult {
   }
 
   function parseUnary(): A.Expr {
+    return nested(parseUnaryInner)
+  }
+
+  function parseUnaryInner(): A.Expr {
     const start = loc()
     const token = peek()
     if (token.kind === "punctuator" && (token.value === "!" || token.value === "-" || token.value === "+" || token.value === "~")) {
@@ -1037,6 +1065,10 @@ export function parse(source: string): ParseResult {
   }
 
   function parseStatement(): A.Stmt {
+    return nested(parseStatementInner)
+  }
+
+  function parseStatementInner(): A.Stmt {
     const start = loc()
     const token = peek()
     if (isPunct("{")) return { ...start, kind: "Block", body: parseBlockBody() }

@@ -10,6 +10,7 @@ import {
   host,
   hostObjects,
   LIMITS,
+  makeError,
   memory,
   ProgramExports,
   Q,
@@ -140,6 +141,12 @@ export interface Machine {
   waiting?: Val
   result?: Val
   error?: RuntimeError
+  /** Выделено единиц памяти с последнего замера. */
+  allocated?: number
+  /** Живая память на последнем замере. */
+  live?: number
+  /** Перерасход кванта (синхронные колбэки, тяжёлые методы): столько инструкций машина пропускает. */
+  debt?: number
 }
 
 export function newMachine(this: void): Machine {
@@ -186,6 +193,49 @@ function describeError(e: Val, line: number | undefined): RuntimeError {
   return { name: "Error", message: toStringValue(value), line, value }
 }
 
+/**
+ * Живая память программы: таблицы и длинные строки, достижимые из кадров машины.
+ * Таблица — 1 единица, ключ — 1/8, 256 байт строки — 1. Обход прекращается, как только предел превышен вдвое.
+ */
+export function measure(this: void, root: Val, limit: number): number {
+  const seen = new LuaTable<Val, boolean>()
+  const stack: Val[] = [root]
+  let units = 0
+  while (stack.length > 0 && units <= limit * 2) {
+    const t = stack.pop()
+    if (seen.get(t)) continue
+    seen.set(t, true)
+    units += 1
+    for (const [k, v] of pairs(t as LuaTable<Val, Val>)) {
+      units += 0.125
+      if (type(k) === "table" && !seen.get(k)) stack.push(k)
+      const tv = type(v)
+      if (tv === "table") {
+        if (!seen.get(v)) stack.push(v)
+      } else if (tv === "string" && (v as string).length > 64) {
+        units += (v as string).length / 256
+      }
+    }
+  }
+  return units
+}
+
+/** Проверка памяти после отрезка: замер, когда выделено достаточно с прошлого раза. */
+function checkMemory(machine: Machine, allocated: number): void {
+  machine.allocated = (machine.allocated ?? 0) + allocated
+  if (machine.allocated < math.max(2000, (machine.live ?? 0) / 2)) return
+  const live = measure([machine.frame, machine.waiting], LIMITS.memory)
+  machine.live = live
+  machine.allocated = 0
+  if (live > LIMITS.memory) {
+    const value = makeError("RangeError", "Program uses too much memory", "memory")
+    machine.status = "error"
+    machine.error = { name: "RangeError", message: value.message, code: "memory", value }
+    machine.frame = undefined
+    machine.waiting = undefined
+  }
+}
+
 /** Один отрезок исполнения: до паузы (квант, ожидание), конца программы или ошибки. */
 export function runSlice(this: void, program: Program, machine: Machine, quantum: number): void {
   if (machine.status !== "ready") return
@@ -195,6 +245,7 @@ export function runSlice(this: void, program: Program, machine: Machine, quantum
   Q.s = 0
   Q.w = undefined
   Q.am = Q.a + LIMITS.allocations
+  const allocatedBefore = Q.a
   let line: number | undefined
   const main = program.P[1]
   const [ok, r, f] = xpcall(
@@ -217,6 +268,8 @@ export function runSlice(this: void, program: Program, machine: Machine, quantum
       machine.waiting = Q.w
       machine.status = "waiting"
     }
+    if (Q.n < 0) machine.debt = -Q.n
+    checkMemory(machine, Q.a - allocatedBefore)
     return
   }
   machine.frame = undefined

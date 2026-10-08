@@ -20,6 +20,7 @@ local function CALL(c, k, this, ...)
 end
 local function CALLS(c, this, ...)
   Q.s = Q.s + 1
+  if Q.s > MAXD then ERR("stack-overflow") end
   local r, f = CALL(c, nil, this, ...)
   while r == Y do
     if Q.n < Q.hard then ERR("callback-too-long") end
@@ -76,6 +77,7 @@ local function NEW(cls, k, ...)
 end
 local function NEWS(cls, ...)
   Q.s = Q.s + 1
+  if Q.s > MAXD then ERR("stack-overflow") end
   local r, f = NEW(cls, nil, ...)
   while r == Y do
     if Q.n < Q.hard then ERR("callback-too-long") end
@@ -139,7 +141,9 @@ local function S(x)
   return SX(x)
 end
 local function CHK(s)
-  if #s > MAXS then ERR("string-too-long") end
+  local n = #s
+  if n > MAXS then ERR("string-too-long") end
+  Q.a = Q.a + n * 0.004
   return s
 end
 local function T(x)

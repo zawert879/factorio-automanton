@@ -81,12 +81,27 @@ class LuaFn {
   ) {}
 }
 
+/** Предел размера исходника, байт (кириллица — 2 байта на букву). */
+export const MAX_SOURCE_BYTES = 100000
+
 export function compile(source: string): CompileResult {
+  if (source.length > MAX_SOURCE_BYTES) {
+    return { ok: false, lua: "", lines: [], diagnostics: [{ code: "program-too-large", params: [MAX_SOURCE_BYTES], line: 1, column: 1 }] }
+  }
   const parsed = parse(source)
   if (parsed.diagnostics.length > 0) return { ok: false, lua: "", lines: [], diagnostics: parsed.diagnostics }
   const analysis = analyze(parsed.program)
   if (analysis.diagnostics.length > 0) return { ok: false, lua: "", lines: [], diagnostics: analysis.diagnostics }
-  return generate(parsed.program, analysis)
+  const result = generate(parsed.program, analysis)
+  if (!result.ok) return result
+  // Пределы Lua (регистры, длина переходов) проверяет сам load: такую программу не публикуем.
+  const [chunk, message] = load(result.lua, "=prog", "t", {})
+  if (chunk === undefined) {
+    const [luaLine] = string.match(message ?? "", "^prog:(%d+):")
+    const line = luaLine !== undefined ? result.lines[tonumber(luaLine)! - 1] ?? 1 : 1
+    return { ok: false, lua: "", lines: [], diagnostics: [{ code: "program-too-complex", params: [], line, column: 1 }] }
+  }
+  return result
 }
 
 // ---------- Литералы Lua ----------

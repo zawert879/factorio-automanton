@@ -230,8 +230,9 @@ function jsonString(s: string): string {
   return `"${escaped}"`
 }
 
-function stringify(value: Val, indent: string, current: string, seen: LuaTable<Val, boolean>, inArray: boolean): string | undefined {
+function stringify(value: Val, indent: string, current: string, seen: LuaTable<Val, boolean>, inArray: boolean, depth: number): string | undefined {
   const t = type(value)
+  if (depth > LIMITS.nesting) err("bad-argument", "structure is too deep for JSON")
   if (t === "nil") return inArray ? "null" : undefined
   if (t === "boolean") return value ? "true" : "false"
   if (t === "number") return value !== value || math.abs(value) === math.huge ? "null" : formatNumber(value)
@@ -248,7 +249,7 @@ function stringify(value: Val, indent: string, current: string, seen: LuaTable<V
   let result: string
   if (value.__n !== undefined) {
     const parts: string[] = []
-    for (let i = 1; i <= value.__n; i++) parts.push(stringify(value[i], indent, inner, seen, true)!)
+    for (let i = 1; i <= value.__n; i++) parts.push(stringify(value[i], indent, inner, seen, true, depth + 1)!)
     result = parts.length === 0 ? "[]" : "[" + open + parts.join(separator) + close + "]"
   } else if (value.__t !== undefined) {
     result = "{}"
@@ -260,7 +261,7 @@ function stringify(value: Val, indent: string, current: string, seen: LuaTable<V
       table.sort(keys)
     }
     for (const key of keys) {
-      const item = stringify(value[key], indent, inner, seen, false)
+      const item = stringify(value[key], indent, inner, seen, false, depth + 1)
       if (item !== undefined) parts.push(jsonString(key) + (indent === "" ? ":" : ": ") + item)
     }
     result = parts.length === 0 ? "{}" : "{" + open + parts.join(separator) + close + "}"
@@ -390,7 +391,7 @@ const JsonLib = {
     let indent = ""
     if (type(space) === "number") indent = string.rep(" ", math.min(math.max(math.floor(space), 0), 10))
     else if (type(space) === "string") indent = string.sub(space, 1, 10)
-    return stringify(value, indent, "", new LuaTable(), false)
+    return stringify(value, indent, "", new LuaTable(), false, 0)
   },
   parse: (text: Val) => {
     const s = toStringValue(text)
