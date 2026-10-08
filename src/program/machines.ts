@@ -46,6 +46,17 @@ export function wake(robotId: number): void {
   for (const listener of wakeListeners) listener(robotId)
 }
 
+const resetListeners: Array<(this: void, robotId: number) => void> = []
+
+/** Программа машины начинается заново или останавливается: её связь, аренды задач и т. п. сбрасываются. */
+export function onMachineReset(listener: (this: void, robotId: number) => void): void {
+  resetListeners.push(listener)
+}
+
+function reset(robotId: number): void {
+  for (const listener of resetListeners) listener(robotId)
+}
+
 export function machineOf(robotId: number): MachineRecord {
   let record = storage.machines[robotId]
   if (record === undefined) {
@@ -79,6 +90,7 @@ function stopActivity(robotId: number): void {
 export function restartMachine(record: MachineRecord): void {
   const program = record.programId === undefined ? undefined : storage.programs.byId[record.programId]
   stopActivity(record.robotId)
+  reset(record.robotId)
   if (program === undefined) {
     record.machine = { status: "done" }
     return
@@ -103,6 +115,7 @@ export function assignProgram(robot: RobotRecord, program: ProgramRecord | undef
 
 export function stopMachine(record: MachineRecord): void {
   stopActivity(record.robotId)
+  reset(record.robotId)
   record.machine = { status: "done" }
   appendConsole(record, "— остановлена")
 }
@@ -119,6 +132,7 @@ export function registerMachines(): void {
     for (const [, record] of pairs(storage.machines)) {
       if (record.programId !== program.id) continue
       stopActivity(record.robotId)
+      reset(record.robotId)
       record.machine = { status: "done" }
       if (!program.quarantined) record.programId = undefined
       appendConsole(record, program.quarantined ? `— ${program.name}: в карантине (постоянные ошибки лимитов)` : `— ${program.name}: программа удалена`)
@@ -133,6 +147,7 @@ export function registerMachines(): void {
     }
     record.parked = true
     record.machine = { status: "done" }
+    reset(id)
   })
   onRobotRegistered((robot) => {
     const record = storage.machines[robot.id]

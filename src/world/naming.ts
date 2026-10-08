@@ -1,14 +1,22 @@
-// Диалог имени метки или зоны: появляется сразу после установки метки или выделения зоны.
-import { LuaPlayer, PlayerIndex } from "factorio:runtime"
+// Диалог имени метки, табло или зоны: появляется сразу после установки или выделения зоны;
+// переименовать потом — /am-name, наведя курсор на метку или табло.
+import { LuaEntity, LuaPlayer, PlayerIndex } from "factorio:runtime"
 import { onEvent } from "../events"
 
-export type NamingTarget = { kind: "marker"; id: number } | { kind: "zone"; name: string }
+export type NamingTarget = { kind: "marker"; id: number } | { kind: "zone"; name: string } | { kind: "display"; id: number }
 
 /** Переименование по виду цели: метки и зоны регистрируют свои (без взаимного импорта модулей). */
 const renamers: Partial<Record<NamingTarget["kind"], (this: void, target: NamingTarget, name: string) => void>> = {}
 
 export function registerRenamer(kind: NamingTarget["kind"], rename: (this: void, target: NamingTarget, name: string) => void): void {
   renamers[kind] = rename
+}
+
+/** Что можно переименовать, наведя курсор (/am-name): сущность → цель и текущее имя. */
+const lookups: Array<(this: void, entity: LuaEntity) => { target: NamingTarget; name: string } | undefined> = []
+
+export function registerNameable(lookup: (this: void, entity: LuaEntity) => { target: NamingTarget; name: string } | undefined): void {
+  lookups.push(lookup)
 }
 
 const FRAME = "automaton-naming"
@@ -28,7 +36,7 @@ export function askName(playerIndex: number, target: NamingTarget, current: stri
   const frame = player.gui.screen.add({
     type: "frame",
     name: FRAME,
-    caption: [target.kind === "marker" ? "automaton.name-marker" : "automaton.name-zone"],
+    caption: [`automaton.name-${target.kind}`],
     direction: "horizontal",
   })
   frame.auto_center = true
@@ -52,6 +60,16 @@ function confirm(player: LuaPlayer): void {
 }
 
 export function registerNaming(): void {
+  commands.add_command("am-name", ["automaton.name-help"], (command) => {
+    const player = command.player_index === undefined ? undefined : game.get_player(command.player_index)
+    const selected = player?.selected
+    if (player === undefined || selected === undefined) return
+    for (const lookup of lookups) {
+      const found = lookup(selected)
+      if (found !== undefined) return askName(player.index, found.target, found.name)
+    }
+    player.print(["automaton.name-help"])
+  })
   onEvent(defines.events.on_gui_click, (e) => {
     if (e.element.valid && e.element.name === OK) confirm(game.get_player(e.player_index)!)
   })

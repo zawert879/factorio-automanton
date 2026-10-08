@@ -6,7 +6,7 @@
 // возят машины, а без электричества не работают лаборатории — иначе не исследовать вообще ничего.
 import { PrototypeData } from "factorio:common"
 import { Color, IconData, TechnologyPrototype } from "factorio:prototype"
-import { CHARGING_STATION, TECH, UPGRADE_LEVELS, UPGRADES, WORKER_MK2, WORKER_MK3 } from "../names"
+import { CHARGING_STATION, DISPLAYS, SIGNAL_MARKER, TECH, UPGRADE_LEVELS, UPGRADES, WORKER_MK2, WORKER_MK3 } from "../names"
 
 declare const data: PrototypeData
 
@@ -46,7 +46,14 @@ const ICON = "__base__/graphics/icons/"
 const SPECS: Spec[] = [
   // Красная наука: место «Логистики».
   { name: TECH.radio, overlay: ICON + "radar.png", prerequisites: ["automation-science-pack"], count: 20, packs: RED, time: 15 },
-  { name: TECH.display, overlay: ICON + "display-panel.png", prerequisites: [TECH.radio], count: 30, packs: RED },
+  {
+    name: TECH.display,
+    overlay: ICON + "display-panel.png",
+    prerequisites: [TECH.radio],
+    count: 30,
+    packs: RED,
+    unlocks: DISPLAYS.map((d) => d.name),
+  },
   { name: TECH.tuning, overlay: ICON + "assembling-machine-1.png", prerequisites: ["automation"], count: 30, packs: RED },
   { name: TECH.sensors1, overlay: ICON + "night-vision-equipment.png", prerequisites: [TECH.radio], count: 50, packs: RED, upgrade: true },
   {
@@ -57,7 +64,14 @@ const SPECS: Spec[] = [
   },
   // Зелёная.
   { name: TECH.construction, overlay: ICON + "blueprint.png", prerequisites: [TECH.radio, "logistic-science-pack"], count: 100, packs: GREEN },
-  { name: TECH.circuits, overlay: ICON + "red-wire.png", prerequisites: ["circuit-network"], count: 100, packs: GREEN },
+  {
+    name: TECH.circuits,
+    overlay: ICON + "red-wire.png",
+    prerequisites: ["circuit-network"],
+    count: 100,
+    packs: GREEN,
+    unlocks: [SIGNAL_MARKER],
+  },
   { name: TECH.sensors2, overlay: ICON + "night-vision-equipment.png", prerequisites: [TECH.sensors1, "logistic-science-pack"], count: 150, packs: GREEN, upgrade: true },
   {
     name: TECH.mk2,

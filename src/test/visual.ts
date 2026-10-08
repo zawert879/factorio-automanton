@@ -6,7 +6,8 @@ import { setActivity } from "../automaton/appearance"
 import { moveRobot } from "../automaton/movement"
 import { say, showProblem } from "../automaton/status"
 import { findRobot, RobotRecord } from "../automaton/registry"
-import { Activity, BODY_DIRECTIONS, CHARGING_STATION, MODELS, TECH, WORKER_MK1, WORKER_MK1_PLACER } from "../names"
+import { Activity, BODY_DIRECTIONS, CHARGING_STATION, DISPLAYS, MODELS, TECH, WORKER_MK1, WORKER_MK1_PLACER } from "../names"
+import { renameDisplay } from "../world/displays"
 import { guiOf } from "../gui/common"
 import { openMachine } from "../gui/machine"
 import { openPrograms, publishFromWindow, showTypes } from "../gui/programs"
@@ -120,11 +121,39 @@ while (true) {
     if (result.ok) assignProgram(robot, result.program)
     storage.machines[robot.id]!.args = { ore: "iron-ore" }
   }
+  // Табло (этап 9): большое табло «штаб» с таблицей занятости, полоской и значком.
+  if (tick === 177) {
+    game.forces.player.technologies[TECH.display].researched = true
+    const entity = nauvis().create_entity({ name: DISPLAYS[1].name, position: { x: CENTER.x + 14, y: CENTER.y - 14 }, force: "player", raise_built: true })!
+    renameDisplay(storage.displays.byId[entity.unit_number!]!, "штаб")
+    const small = nauvis().create_entity({ name: DISPLAYS[0].name, position: { x: CENTER.x + 22.5, y: CENTER.y - 15 }, force: "player", raise_built: true })!
+    renameDisplay(storage.displays.byId[small.unit_number!]!, "часы")
+    const drawer = place({ x: CENTER.x + 14.5, y: CENTER.y - 10 })
+    const result = publishProgram(
+      "Табло",
+      `const s = display("штаб")
+const c = display("часы")
+s.frame(() => {
+  s.clear("black")
+  s.text(4, 4, "Занятость роботов", { color: "yellow", size: 12 })
+  s.table(4, 22, [["Робот", "Задача"], ["AM-1", { text: "свободен", color: "green" }], ["AM-2", { text: "руда → печь #12", color: "yellow" }], ["AM-3", { text: "заправка", color: "orange" }]], { header: true })
+  s.bar(4, s.height - 12, s.width - 8, 8, 0.66, "green")
+  s.icon(170, 4, "iron-plate", 16)
+  s.circle(180, 60, 8, { color: "blue", fill: true })
+  s.line(150, 80, 190, 100, { color: "red", width: 2 })
+})
+c.clear({ r: 0.05, g: 0.1, b: 0.2 })
+c.text(48, 20, "12:34", { color: "white", size: 24, align: "center" })
+for (let x = 10; x < 86; x++) c.pixel(x, 54, x % 2 === 0 ? "green" : "red")`,
+    )
+    if (result.ok) assignProgram(drawer, result.program)
+  }
   if (tick === 200) {
     const player = game.get_player(1 as PlayerIndex)
     const robot = Object.values(storage.robots.byId).find((r) => r !== undefined && storage.machines[r.id] !== undefined)
     if (player !== undefined && robot !== undefined) openMachine(player, robot)
   }
+  if (tick === 199) shot("display", { x: CENTER.x + 17, y: CENTER.y - 14 }, 3)
   if (tick === 205) guiShot("machine-window")
   if (tick === 210) {
     const player = game.get_player(1 as PlayerIndex)

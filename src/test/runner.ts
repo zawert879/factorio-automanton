@@ -15,7 +15,7 @@ let prepared = false
 
 const RESULTS_FILE = "automaton-test-results.json"
 /** Последний тик, до которого тесты обязаны закончиться (npm run test:game гоняет игру дольше). */
-const DEADLINE_TICK = 12000
+const DEADLINE_TICK = 20000
 
 interface TestResult {
   name: string

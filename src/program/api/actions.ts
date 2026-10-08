@@ -31,7 +31,7 @@ function startMove(target: Val, options: Val, name: string): LuaMultiReturn<[Val
     moveRobot(robot, resolved.entity !== undefined && resolved.entity.type !== "simple-entity-with-owner" ? { entity: resolved.entity } : { position: resolved.position }, { radius })
     if (timeout !== undefined) {
       frame.__poll = "moveTimeout"
-      sleepUntil(robot.id, game.tick + timeout)
+      sleepUntil(robot.id, game.tick + timeout, frame)
     }
   })
 }

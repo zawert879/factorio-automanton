@@ -26,7 +26,10 @@ import { forgetEntityHandle, initHandles } from "./program/handles"
 import { initMachines, registerMachines } from "./program/machines"
 import { initScheduler, registerScheduler } from "./program/scheduler"
 import { initPrograms } from "./program/store"
+import { initComms, registerComms } from "./program/comms"
+import { initBoard, registerBoard } from "./program/board"
 import { initMarkers, registerMarkers } from "./world/markers"
+import { initDisplays, registerDisplays } from "./world/displays"
 import { initStart, registerStart } from "./world/start"
 import { registerNaming } from "./world/naming"
 import { initZones, registerZones } from "./world/zones"
@@ -42,7 +45,10 @@ function initStorage(): void {
   initScheduler()
   initHandles()
   initMarkers()
+  initDisplays()
   initZones()
+  initComms()
+  initBoard()
   initStart()
 }
 
@@ -61,6 +67,7 @@ registerAppearance()
 registerActions()
 registerDebugCommands()
 registerMarkers()
+registerDisplays()
 registerZones()
 registerNaming()
 registerMachines()
@@ -73,6 +80,8 @@ registerGuiEvents()
 registerMachineWindow()
 registerProgramsWindow()
 registerStart()
+registerComms()
+registerBoard()
 // Здание исчезло — его обёртка у программ остаётся (valid === false), но из общего списка уходит.
 onEvent(defines.events.on_object_destroyed, (e) => {
   if (e.type === defines.target_type.entity) forgetEntityHandle(e.useful_id)

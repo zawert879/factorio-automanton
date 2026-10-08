@@ -8,6 +8,9 @@ export const CHARGING_STATION = "automaton-charging-station"
 export const ROBOT_TAG = "automaton"
 /** Метка — сущность с именем, к которой программы обращаются marker("имя"). */
 export const MARKER = "automaton-marker"
+/** Сигнальная метка (9.6): метка, которую можно подключить проводами (постоянный комбинатор). */
+export const SIGNAL_MARKER = "automaton-signal-marker"
+export const MARKER_ENTITIES: readonly string[] = [MARKER, SIGNAL_MARKER]
 /** «Программатор» — инструмент выделения зон: zone("имя"). */
 export const PROGRAMMER = "automaton-programmer"
 
@@ -163,3 +166,30 @@ export type UpgradeKind = (typeof UPGRADES)[number]["kind"]
 export const UPGRADE_LEVELS = 3
 /** Радиус зрения по числу исследованных уровней «Сенсоров» (0–3). */
 export const VISION_BY_SENSORS = [10, 16, 24, 32]
+
+/** Табло (9.5): размер в клетках и пикселях экрана (32 пикселя на клетку), рецепт. */
+export const DISPLAYS = [
+  {
+    name: "automaton-display-small",
+    tilesWide: 3,
+    tilesHigh: 2,
+    ingredients: [
+      ["electronic-circuit", 5],
+      ["copper-cable", 10],
+      ["iron-plate", 5],
+    ] as [string, number][],
+  },
+  {
+    name: "automaton-display-large",
+    tilesWide: 6,
+    tilesHigh: 4,
+    ingredients: [
+      ["automaton-display-small", 3],
+      ["electronic-circuit", 5],
+    ] as [string, number][],
+  },
+]
+/** Пикселей экрана табло на клетку. */
+export const DISPLAY_PIXELS_PER_TILE = 32
+/** Спрайт экрана табло: белый квадрат 10×10 (перекрашивается в цвет фона). */
+export const DISPLAY_SCREEN_SPRITE = "automaton-display-screen"

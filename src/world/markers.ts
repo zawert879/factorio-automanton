@@ -2,8 +2,8 @@
 // Имя по умолчанию «M-<номер>»; переименовать — диалог сразу после установки или /am-name под курсором.
 import { LuaEntity, LuaRenderObject } from "factorio:runtime"
 import { onEvent } from "../events"
-import { MARKER } from "../names"
-import { askName, registerRenamer } from "./naming"
+import { MARKER_ENTITIES } from "../names"
+import { askName, registerNameable, registerRenamer } from "./naming"
 
 export interface MarkerRecord {
   id: number
@@ -21,9 +21,10 @@ export function initMarkers(): void {
   storage.markers ??= { byId: {}, nextNumber: 1 }
 }
 
-export function findMarker(name: string): MarkerRecord | undefined {
+/** Метка по имени (своей команды, если она указана). */
+export function findMarker(name: string, force?: string): MarkerRecord | undefined {
   for (const [, marker] of pairs(storage.markers.byId)) {
-    if (marker.name === name && marker.entity.valid) return marker
+    if (marker.name === name && marker.entity.valid && (force === undefined || marker.entity.force.name === force)) return marker
   }
   return undefined
 }
@@ -59,7 +60,11 @@ export function registerMarkers(): void {
     const marker = target.kind === "marker" ? storage.markers.byId[target.id] : undefined
     if (marker !== undefined) renameMarker(marker, name)
   })
-  const isMarker = (entity: LuaEntity) => entity.valid && entity.name === MARKER
+  registerNameable((entity) => {
+    const marker = markerOf(entity)
+    return marker === undefined ? undefined : { target: { kind: "marker", id: marker.id }, name: marker.name }
+  })
+  const isMarker = (entity: LuaEntity) => entity.valid && MARKER_ENTITIES.includes(entity.name)
   onEvent(defines.events.on_built_entity, (e) => {
     if (isMarker(e.entity)) register(e.entity, e.player_index)
   })

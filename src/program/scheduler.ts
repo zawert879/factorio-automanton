@@ -39,10 +39,14 @@ function enqueue(id: number): void {
   state.ready.push(id)
 }
 
-/** Проверить ожидание машины в тик tick (кадр ожидания должен указать __poll). */
-export function sleepUntil(robotId: number, tick: number): void {
+/**
+ * Проверить ожидание машины в тик tick (кадр ожидания должен указать __poll). С кадром — таймер только
+ * для этого ожидания: если машина к тому времени ждёт уже другого, старый таймер её не тронет.
+ */
+export function sleepUntil(robotId: number, tick: number, frame?: Val): void {
   const timers = storage.scheduler.timers
   const at = math.max(tick, game.tick + 1)
+  if (frame !== undefined) frame.__at = at
   const list = timers[at]
   if (list === undefined) timers[at] = [robotId]
   else list.push(robotId)
@@ -140,6 +144,7 @@ function runTimers(tick: number): void {
     const robot = storage.robots.byId[id]
     if (record === undefined || robot === undefined || !robot.entity.valid || record.machine.status !== "waiting") continue
     const frame = record.machine.waiting
+    if (frame?.__at !== undefined && frame.__at !== tick) continue
     const poll = frame?.__poll === undefined ? undefined : polls[frame.__poll]
     if (poll !== undefined) inMachine(record, robot, () => poll(record, frame, tick))
   }

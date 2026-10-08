@@ -4,7 +4,7 @@ import { LuaEntity, MapPosition } from "factorio:runtime"
 import { spend } from "../../automaton/energy"
 import { defineHostObject, hostMethods, Val } from "../../lang/runtime/core"
 import { robotVision } from "../../automaton/models"
-import { MARKER, ROBOT_ENTITIES, ROBOT_PLACERS } from "../../names"
+import { MARKER_ENTITIES, ROBOT_ENTITIES, ROBOT_PLACERS } from "../../names"
 import { actionError, currentRobot } from "../context"
 import { entityHandle, robotHandle } from "../handles"
 import { programArray, programPosition } from "../values"
@@ -83,7 +83,7 @@ hostMethods.scan.entities = (_o: Val, _k: Val, filter: Val) => {
   })
   const buildings: LuaEntity[] = []
   for (const entity of found) {
-    if (SKIPPED_TYPES[entity.type] || entity.name === MARKER || ROBOT_PLACERS.includes(entity.name)) continue
+    if (SKIPPED_TYPES[entity.type] || MARKER_ENTITIES.includes(entity.name) || ROBOT_PLACERS.includes(entity.name)) continue
     buildings.push(entity)
   }
   return programArray(byDistance(buildings, (e) => e.position).map((e) => entityHandle(e)))

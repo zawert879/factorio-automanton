@@ -32,6 +32,23 @@ const WATER_PROGRAM = `const tank = scan.entities({ name: "storage-tank" })[0]
 while (true) { pump("water", 300); fill(tank); wait(0.2) }`
 const OIL_PROGRAM = `while (true) { pump("crude-oil", 30); print(Math.round(me.tank!.amount)) }`
 
+/** Связь (этап 9): запросы с ответом, доска, задачи — до и после сохранения. */
+const PING_PROGRAM = `subscribe("пинг")
+while (true) {
+  const m = receive<number>("пинг", 2)
+  if (m !== null) m.reply(m.data + 1)
+  const task = tasks.next<number>("работа", { timeout: 0.5, lease: 2 })
+  if (task !== null) { board.increment("сделано", task.data); task.done() }
+}`
+const PONG_PROGRAM = `let n = 0
+while (true) {
+  n = request<number>("пинг-машина", "пинг", n, 5)
+  tasks.push("работа", n, { priority: n % 3 })
+  board.set("последний", { n, at: time.tick })
+  broadcast("пинг", n)
+  wait(0.3)
+}`
+
 const DUMP_TICK = 600 // как в tools/test/desync.mjs
 
 function nauvis() {
@@ -88,6 +105,22 @@ const steps: Record<number, () => void> = {
     for (const worker of workers()) {
       if (math.abs(worker.position.x - 118.5) < 2 && math.abs(worker.position.y - 45.5) < 2) assignProgram(findRobot(worker)!, water.program)
       if (math.abs(worker.position.x - 128.5) < 2 && math.abs(worker.position.y - 60.5) < 2) assignProgram(findRobot(worker)!, oil.program)
+    }
+  },
+  95: () => {
+    game.forces.player.technologies[TECH.radio].researched = true
+    const ping = publishProgram("пинг", PING_PROGRAM)
+    const pong = publishProgram("понг", PONG_PROGRAM)
+    if (!ping.ok || !pong.ok) error("программы связи не компилируются")
+    placeAt({ x: 140.5, y: 40.5 })
+    placeAt({ x: 144.5, y: 40.5 })
+    for (const worker of workers()) {
+      const record = findRobot(worker)!
+      if (math.abs(worker.position.x - 140.5) < 2 && math.abs(worker.position.y - 40.5) < 2) {
+        record.name = "пинг-машина"
+        assignProgram(record, ping.program)
+      }
+      if (math.abs(worker.position.x - 144.5) < 2 && math.abs(worker.position.y - 40.5) < 2) assignProgram(record, pong.program)
     }
   },
   120: () => workers()[0].die(),

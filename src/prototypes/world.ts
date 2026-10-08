@@ -8,7 +8,7 @@ import {
   ShortcutPrototype,
   SimpleEntityWithOwnerPrototype,
 } from "factorio:prototype"
-import { MARKER, PROGRAMMER } from "../names"
+import { MARKER, PROGRAMMER, SIGNAL_MARKER } from "../names"
 
 declare const data: PrototypeData
 
@@ -77,5 +77,58 @@ const shortcut: ShortcutPrototype = {
   small_icon: TOOL,
   small_icon_size: 64,
 }
+
+// Сигнальная метка (9.6): постоянный комбинатор игры (провода, окно сигналов), перекрашенный в цвет
+// меток, сквозь который можно ходить. Программы находят её marker("имя") и читают/пишут сигналы.
+function deepcopy<T>(value: T): T {
+  if (type(value) !== "table") return value
+  const copy: Record<string, unknown> = {}
+  for (const [key, item] of pairs(value as Record<string, unknown>)) copy[key] = deepcopy(item)
+  return copy as T
+}
+
+function tintSprites(value: unknown): void {
+  if (type(value) !== "table") return
+  const table = value as Record<string, unknown>
+  if (typeof table.filename === "string" && !table.draw_as_shadow) table.tint = ACCENT
+  for (const [, item] of pairs(table)) tintSprites(item)
+}
+
+const signalMarker = deepcopy(data.raw["constant-combinator"]!["constant-combinator"]!) as unknown as Record<string, unknown>
+signalMarker.name = SIGNAL_MARKER
+signalMarker.icons = [
+  { icon: FLAG, icon_size: 64, tint: ACCENT },
+  { icon: "__base__/graphics/icons/signal/signal-red.png", icon_size: 64, scale: 0.25, shift: [8, 8] },
+]
+signalMarker.icon = undefined
+signalMarker.minable = { mining_time: 0.1, result: SIGNAL_MARKER }
+signalMarker.collision_mask = { layers: {} }
+signalMarker.fast_replaceable_group = undefined
+signalMarker.next_upgrade = undefined
+tintSprites(signalMarker.sprites)
+
+const signalMarkerItem: ItemPrototype = {
+  type: "item",
+  name: SIGNAL_MARKER,
+  icons: signalMarker.icons as ItemPrototype["icons"],
+  subgroup: "transport",
+  order: "z[automaton]-n[signal-marker]",
+  place_result: SIGNAL_MARKER,
+  stack_size: 50,
+}
+
+const signalMarkerRecipe: RecipePrototype = {
+  type: "recipe",
+  name: SIGNAL_MARKER,
+  enabled: false,
+  energy_required: 0.5,
+  ingredients: [
+    { type: "item", name: MARKER, amount: 1 },
+    { type: "item", name: "constant-combinator", amount: 1 },
+  ],
+  results: [{ type: "item", name: SIGNAL_MARKER, amount: 1 }],
+}
+
+data.extend([signalMarker as never, signalMarkerItem, signalMarkerRecipe])
 
 data.extend([marker, markerItem, markerRecipe, programmer, shortcut])
