@@ -6,7 +6,7 @@ import { setActivity } from "../automaton/appearance"
 import { moveRobot } from "../automaton/movement"
 import { say, showProblem } from "../automaton/status"
 import { findRobot, RobotRecord } from "../automaton/registry"
-import { Activity, BODY_DIRECTIONS, WORKER_MK1, WORKER_MK1_PLACER } from "../names"
+import { Activity, BODY_DIRECTIONS, TECH, WORKER_MK1, WORKER_MK1_PLACER } from "../names"
 import { guiOf } from "../gui/common"
 import { openMachine } from "../gui/machine"
 import { openPrograms, publishFromWindow, showTypes } from "../gui/programs"
@@ -142,7 +142,16 @@ while (true) {
     const player = game.get_player(1 as PlayerIndex)
     if (player !== undefined) writeVsCodeFolder(player)
   }
+  // Дерево технологий (этап 6): технологии автоматонов на месте «Логистики». Экран технологий в одиночной
+  // игре ставит её на паузу — поэтому снимок последний, в том же тике (shot.mjs ждёт файлы ещё пару секунд).
   if (tick === 240) {
+    const player = game.get_player(1 as PlayerIndex)
+    if (player !== undefined) {
+      player.opened = undefined
+      player.gui.screen.clear()
+      player.open_technology_gui(TECH.radio)
+      guiShot("tech-tree")
+    }
     helpers.write_file("automaton-visual/done.txt", "done", false)
     script.on_nth_tick(1, undefined)
   }

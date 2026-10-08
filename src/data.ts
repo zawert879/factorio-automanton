@@ -3,3 +3,4 @@
 import "./prototypes/automaton"
 import "./prototypes/world"
 import "./prototypes/gui"
+import "./prototypes/technologies"

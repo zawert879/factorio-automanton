@@ -34,6 +34,11 @@ const timer = setInterval(() => {
   const timedOut = Date.now() - started > TIMEOUT_MS
   if (!done && !timedOut && game.exitCode === null) return
   clearInterval(timer)
+  // Снимок пишется при отрисовке кадра, после done.txt (последний — уже на паузе): даём игре пару секунд.
+  setTimeout(() => finish(done, timedOut), done ? 3000 : 0)
+}, 500)
+
+function finish(done, timedOut) {
   game.kill()
   if (!done) {
     console.error(`Снимки не получены (${timedOut ? "время вышло" : `игра вышла с кодом ${game.exitCode}`}):\n${scriptError(output)}`)
@@ -44,4 +49,4 @@ const timer = setInterval(() => {
   mkdirSync(target, { recursive: true })
   cpSync(outDir, target, { recursive: true })
   console.log(`Снимки: ${target}`)
-}, 500)
+}
