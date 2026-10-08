@@ -25,11 +25,26 @@ function attempt(what: string, action: () => number): number {
   }
 }
 
+/** Здание у метки: ближайшее к самой метке (машина останавливается в паре клеток от неё — с любой стороны). */
+function nearMarker(at: Marker, types: string[]): Entity | null {
+  let best: Entity | null = null;
+  let bestDistance = Infinity;
+  for (const e of scan.entities({ type: types, radius: 6 })) {
+    const d = (e.position.x - at.position.x) ** 2 + (e.position.y - at.position.y) ** 2;
+    if (d < bestDistance) {
+      best = e;
+      bestDistance = d;
+    }
+  }
+  return best;
+}
+
 /** Доехать до метки и найти сундук рядом с ней. */
 function chestAt(name: string): Entity {
-  move(marker(name), { radius: 2 });
-  const chest = scan.entities({ type: ["container", "logistic-container"], radius: 4 })[0];
-  if (chest === undefined) {
+  const at = marker(name);
+  move(at, { radius: 2 });
+  const chest = nearMarker(at, ["container", "logistic-container"]);
+  if (chest === null) {
     alert(`${me.name}: у метки «${name}» нет сундука`);
     exit();
   }

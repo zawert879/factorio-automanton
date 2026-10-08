@@ -1,11 +1,12 @@
 // Отладочные команды для разработки и проверки в игре. В мультиплеере — только для админов.
-import { CustomCommandData, LuaEntity, LuaPlayer, MapPosition } from "factorio:runtime"
+import { CustomCommandData, LuaEntity, LuaForce, LuaPlayer, MapPosition } from "factorio:runtime"
 import { ActionKind, ActionParams, startAction } from "../automaton/actions"
 import { entityFluid, entityFuel, entityInput, entityOutput, entityProgress, entityRecipe, entityStatus } from "../automaton/inspect"
 import { moveRobot } from "../automaton/movement"
 import { say } from "../automaton/status"
 import { RobotRecord } from "../automaton/registry"
 import { MODELS, modelOf } from "../names"
+import { buildScienceDemo } from "../world/scienceDemo"
 
 function adminPlayer(command: CustomCommandData): LuaPlayer | undefined {
   if (command.player_index === undefined) return undefined
@@ -19,6 +20,15 @@ function adminPlayer(command: CustomCommandData): LuaPlayer | undefined {
 }
 
 export function registerDebugCommands(): void {
+  // /am-science: демо-фабрика красной и зелёной науки рядом с игроком (src/world/scienceDemo.ts).
+  commands.add_command("am-science", ["automaton.debug-science-help"], (command) => {
+    const player = adminPlayer(command)
+    if (player === undefined) return
+    const origin = { x: math.floor(player.position.x) + 45, y: math.floor(player.position.y) }
+    buildScienceDemo(player.surface, origin, player.force as LuaForce)
+    player.print(["automaton.debug-science-built", `[gps=${origin.x},${origin.y}]`])
+  })
+
   commands.add_command("am-give", ["automaton.debug-give-help"], (command) => {
     const player = adminPlayer(command)
     if (player === undefined) return

@@ -154,7 +154,7 @@ interface Inventory {
 ```ts
 // Одна программа «Шахтёр» на всех машинах, у каждой свои параметры в окне машины
 const { ore, field } = me.args<{ ore: Item; field: string }>();
-me.label = `⛏ ${ore}`;
+me.label = `копаю ${ore}`;
 ```
 
 ## Движение

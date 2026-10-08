@@ -1480,13 +1480,23 @@ export function generate(program: A.Program, analysis: Analysis): CompileResult 
     ]
   }
 
+  /** Временные для pcall тела try — занимаются ДО компиляции тела: иначе тело взяло бы те же номера,
+   * и результат pcall при паузе (кадр продолжения) затёр бы сохранённое телом значение. */
+  interface TryTemps {
+    ok: string
+    kind: string
+    value: string
+    depth: string
+    sync: string
+  }
+
+  function tryTemps(): TryTemps {
+    return { ok: temp(), kind: temp(), value: temp(), depth: temp(), sync: temp() }
+  }
+
   /** pcall тела try: метка (если тело может приостановиться), сохранение глубины, обработка паузы. */
-  function protectedCall(body: LuaFn): { ok: string; kind: string; value: string } {
-    const ok = temp()
-    const kind = temp()
-    const value = temp()
-    const depth = temp()
-    const sync = temp()
+  function protectedCall(body: LuaFn, temps: TryTemps): { ok: string; kind: string; value: string } {
+    const { ok, kind, value, depth, sync } = temps
     const point = body.pauses.length > 0 ? registerPause() : undefined
     if (point !== undefined) emit(`::${point.label}::`)
     emit(`${depth} = QD ${sync} = QS`)
@@ -1525,8 +1535,9 @@ export function generate(program: A.Program, analysis: Analysis): CompileResult 
   }
 
   function tryCatch(s: Extract<A.Stmt, { kind: "Try" }>): void {
+    const temps = tryTemps()
     const body = compileBody(() => block(s.block))
-    const r = protectedCall(body)
+    const r = protectedCall(body, temps)
     const end = newLabel()
     completions(body, r.kind, r.value, `${r.ok} and `)
     emit(`if ${r.ok} then goto ${end} end`)
@@ -1544,11 +1555,12 @@ export function generate(program: A.Program, analysis: Analysis): CompileResult 
       tryCatch(s)
       return
     }
+    const temps = tryTemps()
     const body = compileBody(() => {
       if (s.handler !== undefined) tryCatch(s)
       else block(s.block)
     })
-    const r = protectedCall(body)
+    const r = protectedCall(body, temps)
     // Вид завершения: nil — обычное, 1 — return, 2 — break/continue, 3 — исключение.
     emit(`if not ${r.ok} then ${r.kind}, ${r.value} = 3, ${r.kind} end`)
     block(s.finalizer)

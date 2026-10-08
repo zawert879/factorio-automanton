@@ -9,7 +9,7 @@
 const { ore, depot } = me.args<{ ore?: Item; depot?: string }>();
 const item: Item = ore ?? "coal";
 const depotName = depot ?? "склад";
-me.label = `⛏ ${item}`;
+me.label = `копаю ${item}`;
 
 /** Ближайшая клетка месторождения (машина должна стоять рядом с ним). */
 function findField(): Position {
@@ -19,6 +19,20 @@ function findField(): Position {
     exit();
   }
   return patch.nearest;
+}
+
+/** Здание у метки: ближайшее к самой метке (машина останавливается в паре клеток от неё — с любой стороны). */
+function nearMarker(at: Marker, types: string[]): Entity | null {
+  let best: Entity | null = null;
+  let bestDistance = Infinity;
+  for (const e of scan.entities({ type: types, radius: 6 })) {
+    const d = (e.position.x - at.position.x) ** 2 + (e.position.y - at.position.y) ** 2;
+    if (d < bestDistance) {
+      best = e;
+      bestDistance = d;
+    }
+  }
+  return best;
 }
 
 let field = findField();
@@ -34,9 +48,10 @@ while (true) {
   }
   if (me.fuel < 0.5 && me.cargo.count("coal") > 0) refuel("coal");
 
-  move(marker(depotName), { radius: 2 });
-  const chest = scan.entities({ type: ["container", "logistic-container"], radius: 4 })[0];
-  if (chest === undefined) {
+  const depot = marker(depotName);
+  move(depot, { radius: 2 });
+  const chest = nearMarker(depot, ["container", "logistic-container"]);
+  if (chest === null) {
     alert(`${me.name}: у метки «${depotName}» нет сундука`);
     exit();
   }

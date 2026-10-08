@@ -12,10 +12,16 @@ const { target } = me.args<{ target?: string }>();
 const targetName = target ?? "котельная";
 me.label = "вода";
 
-const shore = scan.water();
-if (shore === null) {
-  alert(`${me.name}: рядом нет воды — поставьте машину у берега`);
-  exit();
+// Где набирать воду: сухая точка у берега — там, где машина стоит при запуске (в саму воду не проехать).
+let shore = me.position;
+if (scan.water(me.mineReach) === null) {
+  const water = scan.water();
+  if (water === null) {
+    alert(`${me.name}: рядом нет воды — поставьте машину у берега`);
+    exit();
+  }
+  move(water, { radius: 2 });
+  shore = me.position;
 }
 
 /** Залить бак в резервуары и котлы у метки; true — что-то залилось. */

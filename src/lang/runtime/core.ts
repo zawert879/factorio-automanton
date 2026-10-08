@@ -71,9 +71,12 @@ export function program(this: void): ProgramExports {
   return current!
 }
 
-/** Израсходовать n инструкций кванта текущей программы; результат — остаток. */
+/**
+ * Израсходовать n инструкций кванта текущей программы; результат — остаток. Вне программы (окно
+ * машины разбирает параметры через JSON.parse, постройка демо) — без учёта.
+ */
 export function spend(this: void, n: number): number {
-  return current!.charge(n)
+  return current === undefined ? math.huge : current.charge(n)
 }
 
 // ---------- Память ----------
