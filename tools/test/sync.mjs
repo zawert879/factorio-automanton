@@ -93,9 +93,30 @@ if (!existsSync(join(pulled, "automaton.d.ts"))) fail("pull не положил 
 const exported = join(env.data, "script-output", "automaton", "player", "Привет.ts")
 if (!existsSync(exported) || readFileSync(exported, "utf8") !== longProgram) fail(`нет выгрузки в ${exported}`)
 
+// Модули в папках (этап 17): имя — путь от папки с tsconfig.json; ошибки зависимой — в её файле.
+const project = join(env.work, "project")
+mkdirSync(join(project, "lib"), { recursive: true })
+mkdirSync(join(project, "app"), { recursive: true })
+writeFileSync(join(project, "tsconfig.json"), "{}")
+const libFile = join(project, "lib", "Счёт.ts")
+const appFile = join(project, "app", "Главная.ts")
+writeFileSync(libFile, "export function twice(x: number): number {\n  return x * 2\n}\n")
+writeFileSync(appFile, 'import { twice } from "../lib/Счёт"\nprint(twice(2))\n')
+const modulesPush = spawnSync("node", [tool, "push", libFile, appFile, ...rconArgs], { encoding: "utf8" })
+const modulesOut = modulesPush.stdout + modulesPush.stderr
+if (!modulesOut.includes("«lib/Счёт» опубликована") || !modulesOut.includes("«app/Главная» опубликована")) fail(`модули в папках:\n${modulesOut}`)
+writeFileSync(libFile, "export function triple(x: number): number {\n  return x * 3\n}\n")
+const breakPush = spawnSync("node", [tool, "push", libFile, ...rconArgs], { encoding: "utf8" })
+const breakOut = breakPush.stdout + breakPush.stderr
+if (!breakOut.includes(`${appFile}:1:10: error: в «lib/Счёт» нет экспорта «twice»`)) fail(`ошибка зависимой — не в её файле:\n${breakOut}`)
+const modulesPulled = join(env.work, "pulled-modules")
+spawnSync("node", [tool, "pull", modulesPulled, ...rconArgs], { encoding: "utf8" })
+if (!existsSync(join(modulesPulled, "lib", "Счёт.ts")) || !existsSync(join(modulesPulled, "app", "Главная.ts"))) fail("pull не разложил программы по папкам")
+if (!existsSync(join(env.data, "script-output", "automaton", "player", "lib", "Счёт.ts"))) fail("выгрузка не разложила программы по папкам")
+
 // Временную папку не удаляем: сервер ещё дописывает файлы после остановки (её чистит следующий запуск).
 server.kill()
-console.log("RCON (выделенный сервер): публикация частями, ошибки, pull, выгрузка — ок")
+console.log("RCON (выделенный сервер): публикация частями, ошибки, pull, выгрузка, модули в папках — ок")
 
 // ---------- UDP: игра с окном ----------
 const gui = prepareWork("automaton-sync-udp", "automaton-sync-udp")

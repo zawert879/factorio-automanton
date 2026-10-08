@@ -25,13 +25,17 @@ const header = `// Типы API автоматонов (мод Automaton для 
 // Проще всего: в игре окно «Программы команды» → «Папка для VS Code» — мод запишет готовую папку
 // (программы, этот файл, tsconfig.json, синхронизацию с игрой). Вручную:
 //   1. Создайте папку, положите в неё этот файл и tsconfig.json:
-//      { "compilerOptions": { "strict": true, "target": "es2020", "lib": ["es2020"], "noEmit": true, "moduleDetection": "force" } }
+//      { "compilerOptions": { "strict": true, "target": "es2020", "lib": ["es2020"], "noEmit": true, "moduleDetection": "force",
+//        "module": "preserve", "moduleResolution": "bundler" } }
 //   2. Пишите программу в файле .ts рядом — VS Code подскажет функции и найдёт ошибки.
 //   3. Скопируйте текст программы в окно «Программы команды» в игре и нажмите «Опубликовать».
 // Справка по языку и API — docs/API.md и docs/LANGUAGE.md.
 `
 const tsconfig = JSON.stringify(
-  { compilerOptions: { strict: true, target: "es2020", lib: ["es2020"], noEmit: true, moduleDetection: "force", types: [] } },
+  {
+    // module / moduleResolution: import "../lib/Помощники" находит соседний файл без расширения (этап 17).
+    compilerOptions: { strict: true, target: "es2020", lib: ["es2020"], noEmit: true, moduleDetection: "force", module: "preserve", moduleResolution: "bundler", types: [] },
+  },
   null,
   2,
 )
@@ -72,8 +76,13 @@ if (process.argv.includes("--check")) {
   writeFileSync(join(dir, "automaton.d.ts"), dts)
   // Каждый пример — отдельный файл; moduleDetection: force делает их модулями (одинаковые имена не мешают).
   examples.forEach((source, i) => writeFileSync(join(dir, `example${i + 1}.ts`), source))
-  for (const { file, source } of starters) writeFileSync(join(dir, `starter-${file}`), source)
-  writeFileSync(join(dir, "tsconfig.json"), JSON.stringify({ ...JSON.parse(tsconfig), include: ["*.ts"] }))
+  // Стартовые программы — по своим именам (папки — подпапки), как в папке для VS Code: так проверяются и импорты.
+  for (const { name, source } of starters) {
+    const path = join(dir, "starters", ...name.split("/")) + ".ts"
+    mkdirSync(join(path, ".."), { recursive: true })
+    writeFileSync(path, source)
+  }
+  writeFileSync(join(dir, "tsconfig.json"), JSON.stringify({ ...JSON.parse(tsconfig), include: ["**/*.ts"] }))
   try {
     execFileSync(join(root, "node_modules", ".bin", "tsc"), ["-p", join(dir, "tsconfig.json")], { stdio: "pipe" })
     console.log(`automaton.d.ts: ${examples.length} примеров из API.md и руководства и ${starters.length} стартовых программ проходят tsc --strict`)

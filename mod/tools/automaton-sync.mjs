@@ -5,7 +5,8 @@
 //   node automaton-sync.mjs push файл.ts…     — опубликовать файлы один раз
 //   node automaton-sync.mjs pull [папка]      — скачать программы команды из игры в папку
 //
-// Имя программы — имя файла без .ts (или первая строка «// @program Имя»).
+// Имя программы — путь файла от папки программ без .ts, папки через «/»: lib/Помощники.ts → «lib/Помощники»
+// (или первая строка «// @program Имя»). Импорт между программами — как между файлами: "../lib/Помощники".
 // Связь с игрой:
 //   UDP (по умолчанию; игра с окном — одиночная или по сети): параметр запуска игры «--enable-lua-udp 27155»
 //     (в Steam: Свойства → Параметры запуска); утилита: --udp 27155 (по умолчанию);
@@ -13,9 +14,9 @@
 // Параметры можно положить в .automaton-sync.json в папке: { "udp": 27155 } или { "rcon": true, "port": …, "password": … }.
 // Ошибки печатаются как «файл:строка:столбец: error: текст» — VS Code показывает их в коде (docs/VSCODE.md).
 import { createSocket } from "node:dgram"
-import { copyFileSync, existsSync, readdirSync, readFileSync, watch, writeFileSync } from "node:fs"
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, watch, writeFileSync } from "node:fs"
 import { createConnection } from "node:net"
-import { basename, dirname, join, resolve } from "node:path"
+import { dirname, join, relative, resolve, sep } from "node:path"
 import { fileURLToPath } from "node:url"
 
 const HERE = dirname(fileURLToPath(import.meta.url))
@@ -205,9 +206,36 @@ class Udp {
 
 // ---------- Публикация и загрузка ----------
 
+/** Корень папки программ: в watch и pull — папка; у push — ближайшая выше с tsconfig.json или automaton.d.ts. */
+function rootOf(file) {
+  if (mode !== "push") return folder
+  let dir = dirname(file)
+  for (;;) {
+    if (["tsconfig.json", "automaton.d.ts", ".automaton-sync.json"].some((f) => existsSync(join(dir, f)))) return dir
+    const parent = dirname(dir)
+    if (parent === dir) return dirname(file)
+    dir = parent
+  }
+}
+
 function programName(file, source) {
   const marker = /^\/\/\s*@program\s+(.+)$/m.exec(source.split("\n")[0] ?? "")
-  return marker ? marker[1].trim() : basename(file).replace(/\.ts$/, "")
+  if (marker) return marker[1].trim()
+  return relative(rootOf(file), file).split(sep).join("/").replace(/\.ts$/, "")
+}
+
+/** Файл программы по имени: папки — подпапки, запрещённые в путях символы — «_». */
+function fileOf(root, name) {
+  return join(root, ...name.split("/").map((part) => part.replace(/[\\:*?"<>|]/g, "_"))) + ".ts"
+}
+
+/** Список из ответа игры: пустая таблица Lua приходит как {}, а не []. */
+const list = (value) => (Array.isArray(value) ? value : [])
+
+/** Ошибка компиляции для VS Code; ошибка в модуле — в файле модуля. */
+function printError(root, file, error) {
+  const where = error.module ? fileOf(root, error.module) : file
+  console.log(`${where}:${Math.max(1, error.line)}:${Math.max(1, error.column)}: error: ${message(error)}`)
 }
 
 /** Текст, который уже есть в игре (опубликован или скачан): такой файл не публикуется повторно. */
@@ -230,14 +258,18 @@ async function push(link, file, force = false) {
     if (!part.ok) throw new Error(`игра не приняла часть программы: ${part.error}`)
   }
   const result = await link.request({ cmd: "end", parts })
+  const root = rootOf(file)
   if (result.ok) {
     synced.set(file, source)
     console.log(`automaton: «${name}» опубликована, v${result.version}`)
+    if (list(result.rebuilt).length > 0) console.log(`automaton: пересобраны: ${result.rebuilt.join(", ")}`)
+    // Зависимые, которые с новой версией не собрались, — ошибки в их файлах (в игре работает прежняя сборка).
+    for (const stale of list(result.stale)) {
+      for (const error of list(stale.errors)) printError(root, fileOf(root, stale.name), error)
+    }
     return true
   }
-  for (const error of result.errors ?? [{ line: 1, column: 1, code: result.error ?? "error" }]) {
-    console.log(`${file}:${Math.max(1, error.line)}:${Math.max(1, error.column)}: error: ${message(error)}`)
-  }
+  for (const error of result.errors ?? [{ line: 1, column: 1, code: result.error ?? "error" }]) printError(root, file, error)
   return false
 }
 
@@ -252,7 +284,8 @@ async function pull(link) {
       text += part.text
       from = part.next
     }
-    const file = join(folder, `${program.name.replace(/[/\\:*?"<>|]/g, "_")}.ts`)
+    const file = fileOf(folder, program.name)
+    mkdirSync(dirname(file), { recursive: true })
     synced.set(file, text)
     writeFileSync(file, text)
     console.log(`automaton: «${program.name}» v${program.version} → ${file}`)
@@ -277,15 +310,13 @@ async function main() {
     return
   }
   // watch: начало и конец каждой публикации отмечены — по ним VS Code обновляет список ошибок.
-  // Файлы, которые уже лежат в папке, считаются синхронными (иначе запуск опубликовал бы все разом).
-  for (const file of readdirSync(folder)) {
-    if (file.endsWith(".ts") && !file.endsWith(".d.ts")) synced.set(join(folder, file), readFileSync(join(folder, file), "utf8").replace(/\r\n/g, "\n"))
-  }
+  // Файлы, которые уже лежат в папке (и подпапках), считаются синхронными (иначе запуск опубликовал бы все разом).
+  for (const file of programFiles(folder)) synced.set(file, readFileSync(file, "utf8").replace(/\r\n/g, "\n"))
   console.log(`automaton: слежу за ${folder} (Ctrl+C — выход)`)
   const timers = new Map()
   let queue = Promise.resolve()
-  watch(folder, (_event, file) => {
-    if (file === null || !file.endsWith(".ts") || file.endsWith(".d.ts")) return
+  const onChange = (_event, file) => {
+    if (file === null || !file.endsWith(".ts") || file.endsWith(".d.ts") || file.split(/[\\/]/).some((part) => part.startsWith(".") || part === "node_modules")) return
     clearTimeout(timers.get(file))
     timers.set(
       file,
@@ -303,7 +334,25 @@ async function main() {
         })
       }, 300),
     )
-  })
+  }
+  // Подпапки (модули в папках): recursive есть в macOS и Windows, в Linux — с Node.js 20.
+  try {
+    watch(folder, { recursive: true }, onChange)
+  } catch {
+    console.log("automaton: эта версия Node.js не следит за подпапками — обновите Node.js до 20+")
+    watch(folder, onChange)
+  }
+}
+
+/** Файлы программ в папке и подпапках (без .d.ts, скрытых папок и node_modules). */
+function programFiles(dir, out = []) {
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    if (entry.name.startsWith(".") || entry.name === "node_modules") continue
+    const path = join(dir, entry.name)
+    if (entry.isDirectory()) programFiles(path, out)
+    else if (entry.name.endsWith(".ts") && !entry.name.endsWith(".d.ts")) out.push(path)
+  }
+  return out
 }
 
 main().catch((error) => {

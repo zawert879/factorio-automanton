@@ -7,7 +7,8 @@
 // - RCON (выделенный сервер): команда /automaton-sync <json>, ответ — rcon.print.
 // Большая программа передаётся частями с номерами (повтор потерянного пакета не задваивает текст). Части
 // копятся в storage: запросы исполняют все участники, и подключившийся посреди передачи получит тот же текст.
-// Каждая опубликованная программа выгружается в script-output/automaton/<команда>/<имя>.ts (только на сервере).
+// Каждая опубликованная программа выгружается в script-output/automaton/<команда>/<имя>.ts (только на сервере);
+// папки в имени программы (этап 17) — подпапки.
 import { CustomCommandData, LuaPlayer, PlayerIndex } from "factorio:runtime"
 import { onEvent, onTick } from "../events"
 import { Diagnostic } from "../lang/lexer"
@@ -63,7 +64,9 @@ const README = `Папка программ автоматонов для VS Cod
    «Automaton: публиковать при сохранении» (нужен Node.js 18+).
 2. Запускайте игру с параметром «--enable-lua-udp 27155» (Steam: Factorio → Свойства → Параметры запуска).
 3. Сохранили файл .ts — программа опубликована в игре; ошибки подчёркнуты в коде.
-   Имя программы — имя файла. Новые программы из игры: «node automaton-sync.mjs pull».
+   Имя программы — путь файла без .ts: lib/Помощники.ts — программа «lib/Помощники».
+   Импорт между программами — как между файлами: import { nearMarker } from "../lib/Помощники".
+   Новые программы из игры: «node automaton-sync.mjs pull».
 Выделенный сервер: RCON — «node automaton-sync.mjs watch . --rcon --port … --password …».
 `
 
@@ -99,8 +102,13 @@ export function fileName(name: string): string {
   return safe
 }
 
+/** Путь файла программы: папки из имени — подпапки (lib/Помощники → lib/Помощники.ts). */
+export function programPath(name: string): string {
+  return `${name.split("/").map((part) => fileName(part)).join("/")}.ts`
+}
+
 function diagnosticsJson(diagnostics: Diagnostic[]): unknown[] {
-  return diagnostics.map((d) => ({ line: d.line, column: d.column, code: d.code, params: d.params.map((p) => tostring(p)) }))
+  return diagnostics.map((d) => ({ line: d.line, column: d.column, code: d.code, params: d.params.map((p) => tostring(p)), module: d.module }))
 }
 
 /** Обработать запрос утилиты; sender — ключ передачи (кто шлёт), player — игрок (нет — сервер). */
@@ -134,7 +142,9 @@ function handle(request: Request, sender: string, player: LuaPlayer | undefined)
       if (player !== undefined) notePublish(player)
       const result = publish({ name: buffer.name, source: parts.join(""), force: buffer.force, author: player?.name ?? "VS Code" })
       if (!result.ok) return { ok: false, errors: diagnosticsJson(result.diagnostics) }
-      return { ok: true, version: result.program.version }
+      // Зависимые программы: пересобраны или не собрались (их ошибки утилита покажет в их файлах).
+      const stale = (result.stale ?? []).map((name) => ({ name, errors: diagnosticsJson(findProgram(name, buffer.force)?.stale?.diagnostics ?? []) }))
+      return { ok: true, version: result.program.version, rebuilt: result.rebuilt, stale }
     }
     case "list":
       return { ok: true, programs: programsOf(force).map((p) => ({ name: p.name, version: p.version })) }
@@ -188,7 +198,7 @@ export function writeVsCodeFolder(player: LuaPlayer): string {
   write("automaton-sync.mjs", SYNC_TOOL)
   write(".vscode/tasks.json", TASKS)
   write("README.txt", README)
-  for (const program of programsOf(player.force.name)) write(`${fileName(program.name)}.ts`, program.source)
+  for (const program of programsOf(player.force.name)) write(programPath(program.name), program.source)
   return dir
 }
 
@@ -213,6 +223,6 @@ export function registerSync(): void {
   })
   // Выгрузка опубликованных программ — только на сервере (в одиночной игре — у игрока).
   onProgramPublished((program) => {
-    helpers.write_file(`automaton/${fileName(program.force)}/${fileName(program.name)}.ts`, program.source, false, 0)
+    helpers.write_file(`automaton/${fileName(program.force)}/${programPath(program.name)}`, program.source, false, 0)
   })
 }
