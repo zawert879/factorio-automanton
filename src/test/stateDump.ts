@@ -32,6 +32,29 @@ const WATER_PROGRAM = `const tank = scan.entities({ name: "storage-tank" })[0]
 while (true) { pump("water", 300); fill(tank); wait(0.2) }`
 const OIL_PROGRAM = `while (true) { pump("crude-oil", 30); print(Math.round(me.tank!.amount)) }`
 
+/** Толпа машин (13.1): своя роль по id — ездят по кругу или копают; связь, доска, случайные числа. */
+const CROWD_PROGRAM = `const id = me.id
+const points = [{ x: 200, y: 100 }, { x: 230, y: 100 }, { x: 230, y: 130 }, { x: 200, y: 130 }]
+let i = id % 4
+subscribe("толпа")
+while (true) {
+  if (id % 4 === 0) {
+    move({ x: 203, y: 147 })
+    mine("iron-ore", 2)
+  } else {
+    const p = points[i % 4]
+    move({ x: p.x + (id % 7), y: p.y + (id % 5) })
+  }
+  i++
+  board.increment("шаги")
+  if (i % 3 === 0) broadcast("толпа", { from: id, i })
+  const m = tryReceive<{ from: number; i: number }>("толпа")
+  let sum = 0
+  for (let k = 0; k < 50; k++) sum += Math.floor(Math.random() * 10)
+  if (m !== null) print(m.data.from, sum)
+  wait(0.1)
+}`
+
 /** Связь (этап 9): запросы с ответом, доска, задачи — до и после сохранения. */
 const PING_PROGRAM = `subscribe("пинг")
 while (true) {
@@ -133,6 +156,18 @@ const steps: Record<number, () => void> = {
     const robot = findRobot(nauvis().find_entities_filtered({ name: MODELS[3].entity, position, radius: 0.5 })[0])!
     robot.weapon!.insert({ name: "firearm-magazine", count: 10 })
     assignProgram(robot, patrol.program)
+  },
+  // Толпа (13.1): ещё 40 машин с одной программой — поездки по кругу, добыча, связь, доска, случайные числа.
+  100: () => {
+    const crowd = publishProgram("толпа", CROWD_PROGRAM)
+    if (!crowd.ok) error("программа толпы не компилируется")
+    for (let x = 200; x < 206; x++) for (let y = 140; y < 146; y++) nauvis().create_entity({ name: "iron-ore", position: { x: x + 0.5, y: y + 0.5 }, amount: 5000 })
+    for (let i = 0; i < 40; i++) {
+      const position = nauvis().find_non_colliding_position(WORKER_MK1, { x: 200 + (i % 10) * 3, y: 100 + math.floor(i / 10) * 3 }, 10, 0.5)!
+      nauvis().create_entity({ name: WORKER_MK1_PLACER, position, force: "player", raise_built: true })
+      const robot = findRobot(nauvis().find_entities_filtered({ name: WORKER_MK1, position, radius: 0.5 })[0])!
+      assignProgram(robot, crowd.program)
+    }
   },
   120: () => workers()[0].die(),
   200: () => {

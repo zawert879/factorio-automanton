@@ -3,12 +3,16 @@
 // В обоих на тике DUMP_TICK мод пишет снимок storage (src/test/stateDump.ts) — снимки должны совпасть.
 // Ловит состояние вне storage (локальные переменные, кэши), изменения storage в on_load и т.п.
 // DESYNC_SHOW=1 — напечатать снимок.
+// --heavy (npm run test:desync:heavy): в прогоне B сохранение и загрузка каждые 50 тиков — замена
+// heavy mode игры, которую без окна не включить (13.1).
 import { copyFileSync, existsSync, readFileSync, rmSync } from "node:fs"
 import { join } from "node:path"
 import { buildMod, createMap, prepareWork, runFactorio, scriptError } from "./factorio.mjs"
 
 const SAVE_TICK = 300
 const DUMP_TICK = 600 // как в src/test/stateDump.ts
+const HEAVY = process.argv.includes("--heavy")
+const SAVE_TICKS = HEAVY ? Array.from({ length: 11 }, (_, i) => 50 + i * 50) : [SAVE_TICK]
 
 buildMod()
 const env = prepareWork("automaton-test-desync", "automaton-desync-test")
@@ -44,14 +48,14 @@ const dumpA = takeDump("прогон A")
 
 const b = join(env.work, "b.zip")
 copyFileSync(env.map, b)
-runUntil(b, SAVE_TICK, "прогон B до сохранения")
+for (const tick of SAVE_TICKS) runUntil(b, tick, `прогон B до сохранения на тике ${tick}`)
 runUntil(b, DUMP_TICK + 1, "прогон B после загрузки")
 const dumpB = takeDump("прогон B")
 
 if (process.env.DESYNC_SHOW) console.log(dumpA)
 
 if (dumpA === dumpB) {
-  console.log(`сохранение на тике ${SAVE_TICK} не изменило состояние на тике ${DUMP_TICK} — ок`)
+  console.log(`сохранения на тиках ${SAVE_TICKS.join(", ")} не изменили состояние на тике ${DUMP_TICK} — ок`)
   process.exit(0)
 }
 
@@ -60,4 +64,4 @@ const linesB = dumpB.split("\n")
 const diff = linesA
   .map((line, i) => (line === linesB[i] ? null : `  без сохранения:  ${line}\n  с сохранением:   ${linesB[i] ?? "<нет строки>"}`))
   .filter((line) => line !== null)
-fail(`ДЕСИНК: после сохранения на тике ${SAVE_TICK} состояние на тике ${DUMP_TICK} другое:\n${diff.slice(0, 20).join("\n")}`)
+fail(`ДЕСИНК: после сохранений на тиках ${SAVE_TICKS.join(", ")} состояние на тике ${DUMP_TICK} другое:\n${diff.slice(0, 20).join("\n")}`)

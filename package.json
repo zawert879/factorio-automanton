@@ -14,7 +14,9 @@
     "prebuild": "node tools/dts/generate.mjs",
     "dts": "node tools/dts/generate.mjs --check",
     "test:sync": "node tools/test/sync.mjs",
-    "bench:flyers": "node tools/bench/flyers.mjs"
+    "bench:flyers": "node tools/bench/flyers.mjs",
+    "test:desync:heavy": "node tools/test/desync.mjs --heavy",
+    "test:mp": "node tools/test/mp.mjs"
   },
   "devDependencies": {
     "lua-types": "2.14.1",
