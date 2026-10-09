@@ -1,9 +1,12 @@
-// Выгрузка на портал модов (mods.factorio.com, docs/RELEASE.md). Мода на портале ещё нет — публикация
-// (init_publish: архив, описание tools/release/portal.md, категория, лицензия, исходники); есть — новая версия
-// (releases/init_upload).
+// Выгрузка на портал модов (mods.factorio.com, docs/RELEASE.md) — при каждом выпуске:
+// 1. Архив. Мода на портале ещё нет — публикация (init_publish), есть — новая версия (releases/init_upload).
+// 2. Страница (18.2). Галерея — GALLERY по порядку (новые картинки загружаются, совпадающие по SHA1 — остаются,
+//    остальные убираются); описание — tools/release/portal.md, картинки в нём (docs/media/…) — адреса из галереи;
+//    заголовок, краткое описание (description из mod/info.json), категория, теги, лицензия, ссылки.
 //   FACTORIO_UPLOAD_API_KEY=… node tools/release/portal.mjs dist/automaton_0.3.0.zip
 //   node tools/release/portal.mjs dist/automaton_0.3.0.zip --dry-run   — только сказать, что будет сделано
-// Ключ — factorio.com/profile, права «ModPortal: Upload Mods» и «ModPortal: Publish Mods».
+// Ключ — factorio.com/profile, права «ModPortal: Upload Mods», «ModPortal: Publish Mods» и «ModPortal: Edit Mods».
+import { createHash } from "node:crypto"
 import { readFileSync } from "node:fs"
 import { basename, join } from "node:path"
 import { fileURLToPath } from "node:url"
@@ -12,6 +15,22 @@ const root = join(fileURLToPath(import.meta.url), "..", "..", "..")
 const API = "https://mods.factorio.com/api"
 const CATEGORY = "overhaul"
 const LICENSE = "default_mit"
+const TAGS = ["logistics", "mining", "manufacturing", "combat", "circuit-network"]
+/** Галерея на странице мода — в этом порядке (пути от корня репозитория). */
+const GALLERY = [
+  "docs/media/factory.gif",
+  "docs/media/miners.gif",
+  "docs/media/smelting.gif",
+  "docs/media/assembly.gif",
+  "docs/media/water.gif",
+  "docs/media/flyers.gif",
+  "docs/media/combat.gif",
+  "docs/media/display.gif",
+  "docs/media/editor.gif",
+  "docs/media/machine-window.png",
+  "docs/media/picker.png",
+]
+const MIME = { gif: "image/gif", png: "image/png", jpg: "image/jpeg" }
 
 const args = process.argv.slice(2)
 const dryRun = args.includes("--dry-run")
@@ -25,11 +44,11 @@ if (zipPath === undefined || (!dryRun && !key)) {
 const info = JSON.parse(readFileSync(join(root, "mod", "info.json"), "utf8"))
 const zip = readFileSync(zipPath)
 
-/** Есть ли мод на портале: 200 — есть, 404 — нет, другое — ошибка (не публиковать вслепую). */
-async function exists(name) {
-  const response = await fetch(`${API}/mods/${encodeURIComponent(name)}`)
-  if (response.status === 200) return true
-  if (response.status === 404) return false
+/** Сведения о моде на портале (с галереей); мода нет — undefined; другой ответ — ошибка (не публиковать вслепую). */
+async function portalMod(name) {
+  const response = await fetch(`${API}/mods/${encodeURIComponent(name)}/full`)
+  if (response.status === 200) return response.json()
+  if (response.status === 404) return undefined
   throw new Error(`портал ответил ${response.status} на запрос о моде ${name}`)
 }
 
@@ -42,27 +61,116 @@ async function post(url, form) {
   } catch {
     body = { error: "NotJson", message: text.slice(0, 300) }
   }
-  if (!response.ok || body.error !== undefined) throw new Error(`${response.status} ${body.error ?? ""}: ${body.message ?? ""}`)
+  if (!response.ok || body.error !== undefined) {
+    const error = new Error(`${response.status} ${body.error ?? ""}: ${body.message ?? ""}`)
+    error.code = body.error
+    throw error
+  }
   return body
 }
 
-const known = await exists(info.name)
+function modForm(fields) {
+  const form = new FormData()
+  form.append("mod", info.name)
+  for (const [name, value] of Object.entries(fields)) {
+    for (const item of Array.isArray(value) ? value : [value]) form.append(name, item)
+  }
+  return form
+}
+
+const sha1 = (data) => createHash("sha1").update(data).digest("hex")
+
+/** Архив: публикация нового мода или новая версия (эта версия уже есть — пропустить: перезапуск workflow). */
+async function uploadRelease(mod) {
+  if (mod?.releases?.some((r) => r.version === info.version)) {
+    console.log(`Версия ${info.version} уже на портале`)
+    return
+  }
+  const known = mod !== undefined
+  const { upload_url: uploadUrl } = await post(`${API}/v2/mods/${known ? "releases/init_upload" : "init_publish"}`, modForm({}))
+  const form = new FormData()
+  form.append("file", new Blob([zip], { type: "application/zip" }), basename(zipPath))
+  if (!known) {
+    form.append("category", CATEGORY)
+    form.append("license", LICENSE)
+    form.append("source_url", info.homepage)
+  }
+  await post(uploadUrl, form)
+  console.log(known ? `Версия ${info.version} выгружена` : `Мод опубликован: https://mods.factorio.com/mod/${info.name}`)
+}
+
+/** Галерея: путь картинки → адрес на портале (не принятые порталом — пропускаются с предупреждением). */
+async function syncGallery(existing) {
+  const urls = new Map()
+  const ids = []
+  for (const path of GALLERY) {
+    const data = readFileSync(join(root, path))
+    const id = sha1(data)
+    let image = existing.find((i) => i.id === id)
+    if (image === undefined) {
+      try {
+        const { upload_url: uploadUrl } = await post(`${API}/v2/mods/images/add`, modForm({}))
+        const form = new FormData()
+        form.append("image", new Blob([data], { type: MIME[path.split(".").pop()] }), basename(path))
+        image = await post(uploadUrl, form)
+        console.log(`картинка загружена: ${path}`)
+      } catch (error) {
+        if (error.code !== "InvalidImageUpload") throw error
+        console.log(`::warning::портал не принял картинку ${path}: ${error.message}`)
+        continue
+      }
+    }
+    urls.set(path, image.url)
+    ids.push(image.id)
+  }
+  await post(`${API}/v2/mods/images/edit`, modForm({ images: ids.join(",") }))
+  console.log(`галерея: ${ids.length} из ${GALLERY.length}`)
+  return urls
+}
+
+/** Описание: картинки docs/media/… — адресами из галереи (нет в галерее — строка с картинкой убирается). */
+function description(urls) {
+  const text = readFileSync(join(root, "tools", "release", "portal.md"), "utf8")
+  return text
+    .split("\n")
+    .flatMap((line) => {
+      const image = /\]\((docs\/media\/[^)]+)\)/.exec(line)
+      if (image === null) return [line]
+      const url = urls.get(image[1])
+      return url === undefined ? [] : [line.replace(image[1], url)]
+    })
+    .join("\n")
+}
+
+async function updatePage(urls) {
+  await post(
+    `${API}/v2/mods/edit_details`,
+    modForm({
+      title: info.title,
+      summary: info.description,
+      description: description(urls),
+      category: CATEGORY,
+      tags: TAGS,
+      license: LICENSE,
+      homepage: info.homepage,
+      source_url: info.homepage,
+    }),
+  )
+  console.log(`страница обновлена: https://mods.factorio.com/mod/${info.name}`)
+}
+
+const mod = await portalMod(info.name)
 if (dryRun) {
-  console.log(known ? `${info.name} есть на портале — выгрузить версию ${info.version}` : `${info.name} на портале нет — опубликовать (${CATEGORY}, ${LICENSE}, ${info.homepage})`)
+  const released = mod?.releases?.some((r) => r.version === info.version)
+  console.log(mod === undefined ? `${info.name} на портале нет — опубликовать` : released ? `версия ${info.version} уже на портале` : `выгрузить версию ${info.version}`)
+  const existing = mod?.images ?? []
+  const fresh = GALLERY.filter((path) => !existing.some((i) => i.id === sha1(readFileSync(join(root, path)))))
+  console.log(`галерея: ${GALLERY.length} картинок, загрузить ${fresh.length}; теги: ${TAGS.join(", ")}`)
+  const preview = description(new Map(GALLERY.map((path) => [path, `<адрес ${basename(path)} в галерее>`])))
+  console.log(`описание: ${preview.length} символов, начало:\n${preview.split("\n").slice(0, 3).join("\n")}`)
   process.exit(0)
 }
 
-const init = new FormData()
-init.append("mod", info.name)
-const { upload_url: uploadUrl } = await post(`${API}/v2/mods/${known ? "releases/init_upload" : "init_publish"}`, init)
-
-const form = new FormData()
-form.append("file", new Blob([zip], { type: "application/zip" }), basename(zipPath))
-if (!known) {
-  form.append("description", readFileSync(join(root, "tools", "release", "portal.md"), "utf8"))
-  form.append("category", CATEGORY)
-  form.append("license", LICENSE)
-  form.append("source_url", info.homepage)
-}
-await post(uploadUrl, form)
-console.log(known ? `Версия ${info.version} выгружена: https://mods.factorio.com/mod/${info.name}` : `Мод опубликован: https://mods.factorio.com/mod/${info.name}`)
+await uploadRelease(mod)
+const urls = await syncGallery((await portalMod(info.name))?.images ?? [])
+await updatePage(urls)

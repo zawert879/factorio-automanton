@@ -27,16 +27,18 @@ Linux `~/.factorio/mods/`) без распаковки.
 С портала мод ставится из игры (меню «Моды» → поиск), обновляется там же, а при входе на сервер игра сама
 скачивает недостающие моды — друзьям не нужно носить zip.
 
-Выгружает workflow (`tools/release/portal.mjs`): мода на портале ещё нет — публикует его (описание
-`tools/release/portal.md`, категория Overhaul, лицензия MIT, ссылка на исходники — `homepage` из
-`mod/info.json`); есть — выгружает новую версию. Проверить, что будет сделано, без ключа:
-`node tools/release/portal.mjs dist/automaton_0.3.0.zip --dry-run`.
+Выгружает workflow (`tools/release/portal.mjs`): мода на портале ещё нет — публикует его, есть — выгружает
+новую версию. Затем обновляет страницу мода (18.2): описание — `tools/release/portal.md` (картинки `docs/media/…`
+в нём заменяются адресами из галереи), краткое описание и заголовок — из `mod/info.json`, категория Overhaul,
+теги, лицензия MIT, ссылки на репозиторий; галерея — список `GALLERY` в скрипте по порядку (новые картинки
+загружаются, прежние — по совпадению SHA1 — остаются, лишние убираются). Страница обновляется только при выпуске.
+Проверить, что будет сделано, без ключа: `node tools/release/portal.mjs dist/automaton_0.3.1.zip --dry-run`.
 
 Один раз настроить:
 
 1. Аккаунт factorio.com с купленной игрой (Steam-аккаунт привязывается в профиле factorio.com).
-2. На https://factorio.com/profile создать API-ключ с правами «ModPortal: Upload Mods» и
-   «ModPortal: Publish Mods».
+2. На https://factorio.com/profile создать API-ключ с правами «ModPortal: Upload Mods»,
+   «ModPortal: Publish Mods» и «ModPortal: Edit Mods» (страница мода).
 3. GitHub → репозиторий → Settings → Secrets and variables → Actions → New repository secret:
    имя `FACTORIO_UPLOAD_API_KEY`, значение — ключ.
 

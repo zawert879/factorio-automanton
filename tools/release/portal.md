@@ -1,3 +1,5 @@
+![A red and green science factory run entirely by automatons — no belts, no inserters](docs/media/factory.gif)
+
 **Automaton** is an overhaul for playing with friends: belts, drills, inserters, logistic robots and the offshore pump are gone. Their work is done by **automatons** — machines that run programs you write in a subset of **TypeScript**, right in the game or in VS Code.
 
 ```ts
