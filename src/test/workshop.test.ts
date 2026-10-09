@@ -9,6 +9,8 @@ import { assignProgram, machineOf } from "../program/machines"
 import { deleteProgram, findProgram, publish } from "../program/store"
 import { buildGraph, ensureWorkshop, NODE_TAG, readGraph, removeNode, workshopOf } from "../workshop/entities"
 import { publishWorkshop } from "../workshop/publish"
+import { breakLine, machineNode } from "../workshop/debug"
+import { loadedProgram } from "../program/store"
 import { applyImport, decodePrograms, exportPrograms, planImport } from "../program/exchange"
 import { graphToSource } from "../graph/codegen"
 import { describe, expect, test, waitUntil } from "./testing"
@@ -129,6 +131,36 @@ describe("мастерская", () => {
     expect(imported.graph?.wires.length).toBe(4)
     expect(imported.source).toBe(source.source)
     deleteProgram(imported.id)
+  })
+
+  test("отладка: узел, где стоит машина; точка остановки на узле", (t) => {
+    const b = new GraphBuilder()
+    const start = b.node("start")
+    const loop = b.node("forever")
+    const say = b.node("say", { text: "раз" })
+    const wait = b.node("wait", { seconds: 5 })
+    b.seq(start, loop).exec(loop, say, "body").exec(say, wait)
+    const graph = b.layout()
+    const source = graphToSource(graph, "ws/отладка")
+    const old = findProgram("ws/отладка")
+    if (old !== undefined) deleteProgram(old.id)
+    const published = publish({ name: "ws/отладка", source: source.source, graph, graphLines: source.lineNodes })
+    if (!published.ok) error("не опубликована")
+    const program = published.program
+    expect(breakLine(program, say.id) !== undefined).toBe(true)
+    const surface = game.get_surface("nauvis")!
+    const position = { x: -770.5, y: 700.5 }
+    surface.create_entity({ name: MODELS[0].placer, position, force: "player", raise_built: true })
+    const robot = findRobot(surface.find_entities_filtered({ name: MODELS[0].entity, position, radius: 0.5 })[0])!
+    assignProgram(robot, program)
+    const record = machineOf(robot.id)
+    waitUntil(t, "ожидания", () => record.machine.status === "waiting", 120, () => {
+      const loaded = loadedProgram(program)
+      if (loaded === undefined || typeof loaded === "string") error("не загружена")
+      expect(machineNode(program, loaded, record.machine)).toBe(wait.id)
+      robot.entity.destroy()
+      deleteProgram(program.id)
+    })
   })
 
   test("ошибка схемы — на узле, публикации нет", () => {

@@ -37,6 +37,7 @@ import { loadedProgram, ProgramRecord } from "../program/store"
 import { formatValue } from "../program/api/output"
 import { guiOf, titlebar, onGuiClick, onGuiConfirm } from "./common"
 import { openDebugger } from "./debugger"
+import { machineNode } from "../workshop/debug"
 import { closeHelp } from "./help"
 import { closePicker, onProgramPicked, openPicker } from "./picker"
 import { closePrograms, openPrograms } from "./programs"
@@ -229,10 +230,9 @@ export function cargoFromHand(hand: LuaItemStack, robot: RobotRecord, item: stri
   return undefined
 }
 
-/** Строка программы; у схемы — и узел этой строки (код собран из схемы, строки игроку ничего не говорят). */
-function lineCaption(line: number, program: ProgramRecord | undefined): LocalisedString {
+/** Строка программы; у схемы — и узел, где стоит машина (код собран из схемы, строки игроку ничего не говорят). */
+function lineCaption(line: number, program: ProgramRecord | undefined, nodeId: number | undefined): LocalisedString {
   const text = formatLine(line, program?.modules)
-  const nodeId = program?.graphLines?.[line]
   const node = nodeId === undefined ? undefined : program!.graph?.nodes.find((n) => n.id === nodeId)
   return node === undefined ? text : ["", text, " · ", [`automaton-node.${node.kind}`], ` #${node.id}`]
 }
@@ -283,7 +283,8 @@ export function refreshMachine(window: MachineWindow): void {
   ]
   const loaded = program !== undefined ? loadedProgram(program) : undefined
   const line = loaded !== undefined && typeof loaded !== "string" ? pausedLine(loaded, record.machine) : undefined
-  window.line.caption = line === undefined ? "—" : lineCaption(line, program)
+  const node = program?.graph !== undefined && loaded !== undefined && typeof loaded !== "string" ? machineNode(program, loaded, record.machine) : undefined
+  window.line.caption = line === undefined ? "—" : lineCaption(line, program, node)
   window.version.caption =
     program === undefined ? "—" : record.version === program.version ? `v${program.version}` : ["automaton-gui.old-version", record.version, program.version]
   const e = record.machine.status === "error" ? record.machine.error : undefined

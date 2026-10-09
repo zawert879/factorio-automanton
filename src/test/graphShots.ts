@@ -15,6 +15,7 @@ import { markerOf, renameMarker } from "../world/markers"
 import { createZone } from "../world/zones"
 import { ensureWorkshop, nodeCorner, workshopOf } from "../workshop/entities"
 import { enterWorkshop, exitWorkshop } from "../workshop/session"
+import { breakLine } from "../workshop/debug"
 import { Workshop } from "../workshop/state"
 
 const OUT = "automaton-graph-shots"
@@ -272,7 +273,24 @@ while (true) {
     }
   }
   if (tick === WINDOW_TICK + 20) guiShot("machine-window")
-  if (tick === WINDOW_TICK + 30) {
+  // Отладка в мастерской: шахтёры на своих узлах, первый выбран для отладки (жёлтая рамка, точка на «Копать»).
+  if (tick === WINDOW_TICK + 22) {
+    const p = player()
+    const program = findProgram("Шахтёр")
+    if (p !== undefined && program !== undefined) {
+      p.gui.screen["automaton-machine"]?.destroy()
+      p.opened = undefined
+      enterWorkshop(p, program)
+      const first = Object.values(storage.machines).find((r) => r !== undefined && r.programId === program.id)
+      const visitor = storage.workshop?.visitors[p.index]
+      if (visitor !== undefined && first !== undefined) visitor.debugRobot = first.robotId
+      const mine = program.graph?.nodes.find((n) => n.kind === "mine")
+      const line = mine === undefined ? undefined : breakLine(program, mine.id)
+      if (first !== undefined && line !== undefined) first.breakpoints = { [line]: true }
+    }
+  }
+  if (tick === WINDOW_TICK + 60) guiShot("workshop-debug")
+  if (tick === WINDOW_TICK + 70) {
     // Состояние машин сцен — для проверки, что схемы работают.
     const lines: string[] = []
     for (const [id, record] of pairs(storage.machines)) {

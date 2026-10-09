@@ -329,6 +329,21 @@ function runSliceBody(program: Program, machine: Machine): void {
 }
 
 /** Строка исходника, на которой стоит программа (самый глубокий кадр программы в цепочке). */
+/** Строки, где стоят все вложенные вызовы — от внешнего к внутреннему (схема ищет среди них строку своего узла). */
+export function pausedLines(this: void, program: Program, machine: Machine): number[] {
+  const lines: number[] = []
+  let frame = machine.frame
+  while (type(frame) === "table") {
+    const id = frame[3]
+    if (type(id) === "number") {
+      const at = program.pauses[id as number]?.[frame[1] as number]
+      if (at !== undefined) lines.push(at)
+    }
+    frame = frame[2]
+  }
+  return lines
+}
+
 export function pausedLine(this: void, program: Program, machine: Machine): number | undefined {
   let frame = machine.frame
   let line: number | undefined

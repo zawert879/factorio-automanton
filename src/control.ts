@@ -44,6 +44,7 @@ import { initStart } from "./world/start"
 import { registerNaming } from "./world/naming"
 import { initZones, registerZones } from "./world/zones"
 import { registerWorkshopEntities } from "./workshop/entities"
+import { registerWorkshopDebug } from "./workshop/debug"
 import { registerWorkshopGui, restoreWorkshopWindows } from "./workshop/gui"
 import { initWorkshop } from "./workshop/state"
 
@@ -115,6 +116,7 @@ registerBoard()
 registerCache()
 registerWorkshopEntities()
 registerWorkshopGui()
+registerWorkshopDebug()
 // Здание исчезло — его обёртка у программ остаётся (valid === false), но из общего списка уходит.
 onEvent(defines.events.on_object_destroyed, (e) => {
   if (e.type === defines.target_type.entity) forgetEntityHandle(e.useful_id)

@@ -34,6 +34,8 @@ export interface WorkshopVisitor {
   editing?: number
   /** Раздел палитры. */
   category?: string
+  /** Машина, выбранная для отладки (её узел — жёлтой рамкой, точки остановки — в окне узла). */
+  debugRobot?: number
 }
 
 export interface WorkshopState {
@@ -45,6 +47,8 @@ export interface WorkshopState {
   visitors: Record<number, WorkshopVisitor | undefined>
   /** Разъёмы, вставленные раньше своего тела: через тик без хозяина — убираются. */
   orphans: LuaEntity[]
+  /** Подсветка отладки (машины на узлах) по программам. */
+  debugRenders?: Record<number, LuaRenderObject[] | undefined>
 }
 
 export function initWorkshop(): void {

@@ -11,6 +11,9 @@ import { findProgram, onProgramPublished, onProgramRemoved, ProgramRecord } from
 import { buildGraph, deleteWorkshop, drawNode, isNodeBody, NODE_TAG, nodeOfEntity, readGraph, refreshNode, slotsOf, workshopOf } from "./entities"
 import { newGraphProgram } from "./programs"
 import { buildWorkshop, publishing, publishWorkshop, showErrors } from "./publish"
+import { breakLine, machinesOf } from "./debug"
+import { MachineRecord, wake } from "../program/machines"
+import { stepMachine } from "../program/scheduler"
 import { currentWorkshop, enterWorkshop, exitWorkshop, onWorkshopEnter, onWorkshopExit, visitorOf, visitorsOf } from "./session"
 import { Workshop, WorkshopNode, workshopState } from "./state"
 
@@ -37,6 +40,25 @@ function openHud(player: LuaPlayer, ws: Workshop): void {
   row.add({ type: "button", caption: ["automaton-workshop.publish"], style: "green_button", tags: { action: "workshop-publish" } })
   row.add({ type: "button", caption: ["automaton-workshop.code"], tags: { action: "workshop-code" } })
   row.add({ type: "button", caption: ["automaton-workshop.exit"], style: "red_button", tags: { action: "workshop-exit" } })
+  // Отладка (15.9): машина с этой программой — её узел подсвечен, «Продолжить», «Шаг», «Пауза».
+  const debugRow = frame.add({ type: "flow", direction: "horizontal" })
+  debugRow.style.vertical_align = "center"
+  debugRow.style.horizontal_spacing = 8
+  debugRow.add({ type: "label", caption: ["automaton-workshop.debug"], style: "bold_label" })
+  const machines = program === undefined ? [] : machinesOf(program)
+  const visitor = visitorOf(player)
+  const items: LocalisedString[] = [["automaton-workshop.debug-none"]]
+  for (const record of machines) items.push(storage.robots.byId[record.robotId]?.name ?? `${record.robotId}`)
+  const chosen = machines.findIndex((r) => r.robotId === visitor?.debugRobot)
+  debugRow.add({
+    type: "drop-down",
+    items,
+    selected_index: chosen >= 0 ? chosen + 2 : 1,
+    tags: { action: "workshop-debug-select", ids: machines.map((r) => r.robotId).join(",") },
+  })
+  debugRow.add({ type: "button", caption: ["automaton-workshop.debug-continue"], tags: { action: "workshop-debug-continue" } })
+  debugRow.add({ type: "button", caption: ["automaton-workshop.debug-step"], tags: { action: "workshop-debug-step" } })
+  debugRow.add({ type: "button", caption: ["automaton-workshop.debug-pause"], tags: { action: "workshop-debug-pause" } })
   const status = frame.add({ type: "label", name: "status", caption: ["automaton-workshop.status-hint"] })
   status.style.single_line = false
   status.style.maximal_width = 720
@@ -175,6 +197,15 @@ function openNodeWindow(player: LuaPlayer, ws: Workshop, node: WorkshopNode): vo
     fields++
   }
   if (fields === 0) frame.add({ type: "label", caption: ["automaton-workshop.no-settings"] })
+  // Точка остановки у машины, выбранной для отладки.
+  const program = programOf(ws)
+  const record = visitor.debugRobot === undefined ? undefined : storage.machines[visitor.debugRobot]
+  if (program !== undefined && record !== undefined && spec?.exec) {
+    const line = breakLine(program, node.id)
+    const name = storage.robots.byId[record.robotId]?.name ?? `${record.robotId}`
+    if (line === undefined) frame.add({ type: "label", caption: ["automaton-workshop.no-break"] })
+    else frame.add({ type: "checkbox", state: record.breakpoints?.[line] === true, caption: ["automaton-workshop.breakpoint", name], tags: { action: "workshop-breakpoint", line } })
+  }
   if (node.error !== undefined) {
     const error = frame.add({ type: "label", caption: node.error })
     error.style.font_color = { r: 1, g: 0.4, b: 0.35 }
@@ -186,6 +217,12 @@ function openNodeWindow(player: LuaPlayer, ws: Workshop, node: WorkshopNode): vo
 
 /** Узлы, чьи разъёмы зависят от этой настройки (переменная, функция, параметр) — обновить все. */
 const SHAPING = ["name", "type", "params", "returns"]
+
+/** Машина, выбранная игроком для отладки в мастерской. */
+function debugRecord(player: LuaPlayer): MachineRecord | undefined {
+  const id = visitorOf(player)?.debugRobot
+  return id === undefined ? undefined : storage.machines[id]
+}
 
 function setValue(player: LuaPlayer, key: string, value: GraphValue | undefined): void {
   const ws = currentWorkshop(player)
@@ -307,6 +344,38 @@ export function registerWorkshopGui(): void {
   onGuiChange("workshop-value", (player, element) => {
     const tags = element.tags as { key: string; kind: string }
     setValue(player, tags.key, parsed((element as unknown as { text: string }).text, tags.kind))
+  })
+  onGuiSelection("workshop-debug-select", (player, element) => {
+    const visitor = visitorOf(player)
+    if (visitor === undefined) return
+    const ids = (element.tags as unknown as { ids: string }).ids.split(",")
+    const index = (element as unknown as { selected_index: number }).selected_index
+    visitor.debugRobot = index >= 2 ? tonumber(ids[index - 2]) : undefined
+  })
+  onGuiClick("workshop-debug-continue", (player) => {
+    const record = debugRecord(player)
+    if (record === undefined) return
+    record.paused = undefined
+    record.stopLine = undefined
+    wake(record.robotId)
+  })
+  onGuiClick("workshop-debug-step", (player) => {
+    const record = debugRecord(player)
+    if (record === undefined) return
+    record.paused = true
+    stepMachine(record)
+  })
+  onGuiClick("workshop-debug-pause", (player) => {
+    const record = debugRecord(player)
+    if (record !== undefined) record.paused = true
+  })
+  onGuiChecked("workshop-breakpoint", (player, element) => {
+    const record = debugRecord(player)
+    if (record === undefined) return
+    const line = (element.tags as unknown as { line: number }).line
+    record.breakpoints ??= {}
+    record.breakpoints[line] = (element as unknown as { state: boolean }).state ? true : undefined
+    if (next(record.breakpoints)[0] === undefined) record.breakpoints = undefined
   })
   onGuiChecked("workshop-value", (player, element) => {
     const tags = element.tags as { key: string }
