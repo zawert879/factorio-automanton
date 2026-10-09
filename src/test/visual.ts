@@ -10,10 +10,10 @@ import { Activity, BODY_DIRECTIONS, CHARGING_STATION, DISPLAYS, MODELS, TECH, WO
 import { renameDisplay } from "../world/displays"
 import { guiOf } from "../gui/common"
 import { openMachine } from "../gui/machine"
-import { closePrograms, openPrograms, publishFromWindow, showTypes } from "../gui/programs"
+import { closePrograms, editViewLine, openPrograms, publishFromWindow, showTypes } from "../gui/programs"
 import { openPicker } from "../gui/picker"
 import { assignProgram } from "../program/machines"
-import { publish, publishProgram } from "../program/store"
+import { findProgram, publish, publishProgram } from "../program/store"
 import { writeVsCodeFolder } from "../program/sync"
 
 const CENTER = { x: 300, y: 300 }
@@ -182,11 +182,23 @@ for (let x = 10; x < 86; x++) c.pixel(x, 54, x % 2 === 0 ? "green" : "red")`,
       const window = guiOf(player).programs!
       let lines = ""
       for (let i = 1; i <= 30; i++) lines += `\nprint("строка ${i + 7}")`
-      window.code.text = window.code.text + lines + "\nlet x = 1 == 2\n"
+      // Rich text в коде — текст: ни иконки, ни цвета из строки.
+      window.code.text = window.code.text + lines + '\nprint("[item=iron-plate] [color=red]не красный[/color]", a[0])' + "\nlet x = 1 == 2\n"
       publishFromWindow(player)
     }
   }
   if (tick === 215) guiShot("programs-window")
+  // Просмотр с подсветкой (стартовая программа) и правка по клику на строку.
+  if (tick === 216) {
+    const player = game.get_player(1 as PlayerIndex)
+    if (player !== undefined) openPrograms(player, findProgram("Шахтёр", "player")!.id, undefined)
+  }
+  if (tick === 217) guiShot("programs-view")
+  if (tick === 218) {
+    const player = game.get_player(1 as PlayerIndex)
+    if (player !== undefined) editViewLine(player, 5)
+  }
+  if (tick === 219) guiShot("programs-edit")
   if (tick === 220) {
     const player = game.get_player(1 as PlayerIndex)
     if (player !== undefined) showTypes(player)

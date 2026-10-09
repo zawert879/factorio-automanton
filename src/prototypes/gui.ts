@@ -38,10 +38,12 @@ data.extend([open, copySettings, pasteSettings, codeFont, consoleFont])
 
 const styles = data.raw["gui-style"]!.default as Record<string, unknown>
 // Редактор кода: размер задаётся по экрану игрока; отступы фиксированы — номера строк рядом
-// (такое же поле, только для чтения) совпадают с кодом построчно.
+// (такое же поле, только для чтения) совпадают с кодом построчно. Rich text в полях с кодом выключен:
+// "[item=iron-plate]" в строке программы — текст, а не иконка.
 styles.automaton_code = {
   type: "textbox_style",
   font: "automaton-code",
+  rich_text_setting: "disabled",
   top_padding: 4,
   bottom_padding: 4,
   left_padding: 6,
@@ -60,6 +62,7 @@ styles.automaton_line_numbers = {
 styles.automaton_types = {
   type: "textbox_style",
   font: "automaton-code",
+  rich_text_setting: "disabled",
   width: 760,
   height: 560,
 }
@@ -72,6 +75,36 @@ styles.automaton_console_line = {
 styles.automaton_json = {
   type: "textbox_style",
   font: "automaton-code",
+  rich_text_setting: "disabled",
   width: 400,
   height: 120,
+}
+
+// Просмотр кода с подсветкой: фон — как у поля ввода в фокусе, строки — подписи с rich text
+// (номер и код; клик по строке открывает правку на ней). Высота строки — как в поле ввода.
+const textbox = styles.textbox as { active_background: unknown }
+styles.automaton_code_view = {
+  type: "frame_style",
+  graphical_set: textbox.active_background,
+  top_padding: 4,
+  bottom_padding: 4,
+  left_padding: 0,
+  right_padding: 6,
+}
+styles.automaton_code_line = {
+  type: "label_style",
+  font: "automaton-code",
+  font_color: { r: 0.15, g: 0.14, b: 0.12 },
+  hovered_font_color: { r: 0.15, g: 0.14, b: 0.12 },
+  height: 20,
+  single_line: true,
+}
+styles.automaton_code_number = {
+  type: "label_style",
+  parent: "automaton_code_line",
+  width: 52,
+  horizontal_align: "right",
+  right_padding: 8,
+  font_color: { r: 0.55, g: 0.47, b: 0.33 },
+  hovered_font_color: { r: 0.2, g: 0.17, b: 0.1 },
 }

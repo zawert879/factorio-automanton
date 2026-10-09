@@ -6,6 +6,10 @@
 // (такое же поле, только для чтения, — строки совпадают), справа — невидимые метки строк, к которым
 // прокручивает клик по ошибке. Черновик у каждого игрока: закрыл окно — текст не пропал.
 //
+// Просмотр (подсветка, вариант A): программа открывается в цвете — строки-подписи с rich text
+// (src/lang/highlight.ts); в поле ввода цвета нет — теги стали бы частью кода. «Править» или клик по
+// строке — поле ввода с курсором на ней; после публикации — снова просмотр, ошибки — красным в строке.
+//
 // Список — дерево папок (имя программы с «/», этап 17): папки сворачиваются кликом, поиск по имени
 // раскрывает всё найденное. Библиотеки помечены; у программы видно, кто её импортирует и не отстала ли
 // её сборка от новой версии модуля.
@@ -15,14 +19,17 @@ import {
   EmptyWidgetGuiElement,
   FlowGuiElement,
   FrameGuiElement,
+  LabelGuiElement,
   ListBoxGuiElement,
   LocalisedString,
   LuaGuiElement,
   LuaPlayer,
   ScrollPaneGuiElement,
+  TableGuiElement,
   TextBoxGuiElement,
   TextFieldGuiElement,
 } from "factorio:runtime"
+import { escapeRichText, highlight, markError, Paint, richLine } from "../lang/highlight"
 import { Diagnostic } from "../lang/lexer"
 import { ulen } from "../lang/runtime/strings"
 import { assignProgram } from "../program/machines"
@@ -53,6 +60,25 @@ const MAX_ERRORS = 8
 const LINE_HEIGHT = 20
 /** Отступы поля сверху и снизу (стиль automaton_code). */
 const CODE_PADDING = 8
+/** Длиннее — без просмотра с подсветкой (строка — две подписи). */
+const VIEW_MAX_LINES = 2000
+/** Ширина номеров строк в просмотре (стиль automaton_code_number) и отступ справа. */
+const VIEW_GUTTER = 52 + 6
+
+/** Цвета подсветки на светлом фоне поля. */
+const PALETTE: Record<Paint, string | undefined> = {
+  plain: undefined,
+  keyword: "#6a35b8",
+  control: "#8e2a9c",
+  constant: "#0b6e75",
+  number: "#0b6e75",
+  string: "#a1420b",
+  comment: "#6f7a52",
+  function: "#1d52a3",
+  type: "#1f7a4d",
+  error: "#d0201a",
+}
+const ERROR_TEXT = "#c0392b"
 
 const TEMPLATE = `// Новая программа. Справка по API — docs/API.md в папке мода, типы — «Типы для VS Code».
 while (true) {
@@ -72,13 +98,25 @@ export interface ProgramsWindow {
   name: TextFieldGuiElement
   info: LuaGuiElement
   pane: ScrollPaneGuiElement
+  /** Правка: номера строк, поле кода, метки строк. */
+  row: FlowGuiElement
   numbers: TextBoxGuiElement
   code: TextBoxGuiElement
   marks: FlowGuiElement
+  /** Просмотр с подсветкой: по строке — номер и код (подписи). */
+  view: FrameGuiElement
+  viewLines: TableGuiElement
+  viewWidth: number
+  /** Поле кода — не ниже окна: клик под текстом тоже попадает в поле. */
+  minCodeHeight: number
+  mode: "view" | "edit"
+  viewButton: ButtonGuiElement
+  editButton: ButtonGuiElement
   /** Под именем: кто импортирует, отставшая сборка. */
   notes: FlowGuiElement
   lineCount: number
-  errorLines: Record<number, boolean>
+  /** Ошибки публикации по строкам (первая в строке). */
+  errorLines: Record<number, Diagnostic | undefined>
   errors: FlowGuiElement
   versions: DropDownGuiElement
   assign: ButtonGuiElement
@@ -158,9 +196,19 @@ export function openPrograms(player: LuaPlayer, programId?: number, robotId?: nu
   const marks = row.add({ type: "flow", direction: "vertical" })
   marks.style.vertical_spacing = 0
   marks.style.top_padding = CODE_PADDING / 2
+  const view = pane.add({ type: "frame", style: "automaton_code_view", direction: "vertical" })
+  view.style.minimal_width = size.width - 24
+  view.style.minimal_height = size.height - 12
+  const viewLines = view.add({ type: "table", column_count: 2 })
+  viewLines.style.horizontal_spacing = 0
+  viewLines.style.vertical_spacing = 0
 
   const errors = right.add({ type: "flow", direction: "vertical" })
   const buttons = right.add({ type: "flow", direction: "horizontal" })
+  const viewButton = button(buttons, ["automaton-gui.view-mode"], "programs-view")
+  viewButton.tooltip = ["automaton-gui.view-mode-tooltip"]
+  const editButton = button(buttons, ["automaton-gui.edit-mode"], "programs-edit")
+  editButton.tooltip = ["automaton-gui.edit-mode-tooltip"]
   button(buttons, ["automaton-gui.publish"], "programs-publish", "green_button")
   const assign = button(buttons, "", "programs-assign")
   const versions = buttons.add({ type: "drop-down", items: [], tags: { action: "programs-version" } })
@@ -180,9 +228,17 @@ export function openPrograms(player: LuaPlayer, programId?: number, robotId?: nu
     name,
     info,
     pane,
+    row,
     numbers,
     code,
     marks,
+    view,
+    viewLines,
+    viewWidth: size.width - 24 - VIEW_GUTTER,
+    minCodeHeight: size.height - 12,
+    mode: "edit",
+    viewButton,
+    editButton,
     notes,
     lineCount: -1,
     errorLines: {},
@@ -231,7 +287,7 @@ function layoutLines(window: ProgramsWindow, force = false): void {
   for (const [_] of string.gmatch(text, "\n")) count++
   if (count === window.lineCount && !force) return
   window.lineCount = count
-  const height = count * LINE_HEIGHT + CODE_PADDING + LINE_HEIGHT
+  const height = math.max(count * LINE_HEIGHT + CODE_PADDING + LINE_HEIGHT, window.minCodeHeight)
   window.code.style.height = height
   window.numbers.style.height = height
   const numbers: string[] = []
@@ -279,7 +335,62 @@ function load(window: ProgramsWindow, player: LuaPlayer, programId: number | und
   window.assign.visible = robot !== undefined && program !== undefined && !program.library
   window.assign.caption = ["automaton-gui.assign", robot?.name ?? ""]
   layoutLines(window, true)
+  // Опубликованная программа — в просмотре, новая — сразу в поле ввода.
+  setMode(window, program === undefined ? "edit" : "view")
   window.pane.scroll_to_top()
+}
+
+/** Просмотр с подсветкой или правка в поле ввода (длинная программа — только правка). */
+function setMode(window: ProgramsWindow, mode: "view" | "edit"): void {
+  const tooLong = window.lineCount > VIEW_MAX_LINES
+  if (tooLong) mode = "edit"
+  window.mode = mode
+  window.row.visible = mode === "edit"
+  window.view.visible = mode === "view"
+  window.viewButton.toggled = mode === "view"
+  window.editButton.toggled = mode === "edit"
+  window.viewButton.enabled = !tooLong
+  window.viewButton.tooltip = tooLong ? ["automaton-gui.view-too-long", VIEW_MAX_LINES] : ["automaton-gui.view-mode-tooltip"]
+  window.pane.horizontal_scroll_policy = mode === "view" ? "auto" : "never"
+  if (mode === "view") renderView(window)
+}
+
+/** Строки просмотра: номер (у строки с ошибкой — красная точка) и код в цвете; ошибка — красным и текстом в конце. */
+function renderView(window: ProgramsWindow): void {
+  const lines = highlight(window.code.text)
+  const table = window.viewLines
+  const cells = table.children
+  for (let i = 1; i <= lines.length; i++) {
+    let number = cells[(i - 1) * 2] as LabelGuiElement | undefined
+    let code = cells[(i - 1) * 2 + 1] as LabelGuiElement | undefined
+    if (number === undefined || code === undefined) {
+      number = table.add({ type: "label", style: "automaton_code_number", tags: { action: "programs-view-line", line: i } })
+      code = table.add({ type: "label", style: "automaton_code_line", tags: { action: "programs-view-line", line: i } })
+      code.style.minimal_width = window.viewWidth
+    }
+    const error = window.errorLines[i]
+    if (error === undefined) {
+      number.caption = `${i}`
+      code.caption = richLine(lines[i - 1], PALETTE)
+      code.tooltip = ""
+    } else {
+      number.caption = `[color=${PALETTE.error}]●[/color] ${i}`
+      code.caption = ["", richLine(markError(lines[i - 1], error.column), PALETTE), `[color=${ERROR_TEXT}]    ◀ `, diagnosticMessage(error, true), "[/color]"]
+      code.tooltip = diagnosticText(error)
+    }
+  }
+  for (let k = cells.length - 1; k >= lines.length * 2; k--) cells[k].destroy()
+}
+
+/** Подпись кода строки в просмотре (на строку — номер и код). */
+function viewLine(window: ProgramsWindow, line: number): LuaGuiElement | undefined {
+  return window.viewLines.children[(line - 1) * 2 + 1]
+}
+
+/** Перейти к правке строки: выделить её (selectLine) или поставить курсор в её конец. */
+function editAt(window: ProgramsWindow, line: number, selectLine: boolean): void {
+  setMode(window, "edit")
+  goToLine(window, line, selectLine)
 }
 
 /** Кто импортирует программу; сборка, отставшая от новой версии модуля. */
@@ -306,8 +417,15 @@ function showNotes(window: ProgramsWindow, program: ProgramRecord): void {
 
 /** Ошибка компиляции понятным текстом: «[модуль:]строка:столбец текст». */
 export function diagnosticText(d: Diagnostic): LocalisedString {
-  const params: LocalisedString[] = d.params.map((p, i) => (d.code === "unsupported" && i === 0 ? [`automaton-feature.${p}`] : tostring(p)))
-  return ["", `${d.module !== undefined ? `${d.module}:` : ""}${d.line}:${d.column}  `, [`automaton-diagnostic.${d.code}`, ...params]]
+  return ["", `${d.module !== undefined ? `${d.module}:` : ""}${d.line}:${d.column}  `, diagnosticMessage(d)]
+}
+
+/** Текст ошибки без места; rich — для подписи с rich text (знаки кода в параметрах — как есть, не теги). */
+function diagnosticMessage(d: Diagnostic, rich = false): LocalisedString {
+  const params: LocalisedString[] = d.params.map((p, i) =>
+    d.code === "unsupported" && i === 0 ? [`automaton-feature.${p}`] : rich ? escapeRichText(tostring(p)) : tostring(p),
+  )
+  return [`automaton-diagnostic.${d.code}`, ...params]
 }
 
 function showErrors(window: ProgramsWindow, diagnostics: Diagnostic[]): void {
@@ -315,25 +433,32 @@ function showErrors(window: ProgramsWindow, diagnostics: Diagnostic[]): void {
   window.errorLines = {}
   for (const d of diagnostics.slice(0, MAX_ERRORS)) {
     // Ошибка в другом модуле: клик откроет его.
-    if (d.line > 0 && d.module === undefined) window.errorLines[d.line] = true
+    if (d.line > 0 && d.module === undefined) window.errorLines[d.line] ??= d
     const line = window.errors.add({ type: "label", caption: diagnosticText(d), tags: { action: "programs-goto", line: d.line, module: d.module ?? "" } })
     line.style.font_color = { r: 1, g: 0.45, b: 0.4 }
     line.tooltip = ["automaton-gui.goto-line"]
   }
   if (diagnostics.length > MAX_ERRORS) window.errors.add({ type: "label", caption: ["automaton-gui.more-errors", diagnostics.length - MAX_ERRORS] })
   layoutLines(window, true)
-  if (diagnostics[0] !== undefined && diagnostics[0].line > 0 && diagnostics[0].module === undefined) goToLine(window, diagnostics[0].line)
+  const first = diagnostics[0]
+  if (first === undefined || first.line <= 0 || first.module !== undefined) return
+  // Ошибки — в просмотре, в своих строках; клик по строке — правка.
+  setMode(window, "view")
+  const target = window.mode === "view" ? viewLine(window, first.line) : undefined
+  if (target !== undefined) window.pane.scroll_to_element(target, "top-third")
+  else goToLine(window, first.line, true)
 }
 
-/** Выделить строку кода и прокрутить к ней. */
-function goToLine(window: ProgramsWindow, line: number): void {
+/** Прокрутить к строке кода и выделить её (selectLine) или поставить курсор в её конец. */
+function goToLine(window: ProgramsWindow, line: number, selectLine: boolean): void {
   const lines = window.code.text.split("\n")
   if (line < 1 || line > lines.length) return
   let start = 1
   for (let i = 0; i < line - 1; i++) start += ulen(lines[i]) + 1
   const length = ulen(lines[line - 1])
   window.code.focus()
-  window.code.select(start, start + length - 1)
+  if (selectLine) window.code.select(start, start + length - 1)
+  else window.code.select(start + length, start + length - 1)
   const mark = window.marks.children[line - 1]
   if (mark !== undefined) window.pane.scroll_to_element(mark, "top-third")
 }
@@ -406,7 +531,15 @@ export function registerProgramsWindow(): void {
       if (window !== undefined) refreshList(window, player)
     }
   }
-  onProgramPublished(() => refreshOpen())
+  onProgramPublished((program) => {
+    refreshOpen()
+    // Программа открыта в просмотре без черновика (из VS Code, товарищем) — показать новую версию.
+    for (const player of game.connected_players) {
+      const window = windowOf(player)
+      if (window === undefined || window.mode !== "view" || window.programId !== program.id) continue
+      if (drafts()[player.index]?.programId !== program.id) load(window, player, program.id)
+    }
+  })
   onProgramRemoved(() => refreshOpen())
   onGuiClick("programs-refresh", (player) => {
     const window = windowOf(player)
@@ -464,7 +597,21 @@ export function registerProgramsWindow(): void {
       load(window, player, target.id)
       refreshList(window, player)
     }
-    goToLine(window, line)
+    editAt(window, line, true)
+  })
+  onGuiClick("programs-view-line", (player, element) => {
+    const { line } = element.tags as { line?: number }
+    if (line !== undefined) editViewLine(player, line)
+  })
+  onGuiClick("programs-view", (player) => {
+    const window = windowOf(player)
+    if (window !== undefined) setMode(window, "view")
+  })
+  onGuiClick("programs-edit", (player) => {
+    const window = windowOf(player)
+    if (window === undefined) return
+    setMode(window, "edit")
+    window.code.focus()
   })
   onGuiChange("programs-search", (player) => {
     const window = windowOf(player)
@@ -494,6 +641,8 @@ export function registerProgramsWindow(): void {
     window.code.text = version.source
     layoutLines(window)
     saveDraft(window, player)
+    setMode(window, "view")
+    window.pane.scroll_to_top()
   })
   onGuiClick("programs-new", (player) => {
     const window = windowOf(player)
@@ -541,6 +690,12 @@ export function registerProgramsWindow(): void {
     label.style.maximal_width = 900
     label.style.font_color = { r: 0.5, g: 1, b: 0.5 }
   })
+}
+
+/** Клик по строке просмотра: правка с курсором в конце строки (строка с ошибкой — выделена). */
+export function editViewLine(player: LuaPlayer, line: number): void {
+  const window = windowOf(player)
+  if (window !== undefined) editAt(window, line, window.errorLines[line] !== undefined)
 }
 
 /** Кнопка «Опубликовать»: права, компиляция, ошибки или новая версия. */

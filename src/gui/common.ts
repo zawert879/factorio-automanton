@@ -86,3 +86,22 @@ export function row(table: LuaGuiElement, caption: LocalisedString): LuaGuiEleme
   table.add({ type: "label", caption, style: "bold_label" })
   return table.add({ type: "label", caption: "" })
 }
+
+/**
+ * Обновление мода (on_configuration_changed): окна мода закрываются — их элементы и записи в storage
+ * от старой версии и могут не знать новых полей.
+ */
+export function closeModWindows(): void {
+  for (const [, player] of game.players) {
+    for (const child of player.gui.screen.children) {
+      if (string.sub(child.name, 1, 9) === "automaton") child.destroy()
+    }
+  }
+  for (const [, state] of pairs(storage.gui ?? {})) {
+    if (state === undefined) continue
+    state.machine = undefined
+    state.programs = undefined
+    state.picker = undefined
+    state.refreshMissing = undefined
+  }
+}

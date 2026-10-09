@@ -18,7 +18,7 @@ import { registerDebugCommands } from "./debug/commands"
 import { initSchema, migrate } from "./migrations"
 import { initDemoStorage, registerDemo } from "./demo"
 import { onEvent } from "./events"
-import { registerGuiEvents } from "./gui/common"
+import { closeModWindows, registerGuiEvents } from "./gui/common"
 import { registerMachineWindow } from "./gui/machine"
 import { registerProgramsWindow } from "./gui/programs"
 import { registerPicker } from "./gui/picker"
@@ -68,6 +68,7 @@ script.on_init(() => {
 script.on_configuration_changed(() => {
   initStorage()
   migrate()
+  closeModWindows()
   adoptUnregisteredRobots()
 })
 

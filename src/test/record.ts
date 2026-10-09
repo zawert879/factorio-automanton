@@ -5,7 +5,7 @@
 import { MapPosition, PlayerIndex } from "factorio:runtime"
 import { findRobot } from "../automaton/registry"
 import { guiOf } from "../gui/common"
-import { openPrograms, publishFromWindow } from "../gui/programs"
+import { editViewLine, openPrograms, publishFromWindow } from "../gui/programs"
 import { DISPLAYS, MARKER, MODELS, TECH } from "../names"
 import { assignProgram, machineOf } from "../program/machines"
 import { findProgram, publishProgram } from "../program/store"
@@ -106,18 +106,22 @@ function releaseBiters(): void {
   }
 }
 
-/** Редактор: программа с ошибкой — публикация (ошибка подсвечена) — исправление — публикация. */
+/**
+ * Редактор: просмотр с подсветкой — правка строки (ошибки в коде) — публикация (ошибки красным в строках) —
+ * исправление — публикация.
+ */
 function editorStep(step: number): void {
   const p = player()
   if (p === undefined) return
-  if (step === 0) {
-    const program = findProgram("Шахтёр", "player")!
-    openPrograms(p, program.id, undefined)
+  if (step === 0) openPrograms(p, findProgram("Шахтёр", "player")!.id, undefined)
+  if (step === 1) {
     const window = guiOf(p).programs!
-    window.code.text = program.source.replace("move(field);", "mov(field);").replace('mine(item);', 'mine(item, "много");')
+    const source = findProgram("Шахтёр", "player")!.source
+    window.code.text = source.replace("move(field);", "mov(field);").replace('mine(item);', 'mine(item, "много");')
+    editViewLine(p, source.split("\n").findIndex((line) => line.includes("move(field);")) + 1)
   }
-  if (step === 1) publishFromWindow(p)
-  if (step === 2) {
+  if (step === 2) publishFromWindow(p)
+  if (step === 3) {
     const window = guiOf(p).programs!
     window.code.text = findProgram("Шахтёр", "player")!.source
     publishFromWindow(p)
@@ -137,8 +141,8 @@ const SCENES: Scene[] = [
     name: "editor",
     gui: true,
     every: 60,
-    frames: 3,
-    before: { 0: () => editorStep(0), 1: () => editorStep(1), 2: () => editorStep(2) },
+    frames: 4,
+    before: { 0: () => editorStep(0), 1: () => editorStep(1), 2: () => editorStep(2), 3: () => editorStep(3) },
   },
 ]
 
