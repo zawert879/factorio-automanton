@@ -1,4 +1,19 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.5.0
+Date: 2026-10-09
+  Major Features:
+    - Debugger: the Debug… button in the machine window. Click a line number to set a breakpoint (for this machine only), step line by line, continue or pause; the program's variables, its modules' variables, me.memory and parameters are shown next to the code.
+    - In-game help (F1 or the shortcut bar): first steps, common errors and every function of the machine API with search and examples to copy.
+  Features:
+    - All machines window (shortcut bar): every machine of the team with its program, state and fuel; filters for errors, no fuel and idle, sorting; a click shows the machine through remote view and opens its window. The Machines: N button in the program window opens it for that program.
+    - Blueprints keep machines with their program and parameters: a built machine starts its program right away and gets a new name.
+    - API descriptions in English: the help, the VS Code types and the new program template follow the game language.
+  Changes:
+    - Step in the machine window now runs to the next line of the program.
+  Info:
+    - Documentation in English: README, player guide, language and VS Code guides.
+    - Programs published before 0.5.0 have no breakpoints until rebuilt: the debug window offers Rebuild for debugging.
+---------------------------------------------------------------------------------------------------
 Version: 0.4.0
 Date: 2026-10-09
   Features:
