@@ -1,5 +1,6 @@
 # Выпуск мода (docs/RELEASE.md): тег vX.Y.Z → проверка версии, тесты вне игры, архив мода в релизе GitHub
-# с заметками из mod/changelog.txt; если задан секрет FACTORIO_UPLOAD_API_KEY — тот же архив на портал модов.
+# с заметками из mod/changelog.txt; если задан секрет FACTORIO_UPLOAD_API_KEY — тот же архив на портал модов
+# (мода там ещё нет — публикация, есть — новая версия). Упавший шаг можно перезапустить: готовый релиз не мешает.
 name: Выпуск
 
 on:
@@ -47,10 +48,13 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" "dist/automaton_$VERSION.zip" \
-            --title "Automaton $VERSION" --notes-file "$RUNNER_TEMP/notes.md"
+          if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
+            echo "Релиз $GITHUB_REF_NAME уже есть"
+          else
+            gh release create "$GITHUB_REF_NAME" "dist/automaton_$VERSION.zip" \
+              --title "Automaton $VERSION" --notes-file "$RUNNER_TEMP/notes.md"
+          fi
 
-      # Только для мода, который уже есть на портале: первая загрузка — вручную (docs/RELEASE.md).
       - name: Портал модов
         if: env.FACTORIO_UPLOAD_API_KEY != ''
-        run: npx --yes factoriomod-debug@2.0.14 upload "dist/automaton_$VERSION.zip" automaton
+        run: node tools/release/portal.mjs "dist/automaton_$VERSION.zip"

@@ -1,4 +1,26 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.3.0
+Date: 2026-10-09
+  Major Features:
+    - Modules: import and export between team programs, own libraries, folders in the program list; updating a library rebuilds the programs that use it. Starter library "lib/Помощники".
+    - Program editor: code opens with syntax highlighting; click a line to edit it, compile errors are shown in red on their lines.
+  Features:
+    - Program picker with search and recently used programs; copy and paste machine settings; the Programmer tool assigns a program to selected machines.
+    - Messaging by subscription: subscribe(robot, topic) and publish(topic, data) instead of broadcasting to every machine.
+    - VS Code: a separate program folder per save; programs in src mirror the game both ways (deleting or renaming a file deletes or renames the program); TypeScript plugin that flags unsupported language features and shows how many ticks a loop takes; "Refresh from folder" button; the sync tool updates itself.
+    - print and console.log show objects, arrays, Map, Set, class instances and game objects.
+    - Demo factory of red and green science: /am-science (admin).
+  Changes:
+    - broadcast is removed: programs that use it get a compile error with a hint to use publish and subscribe.
+    - Rich text in the code editor is turned off: "[item=iron-plate]" in a program stays text.
+    - Mod windows close when the mod is updated.
+  Bugfixes:
+    - Cyrillic text could be corrupted at the end of words when trimmed.
+  Optimizations:
+    - 10 000 machines with programs and subscriptions run at 60 UPS (about 5.4 ms per tick).
+  Info:
+    - Documentation with animations from the game; MIT license.
+---------------------------------------------------------------------------------------------------
 Version: 0.2.0
 Date: 2026-10-08
   Major Features:

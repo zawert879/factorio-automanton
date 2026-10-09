@@ -44,7 +44,8 @@ while (true) {
 
 ## Установка
 
-1. Архив `automaton_<версия>.zip` со страницы [Releases](https://github.com/zawert879/factorio-automanton/releases)
+1. В игре: «Моды» → поиск «Automaton» (после публикации на портале). Или архив `automaton_<версия>.zip`
+   со страницы [Releases](https://github.com/zawert879/factorio-automanton/releases)
    (или собранный `npm run package` в `dist/`) — без распаковки в папку `mods` игры:
    Windows `%APPDATA%\Factorio\mods`, macOS `~/Library/Application Support/factorio/mods`, Linux `~/.factorio/mods`.
 2. Новая игра freeplay — в стартовом наборе два автоматона и метки, в библиотеке команды — 9 готовых программ.
