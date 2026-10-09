@@ -80,6 +80,8 @@
 - Упаковка — `npm run package` (FMTK 2.0.14 из `mod/`, архив — в `dist/`); перед упаковкой FMTK сам
   запускает `npm run build`. Тесты (`mod/test/`) в архив не попадают (`package.ignore` в info.json).
 - Версия мода и `mod/changelog.txt` — при выпуске для друзей; версия схемы storage — `src/migrations.ts`.
+- Выпуск — тег `vX.Y.Z` (= версия в `mod/info.json`): GitHub Actions собирает zip в релиз и, если задан
+  секрет `FACTORIO_UPLOAD_API_KEY`, выгружает на портал модов. Подробно — `docs/RELEASE.md`.
 
 ## FMTK
 - Расширение закреплено на версии 2.0.14 (последняя ветки 2.0.x). FMTK 2.1.x запускает игру с `--dap`,

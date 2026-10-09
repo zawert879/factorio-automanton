@@ -1,0 +1,56 @@
+# Выпуск мода (docs/RELEASE.md): тег vX.Y.Z → проверка версии, тесты вне игры, архив мода в релизе GitHub
+# с заметками из mod/changelog.txt; если задан секрет FACTORIO_UPLOAD_API_KEY — тот же архив на портал модов.
+name: Выпуск
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      FACTORIO_UPLOAD_API_KEY: ${{ secrets.FACTORIO_UPLOAD_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Зависимости
+        run: npm ci
+
+      - name: Тег совпадает с версией в mod/info.json
+        run: |
+          version=$(node -p 'require("./mod/info.json").version')
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::Тег $GITHUB_REF_NAME, а в mod/info.json версия $version"
+            exit 1
+          fi
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+
+      - name: Заметки к выпуску из changelog
+        run: node tools/release/notes.mjs "$VERSION" > "$RUNNER_TEMP/notes.md"
+
+      - name: Тесты вне игры
+        run: npm test
+
+      - name: Архив мода
+        run: npm run package
+
+      - name: Релиз на GitHub
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" "dist/automaton_$VERSION.zip" \
+            --title "Automaton $VERSION" --notes-file "$RUNNER_TEMP/notes.md"
+
+      # Только для мода, который уже есть на портале: первая загрузка — вручную (docs/RELEASE.md).
+      - name: Портал модов
+        if: env.FACTORIO_UPLOAD_API_KEY != ''
+        run: npx --yes factoriomod-debug@2.0.14 upload "dist/automaton_$VERSION.zip" automaton

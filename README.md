@@ -44,7 +44,8 @@ while (true) {
 
 ## Установка
 
-1. Архив `automaton_0.2.0.zip` (собирается `npm run package` в `dist/`) — в папку `mods` игры:
+1. Архив `automaton_<версия>.zip` со страницы [Releases](https://github.com/zawert879/factorio-automanton/releases)
+   (или собранный `npm run package` в `dist/`) — без распаковки в папку `mods` игры:
    Windows `%APPDATA%\Factorio\mods`, macOS `~/Library/Application Support/factorio/mods`, Linux `~/.factorio/mods`.
 2. Новая игра freeplay — в стартовом наборе два автоматона и метки, в библиотеке команды — 9 готовых программ.
 3. Посмотреть готовую фабрику: `/am-science` в чате (админ) построит её рядом с вами.
@@ -76,4 +77,5 @@ while (true) {
 | `npm run docs:record` | Анимации для документации (`docs/media/`) |
 | `npm run package` | Архив мода в `dist/` |
 
-Подробно о проверках — [TESTING.md](docs/TESTING.md), план — [ROADMAP.md](docs/ROADMAP.md).
+Подробно о проверках — [TESTING.md](docs/TESTING.md), план — [ROADMAP.md](docs/ROADMAP.md), выпуск
+(тег → релиз на GitHub и портал модов) — [RELEASE.md](docs/RELEASE.md).
