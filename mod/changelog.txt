@@ -1,4 +1,12 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.4.0
+Date: 2026-10-09
+  Features:
+    - Check a program without publishing: the Check button and switching to the view compile it together with the team's modules; errors are shown on their lines, machines keep running.
+    - Share programs as a string, like blueprint strings: Export picks programs or whole folders and adds the modules they need; Import shows which programs are new, unchanged or different and lets you replace, add alongside or skip each one.
+  Info:
+    - The mod portal page (description, gallery, tags) is updated with each release.
+---------------------------------------------------------------------------------------------------
 Version: 0.3.1
 Date: 2026-10-09
   Changes:
