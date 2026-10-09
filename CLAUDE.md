@@ -16,6 +16,8 @@
 - Замеры производительности — в `tools/bench/` (запускаются без окна и не мешают открытой игре).
 - `docs/LANGUAGE.md` — спецификация языка программ (подмножество TS), представление значений в Lua, отличия от JS.
 - `docs/language-samples/` — варианты синтаксиса, из которых выбран TypeScript (`3-typescript.md`).
+- Английские версии для игроков (18.9): `README.en.md`, `docs/en/{PLAYER_GUIDE,VSCODE,LANGUAGE}.md`. Меняешь русский
+  документ — поправь и английский; примеры кода в них проверяются так же (`npm run dts`, `npm test`).
 
 - Целевая версия: Factorio 2.0 (stable), только base, без зависимости от Space Age.
 - Мод пишется на TypeScript (`src/`), TypeScriptToLua собирает Lua в `mod/` — это папка мода, она

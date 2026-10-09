@@ -7,7 +7,7 @@
 // типами компилируются.
 import { execFileSync } from "node:child_process"
 import { createHash } from "node:crypto"
-import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
@@ -17,13 +17,14 @@ const api = readFileSync(join(root, "docs", "API.md"), "utf8")
 const blocks = [...api.matchAll(/```ts\n([\s\S]*?)```/g)].map((m) => m[1])
 const declarations = blocks.filter((b) => /\bdeclare\b/.test(b) || b.startsWith("type Item"))
 const examples = blocks.filter((b) => !declarations.includes(b))
-// Примеры из руководства игрока — тоже программы, они должны проходить tsc.
-for (const doc of [join(root, "docs", "PLAYER_GUIDE.md"), join(root, "README.md")]) {
+// Примеры из руководства игрока (и его английской версии, 18.9) — тоже программы, они должны проходить tsc.
+for (const doc of ["docs/PLAYER_GUIDE.md", "README.md", "docs/en/PLAYER_GUIDE.md", "README.en.md"].map((f) => join(root, f))) {
+  if (!existsSync(doc)) continue
   for (const m of readFileSync(doc, "utf8").matchAll(/```ts\n([\s\S]*?)```/g)) examples.push(m[1])
 }
 
 const headerEn = `// Automaton API types (the Automaton mod for Factorio) — for the VS Code editor.
-// Easiest: in the game, the "Team programs" window → "VS Code folder" — the mod writes a ready folder
+// Easiest: in the game, the "Team programs" window → "Folder for VS Code" — the mod writes a ready folder
 // (programs, this file, tsconfig.json, sync with the game). By hand:
 //   1. Create a folder and put this file and tsconfig.json in it:
 //      { "compilerOptions": { "strict": true, "target": "es2020", "lib": ["es2020"], "noEmit": true, "moduleDetection": "force",

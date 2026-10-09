@@ -71,13 +71,25 @@ const VIEW_GUTTER = 52 + 6
 
 const ERROR_TEXT = "#c0392b"
 
-const TEMPLATE = `// Новая программа. Все функции с описаниями — «Типы для VS Code»; руководство и примеры —
-// github.com/zawert879/factorio-automanton
+/** Шаблон новой программы — на языке игрока. */
+const TEMPLATES: Record<"ru" | "en", string> = {
+  ru: `// Новая программа. Справка по функциям с примерами — F1; руководство — github.com/zawert879/factorio-automanton
 while (true) {
   print("Привет от", me.name)
   wait(5)
 }
-`
+`,
+  en: `// New program. Help on functions with examples — F1; guide — github.com/zawert879/factorio-automanton
+while (true) {
+  print("Hello from", me.name)
+  wait(5)
+}
+`,
+}
+
+function templateFor(player: LuaPlayer): string {
+  return TEMPLATES[player.locale === "ru" ? "ru" : "en"]
+}
 
 
 export interface ProgramsWindow {
@@ -314,7 +326,7 @@ function load(window: ProgramsWindow, player: LuaPlayer, programId: number | und
   const fromDraft = source === undefined && draft !== undefined && draft.programId === program?.id
   window.programId = program?.id
   window.name.text = name ?? (fromDraft ? draft!.name : (program?.name ?? ""))
-  window.code.text = source ?? (fromDraft ? draft!.source : (program?.source ?? TEMPLATE))
+  window.code.text = source ?? (fromDraft ? draft!.source : (program?.source ?? templateFor(player)))
   const info: LocalisedString =
     program === undefined
       ? ["automaton-gui.draft"]
@@ -640,7 +652,7 @@ export function registerProgramsWindow(): void {
   onGuiClick("programs-new", (player) => {
     const window = windowOf(player)
     if (window === undefined) return
-    load(window, player, undefined, TEMPLATE, "")
+    load(window, player, undefined, templateFor(player), "")
     window.list.selected_index = 0
     saveDraft(window, player)
     window.name.focus()

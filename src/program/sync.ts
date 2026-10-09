@@ -96,6 +96,26 @@ const README = `Папка программ автоматонов для VS Cod
 Выделенный сервер: RCON — «node automaton-sync.mjs watch . --rcon --port … --password …».
 `
 
+const README_EN = `Automaton programs folder for VS Code (the Automaton mod).
+
+This folder belongs to one map: programs from it are published only to that map (its name is in .automaton-map.json).
+
+1. Open this folder in VS Code (File → Open Folder) and allow the automatic task
+   "Automaton: publish on save" (needs Node.js 18+).
+2. Start the game with the "--enable-lua-udp 27155" option (Steam: Factorio → Properties → Launch options).
+3. Programs live in the src folder. Save a .ts file — the program is published in the game; errors are underlined
+   in the code. Delete a file — the program is deleted in the game too; rename or move it — the program is renamed
+   (imports in other programs are fixed). The program name is the file path in src without .ts:
+   src/lib/Helpers.ts — program "lib/Helpers".
+   Imports between programs work like between files: import { nearMarker } from "../lib/Helpers".
+   New programs from the game: "node automaton-sync.mjs pull". Changed files without the sync task —
+   the "Refresh from folder" button in the programs window.
+4. The TypeScript plugin underlines what the machine language does not have (async/await, var, enum…) and shows
+   how many ticks a loop takes (hover over for / while). Not working — "TypeScript: Restart TS Server".
+Dedicated server: RCON — "node automaton-sync.mjs watch . --rcon --port … --password …".
+The sync tool prints its messages in Russian for now.
+`
+
 
 const GET_CHUNK = 2000
 const UDP_POLL_TICKS = 6
@@ -360,8 +380,11 @@ export function writeVsCodeFolder(player: LuaPlayer): string {
   write(".automaton/node_modules/automaton-ts-plugin/index.js", TS_PLUGIN)
   write(".vscode/settings.json", VSCODE_SETTINGS)
   write("automaton-sync.mjs", SYNC_TOOL)
-  write(".vscode/tasks.json", TASKS)
-  write("README.txt", README)
+  // Название задачи и README — на языке игрока (сообщения утилиты синхронизации пока русские: по ним задача
+  // узнаёт начало и конец публикации).
+  const ru = player.locale === "ru"
+  write(".vscode/tasks.json", ru ? TASKS : string.gsub(TASKS, "Automaton: публиковать при сохранении", "Automaton: publish on save")[0])
+  write("README.txt", ru ? README : README_EN)
   write(".automaton-map.json", helpers.table_to_json({ map: mapName(), force: player.force.name }))
   for (const program of programsOf(player.force.name)) write(`src/${programPath(program.name)}`, program.source)
   return dir

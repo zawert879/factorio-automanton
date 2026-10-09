@@ -69,7 +69,9 @@ if (filter === "--build-only") process.exit(0)
  */
 function generateExamples() {
   const examples = []
-  for (const file of ["docs/API.md", "docs/language-samples/3-typescript.md", "docs/PLAYER_GUIDE.md", "README.md"]) {
+  // Английские версии руководства и README (18.9) — те же программы с переведёнными комментариями и именами.
+  for (const file of ["docs/API.md", "docs/language-samples/3-typescript.md", "docs/PLAYER_GUIDE.md", "README.md", "docs/en/PLAYER_GUIDE.md", "README.en.md"]) {
+    if (!existsSync(join(root, file))) continue
     const text = readFileSync(join(root, file), "utf8")
     let index = 0
     for (const match of text.matchAll(/```ts\n([\s\S]*?)```/g)) {

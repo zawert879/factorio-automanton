@@ -16,7 +16,8 @@ while (true) {
 ## What's inside
 
 - **Programmable machines.** Programs are compiled in the game and shared by the whole team; publishing a new version restarts the machines that run it. Errors are shown with line numbers, types are checked on publish.
-- **Editor in the game** with syntax highlighting, and **VS Code integration**: autocompletion, documentation on hover, publishing on save, a separate program folder per save.
+- **Editor in the game** with syntax highlighting, a check without publishing, in-game help (F1), a debugger with breakpoints and variables, and **VS Code integration**: autocompletion, documentation on hover, publishing on save, a separate program folder per save.
+- **Sharing**: programs as a string (like blueprint strings); blueprints keep the machines' programs and parameters.
 - **Modules**: `import` / `export` between team programs, your own libraries, folders.
 - **Everything automatons do**: mining, smelting, crafting, fluids (pumping, crude oil, uranium), building and deconstructing, messaging by subscription, a shared board and task queues, pixel displays, circuit network signals.
 - **Combat automatons** (machine gun, rocket launcher) — biters attack your machines and routes — and **flying haulers**.
@@ -26,7 +27,11 @@ while (true) {
 
 ## Getting started
 
-Start a new freeplay game: you get two automatons and markers. Click a machine, press "Programs…" → "New", write a program (or paste one from the guide), publish it, assign it to the machine and press Run. The full player guide, API reference and language description are on [GitHub](https://github.com/zawert879/factorio-automanton) (in Russian; the in-game texts are in English and Russian).
+Start a new freeplay game: you get two automatons and markers. Click a machine, press "Programs…" → "New", write a program (or paste one from the guide), publish it, assign it to the machine and press Run. **Press F1** in the game for help on every function, with examples.
+
+- [Player guide](https://github.com/zawert879/factorio-automanton/blob/main/docs/en/PLAYER_GUIDE.md) — first steps, recipes, progression, debugging
+- [Writing programs in VS Code](https://github.com/zawert879/factorio-automanton/blob/main/docs/en/VSCODE.md)
+- [The language](https://github.com/zawert879/factorio-automanton/blob/main/docs/en/LANGUAGE.md) — what is supported and how it differs from JavaScript
 
 Multiplayer is supported: programs run deterministically, saving and loading in the middle of work is tested.
 
