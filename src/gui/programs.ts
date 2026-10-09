@@ -112,6 +112,7 @@ export interface ProgramsWindow {
   errors: FlowGuiElement
   versions: DropDownGuiElement
   assign: ButtonGuiElement
+  machines: ButtonGuiElement
   /** Редактируемая программа (undefined — новая, ещё не опубликованная). */
   programId?: number
   /** Машина, из окна которой открыли библиотеку (кнопка «Назначить»). */
@@ -172,6 +173,9 @@ export function openPrograms(player: LuaPlayer, programId?: number, robotId?: nu
   const name = header.add({ type: "textfield", text: "", tags: { action: "programs-name" } })
   name.style.width = 300
   const info = header.add({ type: "label", caption: "" })
+  // Машины с этой программой — окно «Все машины» (18.6; обработчик — gui/fleet.ts).
+  const machines = button(header, "", "programs-machines")
+  machines.tooltip = ["automaton-fleet.machines-tooltip"]
   const notes = right.add({ type: "flow", direction: "vertical" })
 
   const pane = right.add({ type: "scroll-pane", vertical_scroll_policy: "auto-and-reserve-space", horizontal_scroll_policy: "never" })
@@ -240,6 +244,7 @@ export function openPrograms(player: LuaPlayer, programId?: number, robotId?: nu
     errors,
     versions,
     assign,
+    machines,
     robotId,
   }
   guiOf(player).programs = window
@@ -330,6 +335,12 @@ function load(window: ProgramsWindow, player: LuaPlayer, programId: number | und
   const robot = window.robotId === undefined ? undefined : storage.robots.byId[window.robotId]
   window.assign.visible = robot !== undefined && program !== undefined && !program.library
   window.assign.caption = ["automaton-gui.assign", robot?.name ?? ""]
+  let running = 0
+  if (program !== undefined) {
+    for (const [, record] of pairs(storage.machines)) if (record.programId === program.id && !record.parked) running++
+  }
+  window.machines.visible = program !== undefined && !program.library
+  window.machines.caption = ["automaton-fleet.machines", running]
   layoutLines(window, true)
   // Опубликованная программа — в просмотре, новая — сразу в поле ввода.
   setMode(window, program === undefined ? "edit" : "view")

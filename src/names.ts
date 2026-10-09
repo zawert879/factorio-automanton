@@ -22,6 +22,8 @@ export const PROGRAMMER = "automaton-programmer"
 /** Справка в игре (18.5): ярлык на панели быстрого доступа и клавиша (F1). */
 export const HELP_SHORTCUT = "automaton-help"
 export const HELP_INPUT = "automaton-help"
+/** Окно «Все машины» (18.6): ярлык на панели быстрого доступа. */
+export const FLEET_SHORTCUT = "automaton-fleet"
 
 /** Что делает машина — от этого зависит анимация её тела. */
 export type Activity = "idle" | "run" | "mine"

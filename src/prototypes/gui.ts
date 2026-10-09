@@ -52,7 +52,19 @@ const helpInput: CustomInputPrototype = {
   consuming: "none",
 }
 
-data.extend([open, copySettings, pasteSettings, codeFont, consoleFont, helpShortcut, helpInput])
+// Все машины (18.6): ярлык на панели быстрого доступа.
+const fleetShortcut: ShortcutPrototype = {
+  type: "shortcut",
+  name: "automaton-fleet",
+  action: "lua",
+  toggleable: true,
+  icon: "__core__/graphics/icons/entity/character.png",
+  icon_size: 64,
+  small_icon: "__core__/graphics/icons/entity/character.png",
+  small_icon_size: 64,
+}
+
+data.extend([open, copySettings, pasteSettings, codeFont, consoleFont, helpShortcut, helpInput, fleetShortcut])
 
 const styles = data.raw["gui-style"]!.default as Record<string, unknown>
 // Редактор кода: размер задаётся по экрану игрока; отступы фиксированы — номера строк рядом

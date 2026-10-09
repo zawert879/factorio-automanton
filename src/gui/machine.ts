@@ -201,6 +201,13 @@ function windowRobot(player: LuaPlayer): { window: MachineWindow; robot: RobotRe
 
 const STATUS_CAPTIONS: Record<string, string> = { ready: "running", waiting: "waiting", done: "done", error: "error" }
 
+/** Топливо машины 0..1: энергия в двигателе и топливо в слоте (полный бак — 50 угля). */
+export function fuelLevel(robot: RobotRecord): number {
+  const stack = robot.fuel[0]
+  const stored = robot.energy + (stack.valid_for_read ? stack.count * fuelValue(stack.name) : 0)
+  return math.min(1, stored / FULL_TANK_JOULES)
+}
+
 export function refreshMachine(window: MachineWindow): void {
   const robot = storage.robots.byId[window.robotId]
   if (robot === undefined || !robot.entity.valid) return
@@ -239,9 +246,7 @@ export function refreshMachine(window: MachineWindow): void {
   for (const content of robot.cargo.get_contents()) {
     window.cargo.add({ type: "sprite-button", sprite: `item/${content.name}`, number: content.count, style: "slot_button" })
   }
-  const stack = robot.fuel[0]
-  const stored = robot.energy + (stack.valid_for_read ? stack.count * fuelValue(stack.name) : 0)
-  window.fuel.value = math.min(1, stored / FULL_TANK_JOULES)
+  window.fuel.value = fuelLevel(robot)
   const tank = tankOf(robot)
   window.tank.value = math.min(1, tank.amount / tankCapacity(robot))
   window.tank.caption = tank.fluid === undefined ? "" : `${math.floor(tank.amount)}`

@@ -2,6 +2,7 @@
 import { FrameGuiElement, LocalisedString, LuaGuiElement, LuaPlayer, PlayerIndex } from "factorio:runtime"
 import { onEvent } from "../events"
 import type { ExportWindow, ImportWindow } from "./exchange"
+import type { FleetWindow } from "./fleet"
 import type { HelpWindow } from "./help"
 import type { MachineWindow } from "./machine"
 import type { PickerWindow } from "./picker"
@@ -17,6 +18,8 @@ export interface GuiState {
   importWindow?: ImportWindow
   /** Справка в игре (18.5). */
   help?: HelpWindow
+  /** Все машины (18.6). */
+  fleet?: FleetWindow
   /** Недавно выбранные программы (окно выбора), новые первыми. */
   recent?: number[]
   /** «Обновить из папки»: программы без файлов, о которых спросили «удалить?». */
@@ -117,6 +120,7 @@ export function closeModWindows(): void {
     state.exportWindow = undefined
     state.importWindow = undefined
     state.help = undefined
+    state.fleet = undefined
     state.refreshMissing = undefined
   }
 }
