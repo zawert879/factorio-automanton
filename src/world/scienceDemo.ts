@@ -1,11 +1,12 @@
 // Демо-фабрика красной и зелёной науки (/am-science, сохранение automaton-science): честная цепочка
 // без конвейеров — добыча угля, железа и меди, плавка, котельная (воду возит «Водовоз»), сборщики
 // шестерён, провода, схем, красной и зелёной науки, лаборатории. Всю логистику делают машины по
-// стартовым программам «Добытчик», «Перевозчик» и «Водовоз» с параметрами.
+// программам-примерам «Добытчик», «Перевозчик» и «Водовоз» с параметрами (публикуются команде при постройке).
 import { LuaForce, LuaSurface, MapPosition } from "factorio:runtime"
 import { findRobot } from "../automaton/registry"
 import { lib } from "../lang/runtime/library"
 import { MARKER, MODELS, TECH } from "../names"
+import { publishExamples } from "../program/examples"
 import { assignProgram, machineOf } from "../program/machines"
 import { findProgram } from "../program/store"
 import { markerOf, renameMarker } from "./markers"
@@ -112,14 +113,15 @@ export function buildScienceDemo(surface: LuaSurface, origin: MapPosition, force
   ]) build("substation", x, y)
   force.add_research(TARGET_RESEARCH)
 
-  // Машины.
+  // Машины — на программах-примерах (команде они публикуются здесь, если их ещё нет).
+  publishExamples(force.name, ["Добытчик", "Водовоз", "Перевозчик"])
   const robot = (program: string, x: number, y: number, args: string) => {
     const position = surface.find_non_colliding_position(MODELS[0].entity, at(x, y), 6, 0.5)!
     surface.create_entity({ name: MODELS[0].placer, position, force, raise_built: true })
     const record = findRobot(surface.find_entities_filtered({ name: MODELS[0].entity, position, radius: 0.5 })[0])!
     record.fuel.insert({ name: "coal", count: 50 })
     const found = findProgram(program, force.name)
-    if (found === undefined) error(`нет стартовой программы ${program}`)
+    if (found === undefined) error(`нет программы ${program}`)
     const [ok, value] = pcall(lib.JSON.parse, args)
     if (!ok) error(`параметры ${program}: ${tostring(value)}`)
     const machine = machineOf(record.id)

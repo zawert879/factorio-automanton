@@ -19,12 +19,12 @@ while (true) {
 - **Everything automatons do**: mining, smelting, crafting, fluids (pumping, crude oil, uranium), building and deconstructing, messaging by subscription, a shared board and task queues, pixel displays, circuit network signals.
 - **Combat automatons** (machine gun, rocket launcher) — biters attack your machines and routes — and **flying haulers**.
 - **Progression**: worker models Mk1–Mk3, charging stations, research that unlocks API features and more processor time.
-- **Starter kit** in freeplay: two automatons, markers and ready-made example programs (miner, smelter, hauler, water carrier…).
+- **You write the programs**: freeplay starts with two automatons and markers and an empty team library; the player guide walks you through your first program, and the repository has examples (miner, smelter, hauler, water carrier…).
 - **Scales**: 10 000 machines with programs run at 60 UPS.
 
 ## Getting started
 
-Start a new freeplay game: you get two automatons and markers, and the team library already has example programs. Open a machine (click it), pick a program and press Run. The full player guide, API reference and language description are on [GitHub](https://github.com/zawert879/factorio-automanton) (in Russian; the in-game texts are in English and Russian).
+Start a new freeplay game: you get two automatons and markers. Click a machine, press "Programs…" → "New", write a program (or paste one from the guide), publish it, assign it to the machine and press Run. The full player guide, API reference and language description are on [GitHub](https://github.com/zawert879/factorio-automanton) (in Russian; the in-game texts are in English and Russian).
 
 Multiplayer is supported: programs run deterministically, saving and loading in the middle of work is tested.
 

@@ -1,11 +1,7 @@
 // Старт игры (6.4). Freeplay: вместо бура и печи в стартовом наборе — два автоматона Mk1 и метки
 // (сценарий даёт набор через remote-интерфейс «freeplay»; в других сценариях набор не трогаем).
-// Каждой команде один раз публикуются стартовые программы (examples/*.ts): удалённая игроками программа
-// не возвращается, изменённая — не перезаписывается.
-import { LuaForce } from "factorio:runtime"
-import { onEvent } from "../events"
-import { STARTER_PROGRAMS } from "../program/examples.generated"
-import { findProgram, publish } from "../program/store"
+// Библиотека команды в начале пустая: программы игроки пишут сами (примеры — examples/*.ts,
+// src/program/examples.ts).
 import { MARKER, WORKER_MK1 } from "../names"
 
 /** Что убрать из стартового набора freeplay и что дать взамен. */
@@ -21,36 +17,7 @@ export function configureFreeplay(): void {
   remote.call("freeplay", "set_created_items", items)
 }
 
-export function publishStarters(force: LuaForce): void {
-  storage.startersPublished ??= {}
-  if (storage.startersPublished[force.name]) return
-  storage.startersPublished[force.name] = true
-  // Программа собирается только после библиотек, которые импортирует (lib/Помощники): проходы, пока
-  // публикуется хоть одна.
-  let pending = STARTER_PROGRAMS.filter((starter) => findProgram(starter.name, force.name) === undefined)
-  let failures: string[] = []
-  while (pending.length > 0) {
-    const next: typeof pending = []
-    failures = []
-    for (const starter of pending) {
-      const result = publish({ name: starter.name, source: starter.source, force: force.name, author: "Automaton" })
-      if (!result.ok) {
-        next.push(starter)
-        failures.push(`${starter.name}: ${serpent.line(result.diagnostics)}`)
-      }
-    }
-    if (next.length === pending.length) break
-    pending = next
-  }
-  for (const failure of failures) log(`automaton: стартовая программа не скомпилировалась: ${failure}`)
-}
-
 /** on_init и on_configuration_changed (мод добавили в старое сохранение). */
 export function initStart(): void {
   configureFreeplay()
-  for (const [, force] of pairs(game.forces)) if (force.name !== "enemy" && force.name !== "neutral") publishStarters(force)
-}
-
-export function registerStart(): void {
-  onEvent(defines.events.on_force_created, (e) => publishStarters(e.force))
 }

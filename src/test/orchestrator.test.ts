@@ -1,8 +1,9 @@
-// Готовность этапа 9: стартовые программы «Оркестратор» и «Рабочий» — оркестратор раздаёт трём рабочим
+// Готовность этапа 9: программы-примеры «Оркестратор» и «Рабочий» — оркестратор раздаёт трём рабочим
 // печи, рабочие копают руду и кормят печи, табло «штаб» показывает занятость.
 import { MapPosition } from "factorio:runtime"
 import { findRobot, RobotRecord } from "../automaton/registry"
 import { DISPLAYS, MODELS } from "../names"
+import { publishExamples } from "../program/examples"
 import { assignProgram } from "../program/machines"
 import { findProgram } from "../program/store"
 import { renameDisplay } from "../world/displays"
@@ -39,6 +40,7 @@ describe("пример: оркестратор и рабочие", () => {
     const workers = [0, 2, 4].map((dx) => place({ x: left + 12.5 + dx, y: top + 16.5 }))
     for (const robot of [boss, ...workers]) robot.fuel.insert({ name: "coal", count: 20 })
 
+    publishExamples("player", ["Оркестратор", "Рабочий"])
     const orchestrator = findProgram("Оркестратор", "player")!
     const worker = findProgram("Рабочий", "player")!
     assignProgram(boss, orchestrator)

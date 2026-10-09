@@ -120,6 +120,17 @@ script.on_nth_tick(1, (event) => {
       if (record?.activity === "run") shot(`run-${record.name}`, record.entity.position, 5)
     }
   }
+  // Новая игра: программ у команды нет — окно выбора подсказывает, где их писать.
+  if (tick === 166) {
+    const player = game.get_player(1 as PlayerIndex)
+    const robot = Object.values(storage.robots.byId).find((r) => r !== undefined)
+    if (player !== undefined && robot !== undefined) openPicker(player, [robot.id], true)
+  }
+  if (tick === 167) guiShot("picker-empty")
+  if (tick === 168) {
+    const player = game.get_player(1 as PlayerIndex)
+    if (player !== undefined) player.gui.screen["automaton-picker"]?.destroy()
+  }
   // Окна (этап 5): машина с программой, библиотека программ с ошибкой компиляции, типы для VS Code.
   if (tick === 175) {
     const robot = place({ x: CENTER.x - 4.5, y: CENTER.y - 12 })

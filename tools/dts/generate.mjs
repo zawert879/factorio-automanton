@@ -1,9 +1,9 @@
 // Генератор automaton.d.ts (5.5): объявления API из docs/API.md (блоки ```ts с declare / type / interface).
 // Пишет mod/automaton.d.ts (для игроков, VS Code) и src/gui/dts.generated.ts (окно «Типы для VS Code»,
 // папка для VS Code: типы, tsconfig, утилита синхронизации mod/tools/automaton-sync.mjs, задача VS Code).
-// Стартовые программы библиотеки (examples/*.ts, имя — из строки «// @program Имя») — в
-// src/program/examples.generated.ts (6.4).
-// С флагом --check проверяет tsc --strict, что программы-примеры из API.md и стартовые программы с этими
+// Программы-примеры (examples/*.ts, имя — из строки «// @program Имя») — в src/program/examples.generated.ts:
+// в игру сами не попадают, их публикуют /am-science и тесты (src/program/examples.ts).
+// С флагом --check проверяет tsc --strict, что примеры из API.md и руководства и программы-примеры с этими
 // типами компилируются.
 import { execFileSync } from "node:child_process"
 import { createHash } from "node:crypto"
@@ -69,7 +69,7 @@ writeFileSync(
     `export const SYNC_TOOL_HASH = ${JSON.stringify(createHash("sha1").update(tool).digest("hex").slice(0, 12))}\n`,
 )
 
-const starters = readdirSync(join(root, "examples"))
+const programs = readdirSync(join(root, "examples"))
   .filter((file) => file.endsWith(".ts"))
   .sort()
   .map((file) => {
@@ -81,8 +81,8 @@ const starters = readdirSync(join(root, "examples"))
 writeFileSync(
   join(root, "src", "program", "examples.generated.ts"),
   "// Создаётся tools/dts/generate.mjs из examples/*.ts — не править руками.\n" +
-    `export const STARTER_PROGRAMS: { name: string; source: string }[] = ${JSON.stringify(
-      starters.map(({ name, source }) => ({ name, source })),
+    `export const EXAMPLE_PROGRAMS: { name: string; source: string }[] = ${JSON.stringify(
+      programs.map(({ name, source }) => ({ name, source })),
       null,
       2,
     )}\n`,
@@ -95,9 +95,9 @@ if (process.argv.includes("--check")) {
   writeFileSync(join(dir, "automaton.d.ts"), dts)
   // Каждый пример — отдельный файл; moduleDetection: force делает их модулями (одинаковые имена не мешают).
   examples.forEach((source, i) => writeFileSync(join(dir, `example${i + 1}.ts`), source))
-  // Стартовые программы — по своим именам (папки — подпапки), как в папке для VS Code: так проверяются и импорты
+  // Программы-примеры — по своим именам (папки — подпапки), как в папке для VS Code: так проверяются и импорты
   // (и в примерах из документации: import из "./lib/Помощники").
-  for (const { name, source } of starters) {
+  for (const { name, source } of programs) {
     const path = join(dir, ...name.split("/")) + ".ts"
     mkdirSync(join(path, ".."), { recursive: true })
     writeFileSync(path, source)
@@ -105,7 +105,7 @@ if (process.argv.includes("--check")) {
   writeFileSync(join(dir, "tsconfig.json"), JSON.stringify({ ...JSON.parse(tsconfig), include: ["**/*.ts"] }))
   try {
     execFileSync(join(root, "node_modules", ".bin", "tsc"), ["-p", join(dir, "tsconfig.json")], { stdio: "pipe" })
-    console.log(`automaton.d.ts: ${examples.length} примеров из API.md и руководства и ${starters.length} стартовых программ проходят tsc --strict`)
+    console.log(`automaton.d.ts: ${examples.length} примеров из API.md и руководства и ${programs.length} программ-примеров проходят tsc --strict`)
   } catch (error) {
     console.error(String(error.stdout ?? error))
     process.exit(1)

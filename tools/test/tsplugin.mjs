@@ -1,5 +1,5 @@
 // Плагин TypeScript для VS Code (mod/tools/automaton-ts-plugin.js): ошибки на неподдерживаемом, без ложных
-// срабатываний на стартовых программах и примерах, подсказки о тиках, только файлы src папки программ.
+// срабатываний на программах-примерах и примерах из документации, подсказки о тиках, только файлы src папки программ.
 import { mkdtempSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs"
 import { createRequire } from "node:module"
 import { tmpdir } from "node:os"
@@ -26,7 +26,7 @@ export function checkTsPlugin(root) {
   expect("import(), export =", features("const m = import('./x')\nexport = 5"), "dynamic-import,export-assignment")
   expect("разрешённое", features(`import { a } from "./lib"\nexport class B extends A { get x() { return 1 } }\nconst f = async`), "")
 
-  // Без ложных срабатываний: стартовые программы и программы из документации.
+  // Без ложных срабатываний: программы-примеры и программы из документации.
   for (const file of readdirSync(join(root, "examples")).filter((f) => f.endsWith(".ts"))) {
     expect(`examples/${file}`, features(readFileSync(join(root, "examples", file), "utf8")), "")
   }

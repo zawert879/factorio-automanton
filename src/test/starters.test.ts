@@ -1,14 +1,15 @@
-// Стартовые программы в деле: «Перевозчик» везёт уголь со склада в печи зоны (keep) и плиты — в сундук.
+// Программы-примеры в деле: «Перевозчик» везёт уголь со склада в печи зоны (keep) и плиты — в сундук.
 import { findRobot } from "../automaton/registry"
 import { lib } from "../lang/runtime/library"
 import { MARKER, MODELS } from "../names"
+import { publishExamples } from "../program/examples"
 import { assignProgram, machineOf } from "../program/machines"
 import { findProgram } from "../program/store"
 import { markerOf, renameMarker } from "../world/markers"
 import { createZone } from "../world/zones"
 import { describe, expect, test, waitUntil } from "./testing"
 
-describe("стартовые программы", () => {
+describe("программы-примеры", () => {
   test("Перевозчик: уголь со склада в печь до keep, руду в печь, плиты в сундук", (t) => {
     const surface = game.get_surface("nauvis")!
     const [left, top] = [-950, 700]
@@ -42,6 +43,7 @@ describe("стартовые программы", () => {
       ]}`,
     )
     machineOf(robot.id).args = args
+    publishExamples("player", ["Перевозчик"])
     const m = assignProgram(robot, findProgram("Перевозчик", "player")!)
     waitUntil(t, "плит в сундуке", () => plates.get_item_count("iron-plate") >= 3, 3600, () => {
       expect(m.machine.status).toBe("waiting")

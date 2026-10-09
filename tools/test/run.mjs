@@ -64,7 +64,7 @@ if (filter === "--build-only") process.exit(0)
 
 /**
  * tests/lang/examples.generated.ts: программы из блоков ```ts в docs/API.md и docs/language-samples/3-typescript.md
- * и стартовые программы examples/*.ts
+ * и программы-примеры examples/*.ts
  * (без блоков с объявлениями declare — это описание API, а не программы).
  */
 function generateExamples() {

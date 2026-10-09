@@ -7,7 +7,7 @@
 import { findProgram } from "../program/store"
 import { LuaTechnologyPrototype } from "factorio:runtime"
 import { compile } from "../lang/codegen"
-import { STARTER_PROGRAMS } from "../program/examples.generated"
+import { EXAMPLE_PROGRAMS } from "../program/examples.generated"
 import { MARKER, REMOVED_ENTITY_TYPES, TECH, WORKER_MK1 } from "../names"
 import { describe, expect, test } from "./testing"
 
@@ -180,14 +180,14 @@ describe("целостность после удаления ванили", () =
     expect(items["stone-furnace"]).toBe(undefined)
   })
 
-  test("стартовые программы опубликованы команде и компилируются", () => {
-    expect(storage.startersPublished?.["player"]).toBe(true)
-    // Модули — другие стартовые программы (lib/Помощники).
-    const resolve = (name: string) => STARTER_PROGRAMS.find((s) => s.name === name)
-    for (const starter of STARTER_PROGRAMS) {
-      const result = compile(starter.source, { name: starter.name, resolve })
-      expect(`${starter.name}: ${result.ok}`).toBe(`${starter.name}: true`)
-      expect(`${starter.name}: ${findProgram(starter.name) !== undefined}`).toBe(`${starter.name}: true`)
+  test("программы-примеры компилируются; сами команде не публикуются", () => {
+    // Модули — другие примеры (lib/Помощники).
+    const resolve = (name: string) => EXAMPLE_PROGRAMS.find((e) => e.name === name)
+    for (const example of EXAMPLE_PROGRAMS) {
+      const result = compile(example.source, { name: example.name, resolve })
+      expect(`${example.name}: ${result.ok}`).toBe(`${example.name}: true`)
     }
+    // Тесты публикуют нужные им примеры сами; «Печник» не нужен ни одному — в новой игре его нет.
+    expect(findProgram("Печник")).toBe(undefined)
   })
 })

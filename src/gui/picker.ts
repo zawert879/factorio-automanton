@@ -2,7 +2,7 @@
 // нескольких (рамка «Программатора» правой кнопкой). Поиск, папки, недавние наверху, у каждой программы —
 // сколько машин уже работает по ней. Библиотеки не предлагаются: запускать их нечего.
 import { trim } from "../lang/runtime/strings"
-import { FrameGuiElement, ListBoxGuiElement, LocalisedString, LuaPlayer, TextFieldGuiElement } from "factorio:runtime"
+import { FrameGuiElement, ListBoxGuiElement, LocalisedString, LuaGuiElement, LuaPlayer, TextFieldGuiElement } from "factorio:runtime"
 import { assignProgram, machineOf } from "../program/machines"
 import { programsOf } from "../program/store"
 import { guiOf, onGuiChange, onGuiClick, onGuiSelection, titlebar } from "./common"
@@ -18,6 +18,8 @@ export interface PickerWindow {
   frame: FrameGuiElement
   search: TextFieldGuiElement
   list: ListBoxGuiElement
+  /** Подсказка, когда у команды нет ни одной программы (новая игра). */
+  empty: LuaGuiElement
   entries: PickerEntry[]
   robotIds: number[]
 }
@@ -50,10 +52,13 @@ export function openPicker(player: LuaPlayer, robotIds: number[], modal = false)
   searchRow.add({ type: "label", caption: ["automaton-gui.search"] })
   const search = searchRow.add({ type: "textfield", text: "", tags: { action: "picker-search" } })
   search.style.width = 300
+  const empty = body.add({ type: "label", caption: ["automaton-gui.picker-empty"] })
+  empty.style.single_line = false
+  empty.style.maximal_width = 380
   const list = body.add({ type: "list-box", items: [], tags: { action: "picker-select" } })
   list.style.width = 380
   list.style.height = 420
-  const window: PickerWindow = { frame, search, list, entries: [], robotIds }
+  const window: PickerWindow = { frame, search, list, empty, entries: [], robotIds }
   guiOf(player).picker = window
   refresh(window, player)
   if (modal) player.opened = frame
@@ -62,6 +67,7 @@ export function openPicker(player: LuaPlayer, robotIds: number[], modal = false)
 
 function refresh(window: PickerWindow, player: LuaPlayer): void {
   const programs = programsOf(player.force.name).filter((p) => !p.library)
+  window.empty.visible = programs.length === 0
   // Сколько машин работает по каждой программе.
   const counts: Record<number, number | undefined> = {}
   for (const [, record] of pairs(storage.machines)) {

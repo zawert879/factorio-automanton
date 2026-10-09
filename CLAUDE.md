@@ -58,7 +58,8 @@
   прототипы (data stage); `src/control.ts` — runtime (события, команды, GUI); модули — рядом, в подпапках.
 - `src/storage.d.ts` — тип `storage`; `src/names.ts` — имена прототипов (общие для data и control).
 - `src/prototypes/removal.ts` — удаление ванили (`data-final-fixes`), `src/prototypes/technologies.ts` — технологии.
-- `examples/*.ts` — стартовые программы библиотеки команды (первая строка `// @program Имя`); проверяются
+- `examples/*.ts` — программы-примеры (первая строка `// @program Имя`); в игру сами не попадают — их публикуют
+  `/am-science` и тесты (`publishExamples`, `src/program/examples.ts`); проверяются
   `npm run dts` (tsc) и `npm test` (компилятор мода), попадают в мод через `src/program/examples.generated.ts`.
 - `src/debug/commands.ts` — отладочные команды (`/am-give [число]` — выдать машины); в мультиплеере только админам.
 - В `data`/`settings` глобальные `data`, `mods` объявляются в файле через `factorio:common`

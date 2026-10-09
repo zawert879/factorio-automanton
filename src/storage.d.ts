@@ -58,8 +58,6 @@ declare global {
     refreshPending?: Record<number, number | undefined>
     /** Папку игрока переписали из-за устаревшей утилиты: игрок → тик (не чаще раза в минуту). */
     syncFolderUpdated?: Record<number, number | undefined>
-    /** Команды, которым уже опубликованы стартовые программы (src/world/start.ts). */
-    startersPublished?: Record<string, boolean | undefined>
     /** Сообщения между машинами (src/program/comms.ts). */
     comms: CommsState
     /** Доска команды: по имени команды (src/program/board.ts). */

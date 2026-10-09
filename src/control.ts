@@ -36,13 +36,13 @@ import { initBoard, registerBoard } from "./program/board"
 import { registerCache } from "./program/cache"
 import { initMarkers, registerMarkers } from "./world/markers"
 import { initDisplays, registerDisplays } from "./world/displays"
-import { initStart, registerStart } from "./world/start"
+import { initStart } from "./world/start"
 import { registerNaming } from "./world/naming"
 import { initZones, registerZones } from "./world/zones"
 
 function initStorage(): void {
   initDemoStorage()
-  // Имя карты — до стартовых программ: их публикация выгружает файлы в папку карты.
+  // Имя карты — до любых публикаций: публикация выгружает файлы в папку карты.
   initSync()
   initRegistry()
   initMovement()
@@ -97,7 +97,6 @@ registerMachineWindow()
 registerProgramsWindow()
 registerPicker()
 registerAssignTools()
-registerStart()
 registerComms()
 registerBoard()
 registerCache()

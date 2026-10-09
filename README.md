@@ -48,7 +48,8 @@ while (true) {
    со страницы [Releases](https://github.com/zawert879/factorio-automanton/releases)
    (или собранный `npm run package` в `dist/`) — без распаковки в папку `mods` игры:
    Windows `%APPDATA%\Factorio\mods`, macOS `~/Library/Application Support/factorio/mods`, Linux `~/.factorio/mods`.
-2. Новая игра freeplay — в стартовом наборе два автоматона и метки, в библиотеке команды — 9 готовых программ.
+2. Новая игра freeplay — в стартовом наборе два автоматона и метки; программы пишете вы
+   ([первые 15 минут](docs/PLAYER_GUIDE.md#первые-15-минут), примеры — [examples](examples)).
 3. Посмотреть готовую фабрику: `/am-science` в чате (админ) построит её рядом с вами.
 
 ## Документация

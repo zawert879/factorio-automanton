@@ -7,6 +7,7 @@ import { findRobot } from "../automaton/registry"
 import { guiOf } from "../gui/common"
 import { editViewLine, openPrograms, publishFromWindow } from "../gui/programs"
 import { DISPLAYS, MARKER, MODELS, TECH } from "../names"
+import { publishExamples } from "../program/examples"
 import { assignProgram, machineOf } from "../program/machines"
 import { findProgram, publishProgram } from "../program/store"
 import { renameDisplay } from "../world/displays"
@@ -113,7 +114,10 @@ function releaseBiters(): void {
 function editorStep(step: number): void {
   const p = player()
   if (p === undefined) return
-  if (step === 0) openPrograms(p, findProgram("Шахтёр", "player")!.id, undefined)
+  if (step === 0) {
+    publishExamples("player", ["Шахтёр"])
+    openPrograms(p, findProgram("Шахтёр", "player")!.id, undefined)
+  }
   if (step === 1) {
     const window = guiOf(p).programs!
     const source = findProgram("Шахтёр", "player")!.source

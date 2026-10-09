@@ -3,6 +3,7 @@ import { LuaForce, MapPosition } from "factorio:runtime"
 import { findRobot, RobotRecord } from "../automaton/registry"
 import { COMBAT_MK1, MODELS, TECH } from "../names"
 import { describeDiagnostics } from "../program/commands"
+import { publishExamples } from "../program/examples"
 import { assignProgram, MachineRecord } from "../program/machines"
 import { publishProgram } from "../program/store"
 import { findProgram } from "../program/store"
@@ -169,6 +170,7 @@ print("круг")`,
       renameMarker(markerOf(entity)!, p.name)
       return entity
     })
+    publishExamples("player", ["Патруль"])
     assignProgram(robot, findProgram("Патруль", "player")!)
     // Параметры — значения программы: массив — таблица с __n (так их делает окно машины из JSON).
     storage.machines[robot.id]!.args = { posts: { __n: 2, 1: "пост-1", 2: "пост-2" } }

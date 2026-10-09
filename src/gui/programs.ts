@@ -80,7 +80,8 @@ const PALETTE: Record<Paint, string | undefined> = {
 }
 const ERROR_TEXT = "#c0392b"
 
-const TEMPLATE = `// Новая программа. Справка по API — docs/API.md в папке мода, типы — «Типы для VS Code».
+const TEMPLATE = `// Новая программа. Все функции с описаниями — «Типы для VS Code»; руководство и примеры —
+// github.com/zawert879/factorio-automanton
 while (true) {
   print("Привет от", me.name)
   wait(5)
