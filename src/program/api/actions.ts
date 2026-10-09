@@ -150,7 +150,9 @@ blocking("give", (k, to, what, amount) =>
 blocking("repair", (k, target) =>
   actionCall(k, "repair", k !== undefined ? {} : { target: type(target) === "table" && target.__h === "robot" ? handleRobot(target).entity : handleEntity(target) }),
 )
-blocking("refuel", (k, what) => actionCall(k, "refuel", k !== undefined ? {} : { item: optionalItem(what) }))
+blocking("refuel", (k, what, to) =>
+  actionCall(k, "refuel", k !== undefined ? {} : { item: optionalItem(what), target: to === undefined ? undefined : handleRobot(to).entity }),
+)
 
 // ---------- Зарядка, наладка, строительство ----------
 

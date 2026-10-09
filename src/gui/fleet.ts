@@ -11,7 +11,8 @@ import { robotState } from "../program/handles"
 import { MachineRecord, machineOf } from "../program/machines"
 import { programsOf } from "../program/store"
 import { guiOf, onGuiChange, onGuiClick, onGuiSelection, titlebar } from "./common"
-import { fuelLevel, openMachine } from "./machine"
+import { fuelLevel } from "../automaton/energy"
+import { openMachine } from "./machine"
 
 const FRAME = "automaton-fleet"
 const PAGE_SIZE = 50

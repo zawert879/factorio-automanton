@@ -218,6 +218,7 @@ interface Robot {
   readonly state: RobotState;
   readonly program: string | null;     // имя программы из библиотеки @en name of the program from the library
   readonly health: number;             // 0..1
+  readonly fuel: number;               // 0..1 — топливо или заряд @en 0..1 — fuel or charge
   distance(to: Target): number;
 }
 
@@ -479,10 +480,10 @@ while (true) {
 
 ```ts
 /**
- * Mk1: переложить топливо из груза в топливный слот. Без item — лучшее, что есть.
- * @en Mk1: move fuel from the cargo into the fuel slot. Without item — the best available.
+ * Mk1: переложить топливо из груза в топливный слот. Без item — лучшее, что есть. С to — в топливный слот другой машины Mk1 в радиусе me.reach: заправщику не нужна её программа.
+ * @en Mk1: move fuel from the cargo into the fuel slot. Without item — the best available. With to — into the fuel slot of another Mk1 machine within me.reach: the refueler does not need its program.
  */
-declare function refuel(item?: Item): void;
+declare function refuel(item?: Item, to?: Robot): void;
 
 /**
  * Mk2+: доехать до станции (по умолчанию — ближайшей видимой) и зарядиться полностью.
@@ -496,6 +497,16 @@ declare function charge(station?: Entity): void;
 if (me.fuel < 0.2) {
   if (me.model === "worker-mk1") refuel("coal");
   else charge();
+}
+```
+
+```ts
+// Заправщик: объезжает машины Mk1 рядом и подливает уголь тем, у кого меньше трети бака
+for (const robot of scan.robots()) {
+  if (robot.model === "worker-mk1" && robot.fuel < 0.3 && me.cargo.count("coal") > 0) {
+    move(robot);
+    refuel("coal", robot);
+  }
 }
 ```
 

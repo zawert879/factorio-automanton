@@ -8,6 +8,7 @@ import { LuaEntity, LuaInventory, MapPosition } from "factorio:runtime"
 import { currentAction } from "../automaton/actions"
 import { distanceToEntity } from "../automaton/actions"
 import { entityFluid, entityFuel, entityInput, entityItemCount, entityOutput, entityProgress, entityRecipe, entityStatus } from "../automaton/inspect"
+import { fuelLevel } from "../automaton/energy"
 import { robotPosition } from "../automaton/flight"
 import { modelOfRecord, robotVision } from "../automaton/models"
 import { isMoving } from "../automaton/movement"
@@ -241,6 +242,7 @@ robotGetters.position = (o: Val) => programPosition(robotPosition(sightedRobot(o
 robotGetters.state = (o: Val) => robotState(sightedRobot(o))
 robotGetters.program = (o: Val) => robotProgramName(sightedRobot(o))
 robotGetters.health = (o: Val) => robotHealth(sightedRobot(o))
+robotGetters.fuel = (o: Val) => fuelLevel(sightedRobot(o))
 hostMethods.robot.distance = (o: Val, _k: Val, to: Val) => distanceBetween(sightedRobot(o).entity.position, to)
 rawset(hostMethods.robot, "toString", (o: Val) => `${storage.robots.byId[o.__id]?.name ?? "robot"}#${o.__id}`)
 

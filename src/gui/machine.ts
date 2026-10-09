@@ -1,5 +1,6 @@
 // Окно машины (5.1–5.3, 5.7): открывается кликом по машине. Программа и управление (запуск, стоп, пауза,
 // шаг), состояние и текущая строка, ошибка, консоль, груз и топливо, настройки: имя, дом, параметры (args).
+// Слот топлива и груз — как у вагона: клик с предметом в руке кладёт, пустой рукой — забирает (игрок рядом).
 // Программа выбирается в окне выбора (src/gui/picker.ts): кнопка с её именем.
 import { trim } from "../lang/runtime/strings"
 import { formatLine } from "../lang/modules"
@@ -8,16 +9,21 @@ import {
   FlowGuiElement,
   FrameGuiElement,
   LabelGuiElement,
+  LocalisedString,
   LuaGuiElement,
+  LuaInventory,
+  LuaItemStack,
   LuaPlayer,
   PlayerIndex,
   ProgressBarGuiElement,
   ScrollPaneGuiElement,
+  SpriteButtonGuiElement,
   TableGuiElement,
   TextBoxGuiElement,
   TextFieldGuiElement,
 } from "factorio:runtime"
-import { fuelValue } from "../automaton/energy"
+import { fuelLevel, fuelValue } from "../automaton/energy"
+import { robotBattery } from "../automaton/models"
 import { tankCapacity, tankOf } from "../automaton/tank"
 import { RobotRecord } from "../automaton/registry"
 import { onEvent, onTick } from "../events"
@@ -38,8 +44,6 @@ import { closePrograms, openPrograms } from "./programs"
 const FRAME = "automaton-machine"
 const CONSOLE_SHOWN = 40
 const REFRESH_TICKS = 30
-/** Полный бак — для полоски топлива (как me.fuel). */
-const FULL_TANK_JOULES = 50 * 4_000_000
 
 export interface MachineWindow {
   robotId: number
@@ -55,6 +59,8 @@ export interface MachineWindow {
   scroll: ScrollPaneGuiElement
   consoleSize: number
   cargo: TableGuiElement
+  /** Нет у окон, открытых до 0.6.0. */
+  fuelSlot?: SpriteButtonGuiElement
   fuel: ProgressBarGuiElement
   tank: ProgressBarGuiElement
   name: TextFieldGuiElement
@@ -120,6 +126,7 @@ export function openMachine(player: LuaPlayer, robot: RobotRecord): void {
   label(cargoRow, "cargo")
   const cargo = cargoRow.add({ type: "table", column_count: 10 })
   label(cargoRow, "fuel")
+  const fuelSlot = cargoRow.add({ type: "sprite-button", style: "slot_button", tags: { action: "machine-fuel" }, tooltip: ["automaton-gui.fuel-slot-tooltip"] })
   const fuel = cargoRow.add({ type: "progressbar", value: 0 })
   fuel.style.width = 100
   label(cargoRow, "tank")
@@ -160,6 +167,7 @@ export function openMachine(player: LuaPlayer, robot: RobotRecord): void {
     scroll,
     consoleSize: -1,
     cargo,
+    fuelSlot,
     fuel,
     tank,
     name,
@@ -170,6 +178,55 @@ export function openMachine(player: LuaPlayer, robot: RobotRecord): void {
   guiOf(player).machine = window
   fillPrograms(window, robot)
   refreshMachine(window)
+}
+
+function notify(player: LuaPlayer, text: LocalisedString): void {
+  player.create_local_flying_text({ text, create_at_cursor: true })
+}
+
+/** Перекладывать в машину и из неё можно, только стоя рядом (как с вагоном): окно открывается и издалека. */
+function nearby(player: LuaPlayer, robot: RobotRecord): boolean {
+  const character = player.character
+  const reach = character?.valid ? character.reach_distance : 0
+  const close =
+    character?.valid === true &&
+    character.surface === robot.entity.surface &&
+    (character.position.x - robot.entity.position.x) ** 2 + (character.position.y - robot.entity.position.y) ** 2 <= reach * reach
+  if (!close) notify(player, ["automaton-gui.too-far"])
+  return close
+}
+
+/** Слот топлива: топливо в руке — в слот (сколько влезет), пустая рука — забрать содержимое слота в руку. Итог — сообщение или undefined. */
+export function fuelFromHand(hand: LuaItemStack, robot: RobotRecord): LocalisedString | undefined {
+  const slot = robot.fuel[0]
+  if (!hand.valid_for_read) {
+    if (slot.valid_for_read && hand.set_stack(slot)) slot.clear()
+    return undefined
+  }
+  if (fuelValue(hand.name) <= 0) return ["automaton-gui.not-fuel"]
+  if (slot.valid_for_read && slot.name !== hand.name) return ["automaton-gui.fuel-other"]
+  const moved = robot.fuel.insert({ name: hand.name, count: hand.count })
+  if (moved >= hand.count) hand.clear()
+  else hand.count -= moved
+  return undefined
+}
+
+/** Груз: предмет в руке — в груз (сколько влезет), пустая рука по предмету — весь этот предмет игроку (в to). */
+export function cargoFromHand(hand: LuaItemStack, robot: RobotRecord, item: string | undefined, to: LuaPlayer | LuaInventory): LocalisedString | undefined {
+  if (hand.valid_for_read) {
+    const moved = robot.cargo.insert({ name: hand.name, count: hand.count })
+    if (moved === 0) return ["automaton-gui.cargo-no-room"]
+    if (moved >= hand.count) hand.clear()
+    else hand.count -= moved
+    return undefined
+  }
+  if (item === undefined) return undefined
+  const have = robot.cargo.get_item_count(item)
+  if (have <= 0) return undefined
+  const taken = to.insert({ name: item, count: have })
+  if (taken === 0) return ["automaton-gui.inventory-no-room"]
+  robot.cargo.remove({ name: item, count: taken })
+  return undefined
 }
 
 function argsText(args: unknown): string {
@@ -202,13 +259,6 @@ function windowRobot(player: LuaPlayer): { window: MachineWindow; robot: RobotRe
 }
 
 const STATUS_CAPTIONS: Record<string, string> = { ready: "running", waiting: "waiting", done: "done", error: "error" }
-
-/** Топливо машины 0..1: энергия в двигателе и топливо в слоте (полный бак — 50 угля). */
-export function fuelLevel(robot: RobotRecord): number {
-  const stack = robot.fuel[0]
-  const stored = robot.energy + (stack.valid_for_read ? stack.count * fuelValue(stack.name) : 0)
-  return math.min(1, stored / FULL_TANK_JOULES)
-}
 
 export function refreshMachine(window: MachineWindow): void {
   const robot = storage.robots.byId[window.robotId]
@@ -245,8 +295,17 @@ export function refreshMachine(window: MachineWindow): void {
   }
 
   window.cargo.clear()
+  const cargoTooltip: LocalisedString = ["automaton-gui.cargo-slot-tooltip"]
   for (const content of robot.cargo.get_contents()) {
-    window.cargo.add({ type: "sprite-button", sprite: `item/${content.name}`, number: content.count, style: "slot_button" })
+    window.cargo.add({ type: "sprite-button", sprite: `item/${content.name}`, number: content.count, style: "slot_button", tags: { action: "machine-cargo", item: content.name }, tooltip: cargoTooltip })
+  }
+  // Пустая клетка — куда положить предмет из руки.
+  if (robot.cargo.count_empty_stacks() > 0) window.cargo.add({ type: "sprite-button", style: "slot_button", tags: { action: "machine-cargo" }, tooltip: cargoTooltip })
+  if (window.fuelSlot?.valid) {
+    const stack = robot.fuel[0]
+    window.fuelSlot.visible = robotBattery(robot) === undefined
+    window.fuelSlot.sprite = stack.valid_for_read ? `item/${stack.name}` : ""
+    window.fuelSlot.number = stack.valid_for_read ? stack.count : undefined
   }
   window.fuel.value = fuelLevel(robot)
   const tank = tankOf(robot)
@@ -294,6 +353,22 @@ export function registerMachineWindow(): void {
   })
 
   onGuiClick("machine-close", (player) => closeMachine(player))
+  onGuiClick("machine-fuel", (player) => {
+    const found = windowRobot(player)
+    if (found === undefined || !nearby(player, found.robot)) return
+    const hand = player.cursor_stack
+    const message = hand === undefined ? undefined : fuelFromHand(hand, found.robot)
+    if (message !== undefined) notify(player, message)
+    refreshMachine(found.window)
+  })
+  onGuiClick("machine-cargo", (player, element) => {
+    const found = windowRobot(player)
+    if (found === undefined || !nearby(player, found.robot)) return
+    const hand = player.cursor_stack
+    const message = hand === undefined ? undefined : cargoFromHand(hand, found.robot, (element.tags as { item?: string }).item, player)
+    if (message !== undefined) notify(player, message)
+    refreshMachine(found.window)
+  })
   onGuiClick("machine-pick", (player) => {
     const found = windowRobot(player)
     if (found !== undefined) openPicker(player, [found.robot.id])

@@ -183,6 +183,11 @@ for (let x = 10; x < 86; x++) c.pixel(x, 54, x % 2 === 0 ? "green" : "red")`,
   if (tick === 200) {
     const player = game.get_player(1 as PlayerIndex)
     const robot = Object.values(storage.robots.byId).find((r) => r !== undefined && storage.machines[r.id] !== undefined)
+    if (robot !== undefined) {
+      // Слот топлива и груз в окне — не пустые.
+      robot.fuel.insert({ name: "coal", count: 25 })
+      robot.cargo.insert({ name: "iron-ore", count: 30 })
+    }
     if (player !== undefined && robot !== undefined) openMachine(player, robot)
   }
   if (tick === 199) shot("display", { x: CENTER.x + 17, y: CENTER.y - 14 }, 3)

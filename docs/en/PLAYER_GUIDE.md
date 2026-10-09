@@ -55,7 +55,8 @@ F1 or "?" on the shortcut bar (search by name, "First steps", "Common errors").
    then **Run** in the machine window. The machine mines some coal, takes it to the chest at the `depot` marker and comes back.
 3. **A miner for iron.** Put the second machine at the iron ore: the same program (the button with the program name
    in the machine window), and in the **Parameters** field enter `{"ore": "iron-ore"}`. One program, different
-   settings on different machines. Give it coal as fuel through the machine window.
+   settings on different machines. Give it coal as fuel: take coal in your hand and click the fuel slot
+   in the machine window while standing next to it.
 4. **Smelting.** Craft a few stone furnaces and place them together. With the **Programmer** shortcut
    on the shortcut bar, drag a box around them and name the zone `smelting`. Place a second
    chest and a `plates` marker. For the third machine, write a smelter: take ore and coal from the depot, load them
@@ -91,7 +92,8 @@ Click a machine to open its window:
 
 - **Parameters** — JSON that the program reads with `me.args()`.
 - **Console** — the last 100 lines of `print` output and error messages; the current program line.
-- **Cargo, Fuel, Tank** — what the machine carries and how much energy it has.
+- **Cargo, Fuel, Tank** — what the machine carries and how much energy it has. Standing next to it, you can move
+  items by hand: click with an item in hand to put it into the cargo or the fuel slot, with an empty hand to take it.
 - **Name and Home** — the name is shown above the machine (Alt mode); home is the point for `goHome()`.
 
 A machine you pick up remembers its name, number, energy and tank, and its program and parameters wait until
@@ -254,8 +256,9 @@ expressions → string methods, `enum` → a union of strings (`type Dir = "nort
   character) and sees within `me.vision` (10 tiles; more with **Automaton sensors** and later models).
   A distant building is only known to exist — to learn its state, drive up to it or ask
   a machine that is nearby.
-- **Energy.** Mk1 burns fuel from its fuel slot (`refuel` moves it there from the cargo), Mk2 and up
-  charge a battery at a charging station (`charge`).
+- **Energy.** Mk1 burns fuel from its fuel slot (`refuel` moves it there from the cargo, `refuel("coal", robot)` —
+  into a nearby machine's slot, a player puts it in through the machine window), Mk2 and up charge a battery
+  at a charging station (`charge`).
 - **Memory.** Variables live while the program runs; `me.memory` survives a restart
   and the machine being picked up.
 

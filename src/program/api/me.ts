@@ -1,6 +1,6 @@
 // Своя машина — me (4.4): состояние, имя и подпись, груз, топливо, параметры программы (args),
 // память (memory: переживает перезапуск программы и подбор машины).
-import { fuelValue } from "../../automaton/energy"
+import { fuelLevel } from "../../automaton/energy"
 import { tankCapacity, tankOf } from "../../automaton/tank"
 import { robotPosition } from "../../automaton/flight"
 import { charge, defineHostObject, hostGetters, hostMethods, hostSetters, Val } from "../../lang/runtime/core"
@@ -9,9 +9,6 @@ import { modelOfRecord, robotBattery, robotVision } from "../../automaton/models
 import { cargoHandle, distanceBetween, ROBOT_REACH, robotHandle, robotHealth, robotProgramName, robotState } from "../handles"
 import { copyValue, programPosition } from "../values"
 import { text } from "./common"
-
-/** Полный бак — стопка угля в топливном слоте (баланс — этап 8). */
-const FULL_TANK_JOULES = 50 * 4_000_000
 
 defineHostObject("me")
 const getters = hostGetters.me
@@ -26,14 +23,7 @@ getters.program = () => robotProgramName(currentRobot())
 getters.health = () => robotHealth(currentRobot())
 getters.label = () => currentMachine().label ?? ""
 getters.cargo = () => cargoHandle(currentRobot())
-getters.fuel = () => {
-  const robot = currentRobot()
-  const battery = robotBattery(robot)
-  if (battery !== undefined) return math.min(1, robot.energy / battery)
-  const stack = robot.fuel[0]
-  const stored = robot.energy + (stack.valid_for_read ? stack.count * fuelValue(stack.name) : 0)
-  return math.min(1, stored / FULL_TANK_JOULES)
-}
+getters.fuel = () => fuelLevel(currentRobot())
 getters.tank = () => {
   const robot = currentRobot()
   const tank = tankOf(robot)

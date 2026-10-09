@@ -12,8 +12,20 @@ export const MINING_WATTS = 150_000
 /** Одна перекладка (взять, положить, подобрать, передать, починить — за шаг). */
 export const HANDLING_JOULES = 10_000
 
+/** Полный бак Mk1 — стопка угля в топливном слоте (для me.fuel и полоски в окне машины). */
+export const FULL_TANK_JOULES = 50 * 4_000_000
+
 export function fuelValue(item: string): number {
   return prototypes.item[item]?.fuel_value ?? 0
+}
+
+/** Топливо 0..1: у Mk2+ — заряд аккумулятора, у Mk1 — запас и топливо в слоте (полный бак — 50 угля). */
+export function fuelLevel(record: RobotRecord): number {
+  const battery = modelOf(record.model)?.battery
+  if (battery !== undefined) return math.min(1, record.energy / battery)
+  const stack = record.fuel[0]
+  const stored = record.energy + (stack.valid_for_read ? stack.count * fuelValue(stack.name) : 0)
+  return math.min(1, stored / FULL_TANK_JOULES)
 }
 
 /**

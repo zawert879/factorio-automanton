@@ -3,7 +3,8 @@
 // Выбросить — из груза на землю рядом. Передать — другой машине в пределах досягаемости, в её груз.
 // Починить — ремкомплектами из груза здание или машину: столько здоровья за тик, какова скорость
 // ремкомплекта (как у персонажа); прочность ремкомплекта расходуется на починенное здоровье.
-// Заправиться — переложить топливо из груза в топливный слот (по умолчанию лучшее).
+// Заправиться — переложить топливо из груза в топливный слот (по умолчанию лучшее); с целью — в топливный
+// слот другой машины в пределах досягаемости (заправщик).
 // Каждый шаг этих действий тратит HANDLING_JOULES энергии.
 import { LuaEntity, LuaItemStack } from "factorio:runtime"
 import { ActionError, ActionState, distanceToEntity, face, registerActionHandler, StepOutcome } from "./actions"
@@ -160,16 +161,29 @@ function bestFuel(record: RobotRecord): string | undefined {
   return best
 }
 
+/** Кого заправлять: себя или машину-цель рядом; Mk2+ — аккумулятор, заправлять нечего (charge). */
+function refuelTarget(record: RobotRecord, action: ActionState): RobotRecord | ActionError {
+  const into = action.params.target === undefined ? record : receiver(record, action)
+  if (typeof into === "string") return into
+  return robotBattery(into) !== undefined ? "invalid-target" : into
+}
+
 // Заправка не тратит энергию: иначе пустая машина не смогла бы заправиться.
 registerActionHandler("refuel", {
-  // Mk2+ — аккумулятор: заправлять нечего (charge).
-  start: (record) => (robotBattery(record) !== undefined ? { finish: true, error: "invalid-target" } : { after: REFUEL_TICKS }),
+  start: (record, action) => {
+    const into = refuelTarget(record, action)
+    if (typeof into === "string") return { finish: true, error: into }
+    if (into !== record) face(record, into.entity.position, "idle")
+    return { after: REFUEL_TICKS }
+  },
   step: (record: RobotRecord, action: ActionState): StepOutcome => {
+    const into = refuelTarget(record, action)
+    if (typeof into === "string") return { finish: true, error: into }
     const item = action.params.item ?? bestFuel(record)
     if (item === undefined || fuelValue(item) <= 0) return { finish: true, error: "not-enough-items" }
     const have = record.cargo.get_item_count(item)
     if (have <= 0) return { finish: true, error: "not-enough-items" }
-    const moved = record.fuel.insert({ name: item, count: math.min(action.params.count ?? have, have) })
+    const moved = into.fuel.insert({ name: item, count: math.min(action.params.count ?? have, have) })
     if (moved > 0) record.cargo.remove({ name: item, count: moved })
     action.done = moved
     return moved === 0 ? { finish: true, error: "target-full" } : { finish: true }
