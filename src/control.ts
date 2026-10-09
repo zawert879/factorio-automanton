@@ -12,6 +12,7 @@ import { registerCombat } from "./automaton/combat"
 import { initFlight, registerFlight } from "./automaton/flight"
 import { initMovement, registerMovement } from "./automaton/movement"
 import { registerModels } from "./automaton/models"
+import { registerBlueprints } from "./automaton/blueprints"
 import { registerPlacement } from "./automaton/placement"
 import { adoptUnregisteredRobots, initRegistry, registerRegistryEvents } from "./automaton/registry"
 import { registerDebugCommands } from "./debug/commands"
@@ -76,6 +77,7 @@ script.on_configuration_changed(() => {
 
 registerDemo()
 registerPlacement()
+registerBlueprints()
 registerModels()
 registerCombat()
 registerFlight()
