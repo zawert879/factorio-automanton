@@ -17,6 +17,7 @@ import type { MarkersState } from "./world/markers"
 import type { DisplaysState } from "./world/displays"
 import type { NamingTarget } from "./world/naming"
 import type { ZonesState } from "./world/zones"
+import type { WorkshopState } from "./workshop/state"
 import type { LuaRandomGenerator } from "factorio:runtime"
 
 declare global {
@@ -66,5 +67,7 @@ declare global {
     tasks: TasksState
     /** Применённые уровни скорости и груза по командам (src/automaton/models.ts). */
     upgradeLevels?: Record<string, string | undefined>
+    /** Мастерские схем (этап 15, src/workshop/). */
+    workshop?: WorkshopState
   }
 }

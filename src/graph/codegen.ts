@@ -41,6 +41,21 @@ const KEYWORDS = new Set([
   "switch", "this", "throw", "true", "try", "typeof", "undefined", "var", "void", "while", "me", "args",
 ])
 
+/** Имена API и встроенной библиотеки: переменная или параметр с таким именем закрыли бы функцию. */
+const GLOBALS = new Set([
+  "print", "say", "chat", "alert", "move", "canReach", "follow", "goHome", "mine", "take", "put", "pickup", "drop", "give",
+  "repair", "setRecipe", "build", "deconstruct", "rotate", "pump", "fill", "drain", "refuel", "charge", "marker", "zone",
+  "find", "send", "publish", "subscribe", "unsubscribe", "receive", "tryReceive", "request", "robot", "display", "attack",
+  "guard", "patrol", "reload", "wait", "waitUntil", "exit", "restart", "scan", "board", "tasks", "signals", "world", "Math",
+  "JSON", "String", "Number", "Array", "Map", "Set", "Object", "Error", "ActionError", "console", "Infinity", "NaN",
+  "nearestPatch", "nearestWater", "nearestEntity", "chestAt", "markersOf", "writeSignal",
+])
+
+/** Имя константы параметра машины: совпадает с функцией API — с суффиксом Arg (zone → zoneArg). */
+function paramConst(name: string): string {
+  return GLOBALS.has(name) ? `${name}Arg` : name
+}
+
 /** Есть ли в строке совпадение с шаблоном Lua (string.find в TSTL возвращает несколько значений). */
 function has(text: string, pattern: string): boolean {
   const [at] = string.find(text, pattern)
@@ -51,8 +66,9 @@ function has(text: string, pattern: string): boolean {
 const NOT_NAME_CHAR = `[^%w_${string.char(128)}-${string.char(255)}]`
 
 /** Имя переменной, параметра или функции: буквы (и кириллица), цифры, _; не с цифры и не с «__». */
-export function validName(name: unknown): name is string {
+export function validName(name: unknown, allowGlobal = false): name is string {
   if (typeof name !== "string" || name === "" || KEYWORDS.has(name) || string.sub(name, 1, 2) === "__") return false
+  if (!allowGlobal && GLOBALS.has(name)) return false
   if (has(name, "^[%d]")) return false
   return !has(name, NOT_NAME_CHAR)
 }
@@ -158,8 +174,12 @@ function ownerFunction(graph: Graph, target: GraphNode): GraphNode | undefined {
   return undefined
 }
 
-/** Значение из настройки как литерал TypeScript нужного типа. */
-function literal(value: GraphValue, type: PinType): string | undefined {
+/** Узлы, которым машину можно назвать именем (send, subscribe, request принимают имя). */
+const ROBOT_BY_NAME = ["send", "subscribe", "request"]
+
+/** Значение из настройки как литерал TypeScript нужного типа (consumer — вид узла, чей это вход). */
+function literal(value: GraphValue, type: PinType, consumer?: string): string | undefined {
+  if (type === "robot" && consumer !== undefined && !ROBOT_BY_NAME.includes(consumer)) return `robot(${quote(`${value}`)})!`
   switch (type) {
     case "number": {
       const n = typeof value === "number" ? value : tonumber(value)
@@ -276,7 +296,7 @@ export function graphToSource(graph: Graph, title = ""): GraphSource {
     }
     if (node.kind === "param") {
       const name = node.values.name
-      if (!validName(name)) fail(node.id, "graph-bad-name", [`${name ?? ""}`])
+      if (!validName(name, true)) fail(node.id, "graph-bad-name", [`${name ?? ""}`])
       else if (!paramSeen[name]) {
         paramSeen[name] = true
         params.push({ name, type: settingType(node.values.type, "item"), fallback: node.values.default })
@@ -344,8 +364,8 @@ export function graphToSource(graph: Graph, title = ""): GraphSource {
     if (out === undefined) return "undefined"
     switch (node.kind) {
       case "param":
-        // Параметр — константа в начале программы с тем же именем.
-        return `${node.values.name}`
+        // Параметр — константа в начале программы с тем же именем (имя функции API — с суффиксом Arg).
+        return paramConst(`${node.values.name}`)
       case "variable-get":
         return `${node.values.name}`
       case "repeat":
@@ -385,7 +405,7 @@ export function graphToSource(graph: Graph, title = ""): GraphSource {
       }
       const value = node.values[input.id] ?? input.default
       if (value !== undefined && value !== "") {
-        const text = literal(value, input.type)
+        const text = literal(value, input.type, node.kind)
         if (text === undefined) fail(node.id, "graph-bad-value", [`${value}`], input.id)
         args[input.id] = text
       } else if (!input.optional) {
@@ -504,7 +524,7 @@ export function graphToSource(graph: Graph, title = ""): GraphSource {
         line("try {", depth, node.id)
         sub(outs.body, undefined)
         line(`} catch (x${node.id}) {`, depth, node.id)
-        line(`const c${node.id} = x${node.id} instanceof ActionError ? x${node.id}.code : String(x${node.id});`, depth + 1, node.id)
+        if (usedOutput(node.id)) line(`const c${node.id} = x${node.id} instanceof ActionError ? x${node.id}.code : String(x${node.id});`, depth + 1, node.id)
         sub(outs.catch, undefined)
         line("}", depth, node.id)
         return outs.next
@@ -589,7 +609,7 @@ export function graphToSource(graph: Graph, title = ""): GraphSource {
       const raw = fallback === undefined ? `args.${p.name}` : `args.${p.name} ?? ${fallback}`
       const value = p.type === "marker" ? `marker(${raw})` : p.type === "zone" ? `zone(${raw})` : raw
       const declared = fallback === undefined && p.type !== "marker" && p.type !== "zone" ? `${tsType(p.type)} | undefined` : tsType(p.type)
-      push(`const ${p.name}: ${declared} = ${value};`, graph.nodes.find((n) => n.kind === "param" && n.values.name === p.name)?.id)
+      push(`const ${paramConst(p.name)}: ${declared} = ${value};`, graph.nodes.find((n) => n.kind === "param" && n.values.name === p.name)?.id)
     }
   }
   for (const variable of variables) push(variable.text, variable.node)

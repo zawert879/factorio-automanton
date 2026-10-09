@@ -315,3 +315,13 @@ export const DISPLAYS = [
 export const DISPLAY_PIXELS_PER_TILE = 32
 /** Спрайт экрана табло: белый квадрат 10×10 (перекрашивается в цвет фона). */
 export const DISPLAY_SCREEN_SPRITE = "automaton-display-screen"
+
+// Мастерская схем (этап 15): тела узлов (по высоте в клетках), разъёмы порядка и данных, поверхность программы.
+export const NODE_BODY_PREFIX = "automaton-node-"
+export const NODE_MIN_HEIGHT = 2
+export const NODE_MAX_HEIGHT = 12
+/** Ширина узла в клетках: тело и колонки разъёмов по краям. */
+export const NODE_WIDTH = 7
+export const PIN_EXEC = "automaton-pin-exec"
+export const PIN_DATA = "automaton-pin-data"
+export const WORKSHOP_SURFACE_PREFIX = "automaton-workshop-"

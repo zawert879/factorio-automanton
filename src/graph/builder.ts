@@ -2,11 +2,14 @@
 import { Graph, GraphNode, GraphValue } from "./model"
 import { NODES } from "./nodes"
 import { resolvePins } from "./codegen"
+import { NODE_WIDTH } from "../names"
 
-/** Ширина узла в клетках (тело и разъёмы по краям). */
-export const NODE_WIDTH = 6
+export { NODE_WIDTH }
+
 const GAP_X = 2
 const GAP_Y = 1
+/** Цепочка длиннее — продолжается строкой ниже (как перенос строки), чтобы схема не уходила далеко вправо. */
+const WRAP_WIDTH = 64
 
 /** Высота узла: заголовок и по строке на разъём (входы слева, выходы справа). */
 export function nodeHeight(graph: Graph, node: GraphNode): number {
@@ -23,7 +26,11 @@ export class GraphBuilder {
 
   node(kind: string, values: Record<string, GraphValue | undefined> = {}): GraphNode {
     if (NODES[kind] === undefined) error(`нет узла ${kind}`)
-    const node: GraphNode = { id: this.next++, kind, x: 0, y: 0, values }
+    // Настройки узла — по умолчанию, как у узла из палитры.
+    const all: Record<string, GraphValue | undefined> = {}
+    for (const setting of NODES[kind].settings ?? []) if (setting.default !== undefined) all[setting.id] = setting.default
+    for (const [key, value] of pairs(values)) all[key] = value
+    const node: GraphNode = { id: this.next++, kind, x: 0, y: 0, values: all }
     this.graph.nodes.push(node)
     return node
   }
@@ -104,8 +111,13 @@ export function layoutGraph(graph: Graph): void {
   const chain = (start: GraphNode | undefined, x: number, y: number): number => {
     let node = start
     let right = x
+    let row = y
     while (node !== undefined && !placed[node.id]) {
-      const box = put(node, right, y)
+      if (right > x && right + NODE_WIDTH > x + WRAP_WIDTH) {
+        right = x
+        row = maxBottom() + GAP_Y + 3
+      }
+      const box = put(node, right, row)
       placeData(box, node)
       right = box.x + NODE_WIDTH + GAP_X
       let branchY = box.y + box.h + GAP_Y + 3

@@ -26,7 +26,7 @@ import { fuelLevel, fuelValue } from "../automaton/energy"
 import { robotBattery } from "../automaton/models"
 import { tankCapacity, tankOf } from "../automaton/tank"
 import { RobotRecord } from "../automaton/registry"
-import { onEvent, onTick } from "../events"
+import { onCustomInput, onEvent, onTick } from "../events"
 import { pausedLine } from "../lang/runtime"
 import { lib } from "../lang/runtime/library"
 import { modelOf } from "../names"
@@ -333,7 +333,7 @@ function refreshAll(): void {
 
 export function registerMachineWindow(): void {
   // Клик «открыть» по машине.
-  script.on_event("automaton-open", (e) => {
+  onCustomInput("automaton-open", (e) => {
     const player = game.get_player(e.player_index)
     const selected = player?.selected
     if (player === undefined || selected === undefined || modelOf(selected.name) === undefined) return

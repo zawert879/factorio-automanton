@@ -65,7 +65,7 @@ export function machinesForBlueprint(surface: LuaSurface, area: BoundingBox, for
 }
 
 /** Чертёж, который игрок сейчас создаёт: запись библиотеки, предмет чертежа, создаваемый или в руке. */
-function blueprintOf(player: LuaPlayer, stack?: LuaItemStack, record?: LuaRecord): LuaItemStack | LuaRecord | undefined {
+export function blueprintOf(player: LuaPlayer, stack?: LuaItemStack, record?: LuaRecord): LuaItemStack | LuaRecord | undefined {
   if (record !== undefined && record.valid) return record
   for (const candidate of [stack, player.blueprint_to_setup, player.cursor_stack]) {
     if (candidate !== undefined && candidate.valid_for_read && candidate.is_blueprint) return candidate

@@ -1,22 +1,25 @@
 // npm run shot: снимки экрана сцены из src/test/visual.ts — проверить внешний вид без человека.
+// npm run shot:graphs — схемы примеров в мастерской и машины, которые их исполняют (src/test/graphShots.ts).
 // Запускает игру С ОКНОМ на отдельной карте (своя папка данных), ждёт done.txt и закрывает игру.
-// Снимки копируются в build/visual/.
+// Снимки копируются в build/visual/ (схемы — в build/graph-shots/).
 import { spawn } from "node:child_process"
 import { cpSync, existsSync, mkdirSync, rmSync } from "node:fs"
 import { join } from "node:path"
 import { buildMod, createMap, prepareWork, root, scriptError } from "../test/factorio.mjs"
 
-const TIMEOUT_MS = 180_000
+const graphs = process.argv[2] === "graphs"
+const TIMEOUT_MS = graphs ? 600_000 : 180_000
+const MARKER = graphs ? "automaton-graph-shots" : "automaton-visual"
 
 buildMod()
-const env = prepareWork("automaton-visual", "automaton-visual")
+const env = prepareWork(MARKER, MARKER)
 const create = createMap(env)
 if (create.status !== 0) {
   console.error(`Карта не создана:\n${scriptError(create.stdout)}`)
   process.exit(1)
 }
 
-const outDir = join(env.data, "script-output", "automaton-visual")
+const outDir = join(env.data, "script-output", MARKER)
 const factorio =
   process.env.FACTORIO_BIN ??
   join(process.env.HOME, "Library/Application Support/Steam/steamapps/common/Factorio/factorio.app/Contents/MacOS/factorio")
@@ -44,7 +47,7 @@ function finish(done, timedOut) {
     console.error(`Снимки не получены (${timedOut ? "время вышло" : `игра вышла с кодом ${game.exitCode}`}):\n${scriptError(output)}`)
     process.exit(1)
   }
-  const target = join(root, "build", "visual")
+  const target = join(root, "build", graphs ? "graph-shots" : "visual")
   rmSync(target, { recursive: true, force: true })
   mkdirSync(target, { recursive: true })
   cpSync(outDir, target, { recursive: true })

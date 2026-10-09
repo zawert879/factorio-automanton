@@ -43,6 +43,9 @@ import { initDisplays, registerDisplays } from "./world/displays"
 import { initStart } from "./world/start"
 import { registerNaming } from "./world/naming"
 import { initZones, registerZones } from "./world/zones"
+import { registerWorkshopEntities } from "./workshop/entities"
+import { registerWorkshopGui, restoreWorkshopWindows } from "./workshop/gui"
+import { initWorkshop } from "./workshop/state"
 
 function initStorage(): void {
   initDemoStorage()
@@ -62,6 +65,7 @@ function initStorage(): void {
   initZones()
   initComms()
   initBoard()
+  initWorkshop()
   initStart()
 }
 
@@ -73,6 +77,7 @@ script.on_configuration_changed(() => {
   initStorage()
   migrate()
   closeModWindows()
+  restoreWorkshopWindows()
   adoptUnregisteredRobots()
 })
 
@@ -108,6 +113,8 @@ registerAssignTools()
 registerComms()
 registerBoard()
 registerCache()
+registerWorkshopEntities()
+registerWorkshopGui()
 // Здание исчезло — его обёртка у программ остаётся (valid === false), но из общего списка уходит.
 onEvent(defines.events.on_object_destroyed, (e) => {
   if (e.type === defines.target_type.entity) forgetEntityHandle(e.useful_id)
@@ -121,7 +128,8 @@ onEvent(defines.events.on_object_destroyed, (e) => {
 // automaton-bench-flyers — нагрузочный тест летающих (npm run bench:flyers),
 // automaton-bench-machines — стресс-тест машин с программами (npm run bench:machines),
 // automaton-build-science — сохранение с демо-фабрикой науки (npm run demo:science),
-// automaton-record — анимации для документации (npm run docs:record).
+// automaton-record — анимации для документации (npm run docs:record),
+// automaton-graph-shots — схемы примеров и их работа (npm run shot:graphs).
 // Имя модуля — через переменную: TSTL не ищет его заранее, а в zip мода папки test/ нет (package.ignore).
 const testModule =
   script.active_mods["automaton-test"] !== undefined
@@ -140,7 +148,9 @@ const testModule =
                 ? "test.scienceBuild"
                 : script.active_mods["automaton-record"] !== undefined
                   ? "test.record"
-                  : undefined
+                  : script.active_mods["automaton-graph-shots"] !== undefined
+                    ? "test.graphShots"
+                    : undefined
 if (testModule !== undefined) {
   require(testModule)
 }

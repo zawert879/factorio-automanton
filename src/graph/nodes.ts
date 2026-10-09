@@ -136,6 +136,15 @@ export function quote(text: string): string {
   return `"${c}"`
 }
 
+/** Часть шаблонной строки: строковый литерал — текстом, остальное — подстановкой. */
+function templatePart(expr: string): string {
+  const [text] = string.match(expr, '^"([^"\\]*)"$')
+  if (text === undefined) return `\${${expr}}`
+  const [noTicks] = string.gsub(text, "`", "\\`")
+  const [safe] = string.gsub(noTicks, "%${", "\\${")
+  return safe
+}
+
 /** Объект опций без пустых полей: { radius: 2 } или undefined. */
 function options(fields: [string, string | undefined][]): string | undefined {
   const parts: string[] = []
@@ -286,6 +295,7 @@ data("entity-status", "objects", "entity:entity", "value:string", (a) => `${a.en
 data("entity-position", "objects", "entity:entity", "value:position", (a) => `${a.entity}.position`)
 data("entity-fluid", "objects", "entity:entity fluid:fluid?", "value:number", (a) => call(`${a.entity}.fluid`, a.fluid))
 data("entity-name", "objects", "entity:entity", "value:string", (a) => `${a.entity}.name`)
+data("entity-id", "objects", "entity:entity", "value:number", (a) => `${a.entity}.id`)
 data("robot-fuel", "objects", "robot:robot", "value:number", (a) => `${a.robot}.fuel`)
 data("robot-state", "objects", "robot:robot", "value:string", (a) => `${a.robot}.state`)
 data("robot-position", "objects", "robot:robot", "value:position", (a) => `${a.robot}.position`)
@@ -335,7 +345,7 @@ data(
 )
 data("floor", "logic", "a:number", "value:number", (a) => `Math.floor(${a.a})`)
 data("random", "logic", "max:number=10", "value:number", (a) => `Math.floor(Math.random() * ${a.max})`)
-data("join", "logic", "a:value b:value", "value:string", (a) => `\`\${${a.a}}\${${a.b}}\``)
+data("join", "logic", "a:value b:value", "value:string", (a) => `\`${templatePart(a.a!)}${templatePart(a.b!)}\``)
 data("to-text", "logic", "value:value", "value:string", (a) => `String(${a.value})`)
 data(
   "as",
@@ -343,13 +353,13 @@ data(
   "value:value",
   "value:value",
   (a, ctx) => `(${a.value} as ${ctx.node.values.type ?? "Item"})`,
-  [{ id: "type", kind: "type", options: ["item", "number", "string", "boolean", "position", "fluid"], default: "item" }],
+  [{ id: "type", kind: "type", options: ["item", "number", "string", "boolean", "position", "fluid", "entity", "robot"], default: "item" }],
 )
 data("field", "logic", "object:value key:string=item", "value:value", (a) => `(${a.object} as Record<string, Value>)[${a.key}]`)
 data("list-length", "logic", "list:list", "value:number", (a) => `${a.list}.length`)
 data("list-first", "logic", "list:list", "element:value", (a) => `${a.list}[0]`)
 data("list-empty", "logic", "list:list", "value:boolean", (a) => `(${a.list}.length === 0)`)
-data("is-night", "logic", "", "value:boolean", () => "world.isNight()")
+data("is-night", "logic", "", "value:boolean", () => "time.isNight()")
 
 // ---------- Переменные и функции (собирает codegen) ----------
 

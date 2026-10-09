@@ -41,12 +41,13 @@ export function guiOf(player: LuaPlayer): GuiState {
 
 type Handler = (this: void, player: LuaPlayer, element: LuaGuiElement) => void
 
-const handlers: Record<"click" | "change" | "confirm" | "selection" | "checked", Record<string, Handler>> = {
+const handlers: Record<"click" | "change" | "confirm" | "selection" | "checked" | "elem", Record<string, Handler>> = {
   click: {},
   change: {},
   confirm: {},
   selection: {},
   checked: {},
+  elem: {},
 }
 
 export function onGuiClick(action: string, handler: Handler): void {
@@ -64,6 +65,10 @@ export function onGuiSelection(action: string, handler: Handler): void {
 export function onGuiChecked(action: string, handler: Handler): void {
   handlers.checked[action] = handler
 }
+/** Выбор предмета, жидкости, сигнала (choose-elem-button). */
+export function onGuiElemChanged(action: string, handler: Handler): void {
+  handlers.elem[action] = handler
+}
 
 function dispatch(kind: keyof typeof handlers, element: LuaGuiElement | undefined, playerIndex: PlayerIndex): void {
   if (element === undefined || !element.valid) return
@@ -80,6 +85,7 @@ export function registerGuiEvents(): void {
   onEvent(defines.events.on_gui_confirmed, (e) => dispatch("confirm", e.element, e.player_index))
   onEvent(defines.events.on_gui_selection_state_changed, (e) => dispatch("selection", e.element, e.player_index))
   onEvent(defines.events.on_gui_checked_state_changed, (e) => dispatch("checked", e.element, e.player_index))
+  onEvent(defines.events.on_gui_elem_changed, (e) => dispatch("elem", e.element, e.player_index))
 }
 
 /** Заголовок окна: подпись, перетаскивание, кнопка закрытия. */

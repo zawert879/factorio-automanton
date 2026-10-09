@@ -12,6 +12,7 @@ import { trim } from "../lang/runtime/strings"
 import { LuaPlayer } from "factorio:runtime"
 import { compile, CompileResult, MAX_SOURCE_BYTES, ProgramVariable } from "../lang/codegen"
 import { Diagnostic } from "../lang/lexer"
+import { Graph } from "../graph/model"
 import { relativeModulePath, resolveModulePath, rewriteImportPaths } from "../lang/modules"
 import { loadProgram, Program } from "../lang/runtime"
 
@@ -22,6 +23,8 @@ export interface ProgramVersion {
   author?: string
   /** Версия собрана заново из-за новой версии этого модуля (текст программы тот же или с исправленным импортом). */
   rebuiltFor?: string
+  /** Схема версии (программа-схема, этап 15). */
+  graph?: Graph
 }
 
 /** Новая версия модуля не собралась с программой: машины работают на прежней сборке. */
@@ -61,6 +64,10 @@ export interface ProgramRecord {
   /** Отладка (18.8): строки, где можно остановиться, и переменные верхнего уровня в кадре; у сборок до 18.8 нет. */
   breakable?: number[]
   variables?: ProgramVariable[]
+  /** Программа-схема (этап 15): опубликованная схема; код собран из неё и правится только в мастерской. */
+  graph?: Graph
+  /** Строка кода схемы → узел (ошибки и отладка показывают узел). */
+  graphLines?: Record<number, number>
 }
 
 export interface ProgramsState {
@@ -167,6 +174,9 @@ export interface PublishRequest {
   force?: string
   /** Опубликовать новую версию этой программы (возможно, с новым именем). */
   id?: number
+  /** Программа-схема: схема и строки кода → узлы (код собран из схемы). */
+  graph?: Graph
+  graphLines?: Record<number, number>
 }
 
 /** Скомпилировать программу команды (модули — программы команды; overlay — ещё не сохранённые тексты). */
@@ -201,7 +211,7 @@ function applyBuild(program: ProgramRecord, compiled: CompileResult, source: str
   program.quarantined = undefined
   program.stale = undefined
   program.limitErrors = []
-  program.history.push({ version: program.version, source, tick: game.tick, author, rebuiltFor })
+  program.history.push({ version: program.version, source, tick: game.tick, author, rebuiltFor, graph: program.graph })
   while (program.history.length > HISTORY_VERSIONS) program.history.shift()
   for (const listener of publishedListeners) listener(program)
 }
@@ -263,7 +273,14 @@ export function publish(request: PublishRequest): PublishResult {
   if (program !== undefined && sameName !== undefined && sameName !== program) return failure("program-name-taken", [name])
   if (program === undefined && programsOf(force).length >= MAX_PROGRAMS_PER_FORCE) return failure("too-many-programs", [MAX_PROGRAMS_PER_FORCE])
   // Тот же текст — не новая версия (машины не перезапускаются): так повторная публикация из VS Code безвредна.
-  if (program !== undefined && program.name === name && program.source === request.source && !program.quarantined) return { ok: true, program }
+  if (program !== undefined && program.name === name && program.source === request.source && !program.quarantined) {
+    // Схема с тем же кодом (узлы передвинули) — сохранить расстановку без новой версии.
+    if (request.graph !== undefined) {
+      program.graph = request.graph
+      program.graphLines = request.graphLines
+    }
+    return { ok: true, program }
+  }
   const oldName = program !== undefined && program.name !== name ? program.name : undefined
   let source = request.source
   if (oldName !== undefined) {
@@ -299,6 +316,8 @@ export function publish(request: PublishRequest): PublishResult {
     storage.programs.byId[id] = program
   }
   program.name = name
+  program.graph = request.graph
+  program.graphLines = request.graphLines
   applyBuild(program, compiled, source, request.author)
   if (oldName !== undefined) for (const listener of renamedListeners) listener(program, oldName)
   const { rebuilt, stale } = rebuildDependents(program, oldName, request.author)

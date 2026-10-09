@@ -31,7 +31,7 @@ import {
 } from "factorio:runtime"
 import { highlight, markError, richLine } from "../lang/highlight"
 import { Diagnostic } from "../lang/lexer"
-import { ulen } from "../lang/runtime/strings"
+import { trim, ulen } from "../lang/runtime/strings"
 import { assignProgram } from "../program/machines"
 import {
   checkProgram,
@@ -55,6 +55,11 @@ import { diagnosticMessage, diagnosticText } from "./diagnostics"
 import { closeExchange, registerExchangeWindows } from "./exchange"
 import { DTS, DTS_EN } from "./dts.generated"
 import { folderItem, LIBRARY_COLOR, programTree, TreeEntry } from "./tree"
+import { newGraphProgram } from "../workshop/programs"
+import { enterWorkshop } from "../workshop/session"
+
+/** Цвет значка программы-схемы в списке. */
+const GRAPH_COLOR = "0.9,0.8,0.38"
 
 const FRAME = "automaton-programs"
 const CONFIRM_FRAME = "automaton-refresh-confirm"
@@ -125,6 +130,8 @@ export interface ProgramsWindow {
   versions: DropDownGuiElement
   assign: ButtonGuiElement
   machines: ButtonGuiElement
+  /** Мастерская программы-схемы (этап 15); у окон до 15 — нет. */
+  workshop?: ButtonGuiElement
   /** Редактируемая программа (undefined — новая, ещё не опубликованная). */
   programId?: number
   /** Машина, из окна которой открыли библиотеку (кнопка «Назначить»). */
@@ -175,6 +182,7 @@ export function openPrograms(player: LuaPlayer, programId?: number, robotId?: nu
   list.style.height = size.height - 36
   const leftButtons = left.add({ type: "flow", direction: "horizontal" })
   button(leftButtons, ["automaton-gui.new-program"], "programs-new")
+  button(leftButtons, ["automaton-workshop.new-graph"], "programs-new-graph").tooltip = ["automaton-workshop.open-tooltip"]
   button(leftButtons, ["automaton-gui.copy-program"], "programs-copy")
   button(leftButtons, ["automaton-gui.delete-program"], "programs-delete", "red_button")
 
@@ -219,6 +227,8 @@ export function openPrograms(player: LuaPlayer, programId?: number, robotId?: nu
   editButton.tooltip = ["automaton-gui.edit-mode-tooltip"]
   button(buttons, ["automaton-gui.check"], "programs-check").tooltip = ["automaton-gui.check-tooltip"]
   button(buttons, ["automaton-gui.publish"], "programs-publish", "green_button")
+  const workshop = button(buttons, ["automaton-workshop.open"], "programs-workshop")
+  workshop.tooltip = ["automaton-workshop.open-tooltip"]
   const assign = button(buttons, "", "programs-assign")
   const versions = buttons.add({ type: "drop-down", items: [], tags: { action: "programs-version" } })
   versions.style.width = 200
@@ -257,6 +267,7 @@ export function openPrograms(player: LuaPlayer, programId?: number, robotId?: nu
     versions,
     assign,
     machines,
+    workshop,
     robotId,
   }
   guiOf(player).programs = window
@@ -281,6 +292,7 @@ function windowOf(player: LuaPlayer): ProgramsWindow | undefined {
 function programItem(p: ProgramRecord, indent: string): LocalisedString {
   const short = p.name.split("/").pop()!
   const warn = p.quarantined || p.stale !== undefined ? "⚠ " : ""
+  if (p.graph !== undefined) return ["", `${indent}${warn}[color=${GRAPH_COLOR}]▦[/color] ${short} v${p.version} · `, ["automaton-workshop.graph-badge"]]
   if (!p.library) return `${indent}${warn}${short} v${p.version}`
   return ["", `${indent}${warn}[color=${LIBRARY_COLOR}]${short}[/color] v${p.version} · `, ["automaton-gui.library-badge"]]
 }
@@ -333,7 +345,12 @@ function load(window: ProgramsWindow, player: LuaPlayer, programId: number | und
       : fromDraft && draft!.source !== program.source
         ? ["automaton-gui.program-info-draft", program.version, program.author ?? "—"]
         : ["automaton-gui.program-info", program.version, program.author ?? "—"]
-  window.info.caption = program?.library ? ["", info, " · ", ["automaton-gui.library-badge"]] : info
+  window.info.caption = program?.library ? ["", info, " · ", ["automaton-gui.library-badge"]] : program?.graph !== undefined ? ["", info, " · ", ["automaton-workshop.graph-badge"]] : info
+  // Программа-схема: код собран из схемы — только просмотр, правка — в мастерской.
+  const isGraph = program?.graph !== undefined
+  if (window.workshop?.valid) window.workshop.visible = isGraph
+  window.code.read_only = isGraph
+  window.editButton.enabled = !isGraph
   window.errorLines = {}
   window.errors.clear()
   window.notes.clear()
@@ -355,7 +372,7 @@ function load(window: ProgramsWindow, player: LuaPlayer, programId: number | und
   window.machines.caption = ["automaton-fleet.machines", running]
   layoutLines(window, true)
   // Опубликованная программа — в просмотре, новая — сразу в поле ввода.
-  setMode(window, program === undefined ? "edit" : "view")
+  setMode(window, program === undefined && !isGraph ? "edit" : "view")
   window.pane.scroll_to_top()
 }
 
@@ -657,6 +674,29 @@ export function registerProgramsWindow(): void {
     saveDraft(window, player)
     window.name.focus()
   })
+  onGuiClick("programs-new-graph", (player) => {
+    const window = windowOf(player)
+    if (window === undefined) return
+    const denied = publishDenied(player)
+    if (denied !== undefined) {
+      showErrors(window, [{ code: denied, params: [], line: 0, column: 0 }])
+      return
+    }
+    const result = newGraphProgram(player, trim(window.name.text))
+    if (!result.ok) {
+      showErrors(window, result.diagnostics)
+      return
+    }
+    closePrograms(player)
+    enterWorkshop(player, result.program)
+  })
+  onGuiClick("programs-workshop", (player) => {
+    const window = windowOf(player)
+    const program = window?.programId === undefined ? undefined : storage.programs.byId[window.programId]
+    if (program === undefined || program.graph === undefined) return
+    closePrograms(player)
+    enterWorkshop(player, program)
+  })
   onGuiClick("programs-copy", (player) => {
     const window = windowOf(player)
     if (window === undefined) return
@@ -733,7 +773,17 @@ export function publishFromWindow(player: LuaPlayer): void {
     return
   }
   notePublish(player)
-  const result = publish({ id: window.programId, name: window.name.text, source: window.code.text, author: player.name, force: player.force.name })
+  const current = window.programId === undefined ? undefined : storage.programs.byId[window.programId]
+  // Программа-схема из окна программ — только переименовать (код и схема — те же).
+  const result = publish({
+    id: window.programId,
+    name: window.name.text,
+    source: current?.graph !== undefined ? current.source : window.code.text,
+    author: player.name,
+    force: player.force.name,
+    graph: current?.graph,
+    graphLines: current?.graphLines,
+  })
   if (!result.ok) {
     showErrors(window, result.diagnostics)
     return

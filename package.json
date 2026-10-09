@@ -9,6 +9,7 @@
     "test:game": "node tools/test/game.mjs",
     "test:desync": "node tools/test/desync.mjs",
     "shot": "node tools/visual/shot.mjs",
+    "shot:graphs": "node tools/visual/shot.mjs graphs",
     "bench:lang": "node tools/test/run.mjs --build-only && tools/lua/5.2/bin/lua tools/bench/lang.lua build",
     "bench:game": "node tools/bench/game.mjs",
     "prebuild": "node tools/dts/generate.mjs",
@@ -22,7 +23,7 @@
     "demo:science": "node tools/demo/science.mjs",
     "docs:record": "node tools/docs/record.mjs",
     "bench:scale": "node tools/bench/scale.mjs",
-    "test:sim": "node tools/test/sim.mjs"
+    "test:sim": "node tools/test/sim.mjs && node tools/test/sim-workshop.mjs"
   },
   "devDependencies": {
     "gifenc": "^1.0.3",
