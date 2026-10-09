@@ -235,6 +235,7 @@ data("nearest-water", "vision", "", "position:position", (_a, ctx) => {
   ctx.use("nearestWater")
   return "nearestWater()"
 })
+data("water-near", "vision", "radius:number?", "value:boolean", (a) => `(scan.water(${a.radius ?? "me.mineReach"}) !== null)`)
 data("entities-near", "vision", "type:string=container radius:number?", "entities:entities", (a) =>
   call("scan.entities", options([["type", a.type], ["radius", a.radius]])),
 )

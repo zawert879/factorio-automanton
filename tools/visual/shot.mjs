@@ -3,9 +3,10 @@
 // Запускает игру С ОКНОМ на отдельной карте (своя папка данных), ждёт done.txt и закрывает игру.
 // Снимки копируются в build/visual/ (схемы — в build/graph-shots/).
 import { spawn } from "node:child_process"
-import { cpSync, existsSync, mkdirSync, rmSync } from "node:fs"
+import { copyFileSync, cpSync, existsSync, mkdirSync, readdirSync, rmSync } from "node:fs"
 import { join } from "node:path"
 import { buildMod, createMap, prepareWork, root, scriptError } from "../test/factorio.mjs"
+import { framesToGif } from "./gif.mjs"
 
 const graphs = process.argv[2] === "graphs"
 const TIMEOUT_MS = graphs ? 600_000 : 180_000
@@ -51,5 +52,16 @@ function finish(done, timedOut) {
   rmSync(target, { recursive: true, force: true })
   mkdirSync(target, { recursive: true })
   cpSync(outDir, target, { recursive: true })
+  // Серии кадров (сцены работы схем) — в GIF, последний кадр — отдельной картинкой.
+  for (const scene of readdirSync(target, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name)) {
+    const dir = join(target, scene)
+    const frames = readdirSync(dir).filter((f) => f.endsWith(".png")).sort()
+    if (frames.length === 0) continue
+    // Кадр — каждые 10 тиков игры, показ — вдвое быстрее.
+    const size = framesToGif(dir, join(target, `${scene}.gif`), 80)
+    copyFileSync(join(dir, frames[frames.length - 1]), join(target, `${scene}.png`))
+    rmSync(dir, { recursive: true, force: true })
+    console.log(`${scene}: ${frames.length} кадров, GIF ${(size / 1024).toFixed(0)} КБ`)
+  }
   console.log(`Снимки: ${target}`)
 }

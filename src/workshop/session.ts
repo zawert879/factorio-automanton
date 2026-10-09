@@ -26,8 +26,8 @@ function viewPosition(ws: Workshop): MapPosition {
   let best: MapPosition | undefined
   for (const [, node] of pairs(ws.nodes)) {
     if (!node.body.valid) continue
-    if (node.kind === "start") return { x: node.body.position.x + 14, y: node.body.position.y + 8 }
-    best ??= { x: node.body.position.x + 14, y: node.body.position.y + 8 }
+    if (node.kind === "start") return { x: node.body.position.x + 26, y: node.body.position.y + 14 }
+    best ??= { x: node.body.position.x + 26, y: node.body.position.y + 14 }
   }
   return best ?? { x: 16, y: 8 }
 }

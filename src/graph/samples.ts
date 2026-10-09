@@ -159,9 +159,12 @@ function water(): Graph {
   const shore = b.node("variable", { name: "берег", type: "position", initial: "" })
   const start = b.node("start")
   const label = b.node("set-label", { text: "вода" })
+  // Берег — сухая точка у воды: подъехать к ближайшей воде (в саму воду не проехать) и запомнить место.
+  const toWater = b.node("move", { radius: 2 })
   const remember = b.node("variable-set", { name: "берег" })
   const loop = b.node("forever")
-  const toShore = b.node("move", { radius: 2 })
+  // Вернуться к самому берегу: с радиусом 2 машина могла бы встать дальше, чем дотягивается до воды.
+  const toShore = b.node("move", { radius: 1 })
   const pump = b.node("pump", { fluid: "water" })
   const toTarget = b.node("move", { radius: 2 })
   const fuelIf = b.node("if")
@@ -175,7 +178,11 @@ function water(): Graph {
   const boilerTry = b.node("try")
   const fillBoiler = b.node("fill")
   void shore
-  b.seq(start, label, remember, loop).exec(loop, toShore, "body").seq(toShore, pump, toTarget, fuelIf)
+  const far = b.node("if")
+  const near = b.node("water-near")
+  const notNear = b.node("not")
+  b.seq(start, label, far).exec(far, toWater, "then").exec(far, remember, "else").exec(toWater, remember).seq(remember, loop).exec(loop, toShore, "body").seq(toShore, pump, toTarget, fuelIf)
+  b.data(near, notNear, "a").data(notNear, far, "cond").data(b.node("nearest-water"), toWater, "to")
   b.data(b.node("me-position"), remember, "value").data(b.node("variable-get", { name: "берег" }), toShore, "to")
   b.data(param(b, "target", "marker", "котельная"), toTarget, "to")
   b.exec(fuelIf, fuelTry, "then").exec(fuelIf, tanks, "else").exec(fuelTry, take, "body").exec(fuelTry, refuel).exec(refuel, tanks)
