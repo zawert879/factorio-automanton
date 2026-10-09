@@ -1,6 +1,7 @@
 // Общее для окон мода: разбор событий GUI по действию (tags.action элемента), заголовок окна.
 import { FrameGuiElement, LocalisedString, LuaGuiElement, LuaPlayer, PlayerIndex } from "factorio:runtime"
 import { onEvent } from "../events"
+import type { DebugWindow } from "./debugger"
 import type { ExportWindow, ImportWindow } from "./exchange"
 import type { FleetWindow } from "./fleet"
 import type { HelpWindow } from "./help"
@@ -20,6 +21,8 @@ export interface GuiState {
   help?: HelpWindow
   /** Все машины (18.6). */
   fleet?: FleetWindow
+  /** Отладка машины (18.8). */
+  debug?: DebugWindow
   /** Недавно выбранные программы (окно выбора), новые первыми. */
   recent?: number[]
   /** «Обновить из папки»: программы без файлов, о которых спросили «удалить?». */
@@ -121,6 +124,7 @@ export function closeModWindows(): void {
     state.importWindow = undefined
     state.help = undefined
     state.fleet = undefined
+    state.debug = undefined
     state.refreshMissing = undefined
   }
 }

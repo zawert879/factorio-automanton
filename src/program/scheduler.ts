@@ -10,7 +10,7 @@ import { robotMemory, robotQuantum } from "../automaton/models"
 import { RobotRecord } from "../automaton/registry"
 import { showProblem, problemFor } from "../automaton/status"
 import { onTick } from "../events"
-import { completeWait, Program, runSlice } from "../lang/runtime"
+import { completeWait, Program, runSlice, SliceDebug } from "../lang/runtime"
 import { enter, Q, Val } from "../lang/runtime/core"
 import { actionErrorValue, ActionErrorCode, context } from "./context"
 import { alertRobot } from "./alerts"
@@ -174,16 +174,39 @@ function runReady(): void {
     }
     budget -= quantum
     record.machine.memoryLimit = robotMemory(robot)
-    inMachine(record, robot, (program) => runSlice(program, record.machine, quantum))
-    if (record.machine.status === "ready") enqueue(id)
+    let hit: number | undefined
+    inMachine(record, robot, (program) => {
+      hit = runSlice(program, record.machine, quantum, debugOf(record))
+    })
+    // Точка остановки (18.8): машина встаёт на паузу на этой строке.
+    if (hit !== undefined) {
+      record.paused = true
+      record.stopLine = hit
+    }
+    if (record.machine.status === "ready" && !record.paused) enqueue(id)
   }
 }
 
-/** Шаг отладки: один отрезок с квантом в одну инструкцию (машина на паузе). */
+/** Отладка отрезка: точки остановки машины (пустые — нет) и шаг. */
+function debugOf(record: MachineRecord, step = false): SliceDebug | undefined {
+  const points = record.breakpoints
+  const any = points !== undefined && next(points)[0] !== undefined
+  if (!any && !step) return undefined
+  return { breakpoints: any ? points : undefined, step }
+}
+
+/**
+ * Шаг отладки (машина на паузе): до следующей строки программы (18.8). Программа, собранная до 18.8, шагов
+ * по строкам не знает — у неё отрезок с квантом в одну инструкцию, как раньше.
+ */
 export function stepMachine(record: MachineRecord): void {
   const robot = storage.robots.byId[record.robotId]
   if (robot === undefined || !robot.entity.valid || record.machine.status !== "ready") return
-  inMachine(record, robot, (program) => runSlice(program, record.machine, 1))
+  inMachine(record, robot, (program) => {
+    const byLines = program.setBreak !== undefined
+    const hit = runSlice(program, record.machine, byLines ? quantumOf(robot) : 1, debugOf(record, byLines))
+    record.stopLine = hit
+  })
 }
 
 // ---------- Конец действий и поездок ----------

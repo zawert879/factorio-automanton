@@ -255,11 +255,35 @@ function checkMemory(machine: Machine, allocated: number): void {
   }
 }
 
-/** Один отрезок исполнения: до паузы (квант, ожидание), конца программы или ошибки. */
-export function runSlice(this: void, program: Program, machine: Machine, quantum: number): void {
-  if (machine.status !== "ready") return
+/** Отладка отрезка (18.8): точки остановки (строки в кодировке модулей) и шаг до следующей строки. */
+export interface SliceDebug {
+  breakpoints?: Record<number, boolean | undefined>
+  step?: boolean
+}
+
+/**
+ * Один отрезок исполнения: до паузы (квант, ожидание, точка остановки), конца программы или ошибки.
+ * Результат — строка, на которой сработала точка остановки или шаг (машину ставят на паузу), иначе undefined.
+ */
+export function runSlice(this: void, program: Program, machine: Machine, quantum: number, debug?: SliceDebug): number | undefined {
+  if (machine.status !== "ready") return undefined
   enter(program)
   program.setBudget(quantum)
+  // Программы, собранные до 18.8, отладки не знают (setBreak нет).
+  const debugging = debug !== undefined && (debug.step === true || debug.breakpoints !== undefined) && program.setBreak !== undefined
+  if (debugging) program.setBreak!(debug!.breakpoints, debug!.step === true)
+  Q.hit = undefined
+  try {
+    runSliceBody(program, machine)
+  } finally {
+    if (debugging) program.setBreak!(undefined, false)
+  }
+  const hit = Q.hit as number | undefined
+  Q.hit = undefined
+  return machine.status === "ready" ? hit : undefined
+}
+
+function runSliceBody(program: Program, machine: Machine): void {
   Q.w = undefined
   // Счётчик выделений — свой у каждого отрезка: разность глобального счётчика округлялась бы
   // по-разному у игроков с разной историей сессии (рассинхронизация, найдена test:desync).

@@ -108,6 +108,8 @@ export interface Analysis {
   assignedProperties: Set<string>
   /** ns.имя для import * as ns: узел Member → переменная модуля (см. rewriteNamespaceMembers). */
   namespaceMembers: Map<A.Expr, VarInfo>
+  /** Переменные верхнего уровня (let/const) программы и её модулей — для отладки (18.8); module — номер модуля. */
+  topLevel: { module: number; vars: VarInfo[] }[]
   diagnostics: Diagnostic[]
 }
 
@@ -818,8 +820,12 @@ export function analyze(program: A.Program, units?: ModuleUnit[]): Analysis {
   // ---------- Обход программы ----------
 
   const main = newFn("main", "main", undefined)
-  if (units === undefined) walkBlock(program.body, new Scope(main))
-  else {
+  const topScopes: { module: number; scope: Scope }[] = []
+  if (units === undefined) {
+    const scope = new Scope(main)
+    topScopes.push({ module: 0, scope })
+    walkBlock(program.body, scope)
+  } else {
     for (const unit of units) {
       const scope = new Scope(main)
       scope.imports = new Map()
@@ -831,9 +837,15 @@ export function analyze(program: A.Program, units?: ModuleUnit[]): Analysis {
       }
       for (const [local, namespace] of unit.namespaces) scope.imports.set(local, { namespace })
       moduleScopes.set(unit, scope)
+      topScopes.push({ module: unit.index, scope })
       walkBlock(unit.program.body, scope)
     }
   }
+  const topLevel = topScopes.map(({ module, scope }) => {
+    const vars: VarInfo[] = []
+    for (const [, v] of scope.vars) if (v.kind === "let" || v.kind === "const") vars.push(v)
+    return { module, vars }
+  })
 
   for (const info of classes) {
     if (info.superInfo !== undefined) info.ctor.directCallees.push(info.superInfo.ctor)
@@ -861,6 +873,7 @@ export function analyze(program: A.Program, units?: ModuleUnit[]): Analysis {
     declOf,
     assignedProperties,
     namespaceMembers,
+    topLevel,
     diagnostics,
   }
 }

@@ -30,6 +30,7 @@ import { stepMachine } from "../program/scheduler"
 import { loadedProgram } from "../program/store"
 import { formatValue } from "../program/api/output"
 import { guiOf, titlebar, onGuiClick, onGuiConfirm } from "./common"
+import { openDebugger } from "./debugger"
 import { closeHelp } from "./help"
 import { closePicker, onProgramPicked, openPicker } from "./picker"
 import { closePrograms, openPrograms } from "./programs"
@@ -92,6 +93,7 @@ export function openMachine(player: LuaPlayer, robot: RobotRecord): void {
   button(controls, "stop", "machine-stop", "red_button")
   const pause = button(controls, record.paused ? "resume" : "pause", "machine-pause")
   button(controls, "step", "machine-step")
+  button(controls, "debug", "machine-debug")
 
   const status = body.add({ type: "table", column_count: 2 })
   status.style.horizontal_spacing = 12
@@ -328,6 +330,10 @@ export function registerMachineWindow(): void {
     record.paused = record.paused ? undefined : true
     if (!record.paused) wake(record.robotId)
     refreshMachine(found.window)
+  })
+  onGuiClick("machine-debug", (player) => {
+    const found = windowRobot(player)
+    if (found !== undefined) openDebugger(player, found.robot)
   })
   onGuiClick("machine-step", (player) => {
     const found = windowRobot(player)

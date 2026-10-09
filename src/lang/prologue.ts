@@ -16,6 +16,16 @@ local H, HO, LIB, MATH = R.host, R.hostObjects, R.lib, R.math
 local P = {}
 -- Квант, глубина вызовов, вложенность синхронных вызовов: upvalue быстрее полей таблицы.
 local QN, QD, QS, HARD = 0, 0, 0, Q.hard
+-- Отладка (18.8): точки остановки машины (строка в кодировке модулей → true) и шаг до следующей строки.
+-- BPON — включено ли что-то: без отладки проверка перед инструкцией — одно сравнение upvalue.
+local BPON, BP, STEP = false, nil, false
+local function BRK(l)
+  if STEP or (BP and BP[l]) then
+    Q.hit = l
+    return true
+  end
+  return false
+end
 -- Номера возобновляемых прототипов (заполняет конец программы).
 local RES = {}
 local AM, AMR = R.arrayMethods, R.arrayMethodsResumable
@@ -177,4 +187,5 @@ export const EPILOGUE = `return {
   budget = function() return QN end,
   charge = function(n) QN = QN - n return QN end,
   sync = function() return QS end,
+  setBreak = function(points, step) BP, STEP = points, step BPON = points ~= nil or step end,
 }`

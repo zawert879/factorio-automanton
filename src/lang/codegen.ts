@@ -45,6 +45,25 @@ export interface CompileResult {
   modules?: string[]
   /** Библиотека: только объявления и есть экспорт — машине не назначается. */
   library?: boolean
+  /** Строки (в кодировке модулей), где можно остановиться точкой остановки (18.8): инструкции возобновляемых функций. */
+  breakable?: number[]
+  /**
+   * Переменные верхнего уровня программы и модулей в кадре главной функции (18.8): кадр[slot], ячейка — кадр[slot][1].
+   * module — номер модуля (modules[module]).
+   */
+  variables?: ProgramVariable[]
+}
+
+export interface ProgramVariable {
+  name: string
+  module: number
+  slot: number
+  cell?: boolean
+}
+
+/** Инструкции, перед которыми нет проверки точки остановки: объявления, блоки, пустые. */
+const NO_BREAK: Record<string, boolean> = {
+  Block: true, FunctionDecl: true, ClassDecl: true, TypeDecl: true, DeclareClass: true, DeclareFunction: true, DeclareVar: true, Empty: true,
 }
 
 /** В Lua 5.2 не больше 200 локальных переменных на функцию; запас — служебным. */
@@ -116,6 +135,8 @@ class LuaFn {
   hasReturn = false
   tempTop = 0
   maxTemp = 0
+  /** Есть точки остановки через общий блок сохранения кадра BRKSAVE (у тел try — нет: у них кадр короткий). */
+  breakSave = false
   constructor(
     /** Функция программы, в которой живут переменные (у тела try). */
     readonly root: LuaFn | undefined,
@@ -257,6 +278,9 @@ export function generate(program: A.Program, analysis: Analysis): CompileResult 
   let chainNil: string | undefined
   let tryBodies = 0
   const pauseTable: Record<number, number[]> = {}
+  /** Строки с проверкой точки остановки и переменные главной функции (18.8). */
+  const breakable = new Set<number>()
+  const variables: ProgramVariable[] = []
   const numeric = inferNumeric(program, analysis)
 
   function report(code: string, params: (string | number)[], at: A.Loc): void {
@@ -1590,8 +1614,27 @@ export function generate(program: A.Program, analysis: Analysis): CompileResult 
     completions(body, r.kind, r.value, "")
   }
 
+  /**
+   * Точка остановки (18.8): перед инструкцией возобновляемой функции — проверка «отладка включена и на этой строке
+   * точка (или шаг)». Пауза — как у кванта: кадр сохраняется, продолжение — с метки после проверки (та же точка
+   * второй раз не срабатывает). Кадр с переменными — один на функцию (BRKSAVE), а не у каждой строки.
+   */
+  function breakpointHook(s: A.Stmt): void {
+    if (NO_BREAK[s.kind] || !owner().resumable) return
+    const pause = registerPause()
+    const cond = `BPON and QS == 0 and BRK(${tsLine})`
+    if (cur.root !== undefined) emitPause(pause.pc, "nil", cond)
+    else {
+      emit(`if ${cond} then bpc = ${pause.pc} goto BRKSAVE end`)
+      cur.breakSave = true
+    }
+    emit(`::${pause.label}::`)
+    breakable.add(tsLine)
+  }
+
   function statement(s: A.Stmt): void {
     tsLine = s.line
+    breakpointHook(s)
     const markValue = tempMark()
     statementInner(s, undefined)
     tempRelease(markValue)
@@ -1773,7 +1816,8 @@ export function generate(program: A.Program, analysis: Analysis): CompileResult 
     const savedList = saved.join(", ")
     const name = prototypeLocals.has(fn) ? `F${fn.index}` : `P[${fn.index}]`
     out.push({ text: `${name} = function(${luaParams.join(", ")})`, ts: line })
-    for (const group of chunks(lf.resumable ? [...locals, "kc"] : locals, 40)) out.push({ text: `  local ${group.join(", ")}`, ts: line })
+    const service = lf.resumable ? (lf.breakSave ? ["kc", "bpc"] : ["kc"]) : []
+    for (const group of chunks([...locals, ...service], 40)) out.push({ text: `  local ${group.join(", ")}`, ts: line })
     if (lf.resumable) {
       const entry = `E${fn.index}`
       out.push({ text: `  QD = QD + 1`, ts: line })
@@ -1792,6 +1836,20 @@ export function generate(program: A.Program, analysis: Analysis): CompileResult 
     }
     for (const l of lf.lines) {
       out.push({ text: "  " + l.text + (l.save !== undefined ? `, ${savedList}${l.save}` : ""), ts: l.ts, key: l.key })
+    }
+    if (lf.breakSave) {
+      out.push({ text: `  do return end`, ts: line })
+      out.push({ text: `  ::BRKSAVE::`, ts: line })
+      out.push({ text: `  QD = QD - 1 return Y, {bpc, nil, ${fn.index}, ${savedList}}`, ts: line })
+    }
+    // Переменные верхнего уровня — где они в кадре главной функции.
+    if (fn.kind === "main") {
+      for (const { module, vars } of analysis.topLevel) {
+        for (const v of vars) {
+          const index = saved.indexOf(v.lua)
+          if (index >= 0) variables.push({ name: v.name, module, slot: 4 + index, cell: v.cell || undefined })
+        }
+      }
     }
     out.push({ text: "end", ts: line })
     if (prototypeLocals.has(fn)) out.push({ text: `P[${fn.index}] = ${name}`, ts: line })
@@ -1813,5 +1871,8 @@ export function generate(program: A.Program, analysis: Analysis): CompileResult 
   if (diagnostics.length > 0) return { ok: false, lua: "", lines: [], keys: {}, pauses: {}, diagnostics }
   const keys: Record<number, string> = {}
   for (let i = 0; i < out.length; i++) if (out[i].key !== undefined) keys[i + 1] = out[i].key!
-  return { ok: true, lua: out.map((l) => l.text).join("\n"), lines: out.map((l) => l.ts), keys, pauses: pauseTable, diagnostics }
+  const breakableLines: number[] = []
+  for (const l of breakable) breakableLines.push(l)
+  table.sort(breakableLines)
+  return { ok: true, lua: out.map((l) => l.text).join("\n"), lines: out.map((l) => l.ts), keys, pauses: pauseTable, diagnostics, breakable: breakableLines, variables }
 }

@@ -24,8 +24,12 @@ export interface MachineRecord {
   label?: string
   /** Машину подобрали: программа стоит, память и параметры ждут, пока её поставят снова. */
   parked?: boolean
-  /** Пауза для отладки (окно машины): планировщик её пропускает, «Шаг» исполняет один квант. */
+  /** Пауза для отладки (окно машины): планировщик её пропускает, «Шаг» — до следующей строки. */
   paused?: boolean
+  /** Точки остановки машины (18.8): строки в кодировке модулей (модуль × 1 000 000 + строка). */
+  breakpoints?: Record<number, boolean | undefined>
+  /** Строка, на которой машина встала по точке остановки или шагу (18.8); снимается при продолжении. */
+  stopLine?: number
   lastChatTick?: number
 }
 
@@ -107,6 +111,7 @@ export function restartMachine(record: MachineRecord): void {
     return
   }
   record.version = program.version
+  record.stopLine = undefined
   record.machine = newMachine()
   appendConsole(record, `— ${program.name} v${program.version}`)
   wake(record.robotId)

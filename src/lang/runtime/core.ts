@@ -24,6 +24,8 @@ export const Q = {
   hard: -10000,
   /** Кадр ожидания блокирующего вызова API, начатого в этом отрезке (его завершит игра). */
   w: undefined as Val,
+  /** Строка, на которой сработала точка остановки или шаг (18.8; ставит BRK пролога). */
+  hit: undefined as number | undefined,
 }
 
 export const LIMITS = {
@@ -52,6 +54,8 @@ export interface ProgramExports {
   budget: (this: void) => number
   charge: (this: void, n: number) => number
   sync: (this: void) => number
+  /** Отладка (18.8): точки остановки машины и шаг; у программ, собранных раньше, нет. */
+  setBreak?: (this: void, points: Record<number, boolean | undefined> | undefined, step: boolean) => void
   /** CALL(значение-функция, k, this, ...аргументы). */
   call: ResumableFn
   /** CALLS(значение-функция, this, ...аргументы): синхронно, до конца. */

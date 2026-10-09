@@ -10,7 +10,7 @@
 // нельзя; переименование правит пути импорта в зависимых.
 import { trim } from "../lang/runtime/strings"
 import { LuaPlayer } from "factorio:runtime"
-import { compile, CompileResult, MAX_SOURCE_BYTES } from "../lang/codegen"
+import { compile, CompileResult, MAX_SOURCE_BYTES, ProgramVariable } from "../lang/codegen"
 import { Diagnostic } from "../lang/lexer"
 import { relativeModulePath, resolveModulePath, rewriteImportPaths } from "../lang/modules"
 import { loadProgram, Program } from "../lang/runtime"
@@ -58,6 +58,9 @@ export interface ProgramRecord {
   /** Библиотека (только объявления и export): машине не назначается. */
   library: boolean
   stale?: StaleBuild
+  /** Отладка (18.8): строки, где можно остановиться, и переменные верхнего уровня в кадре; у сборок до 18.8 нет. */
+  breakable?: number[]
+  variables?: ProgramVariable[]
 }
 
 export interface ProgramsState {
@@ -191,6 +194,8 @@ function applyBuild(program: ProgramRecord, compiled: CompileResult, source: str
   program.modules = compiled.modules ?? [program.name]
   program.dependencies = (compiled.modules ?? []).slice(1)
   program.library = compiled.library === true
+  program.breakable = compiled.breakable
+  program.variables = compiled.variables
   program.updatedTick = game.tick
   program.author = author
   program.quarantined = undefined
@@ -199,6 +204,17 @@ function applyBuild(program: ProgramRecord, compiled: CompileResult, source: str
   program.history.push({ version: program.version, source, tick: game.tick, author, rebuiltFor })
   while (program.history.length > HISTORY_VERSIONS) program.history.shift()
   for (const listener of publishedListeners) listener(program)
+}
+
+/**
+ * Пересобрать программу тем же текстом (18.8): сборки до отладки не знают точек остановки и переменных.
+ * Новая версия — машины с ней перезапускаются. Ошибки сборки (модуль изменился) — как у публикации.
+ */
+export function rebuildProgram(program: ProgramRecord, author: string | undefined): Diagnostic[] {
+  const compiled = compileFor(program.name, program.source, program.force)
+  if (!compiled.ok) return compiled.diagnostics
+  applyBuild(program, compiled, program.source, author)
+  return []
 }
 
 /**

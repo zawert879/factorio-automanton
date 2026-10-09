@@ -12,6 +12,7 @@ import { guiOf } from "../gui/common"
 import { openMachine } from "../gui/machine"
 import { checkFromWindow, closePrograms, editViewLine, openPrograms, publishFromWindow, showTypes } from "../gui/programs"
 import { openExport, openImport, pasteImport } from "../gui/exchange"
+import { openDebugger } from "../gui/debugger"
 import { openFleet, showRobot } from "../gui/fleet"
 import { openHelp } from "../gui/help"
 import { openPicker } from "../gui/picker"
@@ -298,9 +299,21 @@ for (let x = 10; x < 86; x++) c.pixel(x, 54, x % 2 === 0 ? "green" : "red")`,
     if (player !== undefined && robot !== undefined) showRobot(player, robot)
   }
   if (tick === 243) guiShot("fleet-remote")
+  // Отладка (18.8): точка на строке n++ у машины с «Шахтёром», окно «Отладка».
+  if (tick === 244) {
+    const player = game.get_player(1 as PlayerIndex)
+    const robot = Object.values(storage.robots.byId).find((r) => r !== undefined && storage.programs.byId[storage.machines[r.id]?.programId ?? -1]?.name === "Шахтёр")
+    if (player !== undefined && robot !== undefined) {
+      storage.machines[robot.id]!.breakpoints = { 4: true }
+      player.gui.screen["automaton-fleet"]?.destroy()
+      player.gui.screen["automaton-machine"]?.destroy()
+      openDebugger(player, robot)
+    }
+  }
+  if (tick === 262) guiShot("debug")
   // Дерево технологий (этап 6): технологии автоматонов на месте «Логистики». Экран технологий в одиночной
   // игре ставит её на паузу — поэтому снимок последний, в том же тике (shot.mjs ждёт файлы ещё пару секунд).
-  if (tick === 245) {
+  if (tick === 264) {
     const player = game.get_player(1 as PlayerIndex)
     if (player !== undefined) {
       player.opened = undefined
