@@ -1,7 +1,8 @@
 // Выгрузка на портал модов (mods.factorio.com, docs/RELEASE.md) — при каждом выпуске:
 // 1. Архив. Мода на портале ещё нет — публикация (init_publish), есть — новая версия (releases/init_upload).
 // 2. Страница (18.2). Галерея — GALLERY по порядку (новые картинки загружаются, совпадающие по SHA1 — остаются,
-//    остальные убираются); описание — tools/release/portal.md, картинки в нём (docs/media/…) — адреса из галереи;
+//    остальные убираются; портал перекодирует их в PNG — гифки там без анимации); описание — tools/release/portal.md,
+//    картинки в нём (docs/media/…) — с GitHub по тегу выпуска: так гифка в описании анимирована;
 //    заголовок, краткое описание (description из mod/info.json), категория, теги, лицензия, ссылки.
 //   FACTORIO_UPLOAD_API_KEY=… node tools/release/portal.mjs dist/automaton_0.3.0.zip
 //   node tools/release/portal.mjs dist/automaton_0.3.0.zip --dry-run   — только сказать, что будет сделано
@@ -99,9 +100,8 @@ async function uploadRelease(mod) {
   console.log(known ? `Версия ${info.version} выгружена` : `Мод опубликован: https://mods.factorio.com/mod/${info.name}`)
 }
 
-/** Галерея: путь картинки → адрес на портале (не принятые порталом — пропускаются с предупреждением). */
+/** Галерея по порядку GALLERY (не принятые порталом картинки — пропускаются с предупреждением). */
 async function syncGallery(existing) {
-  const urls = new Map()
   const ids = []
   for (const path of GALLERY) {
     const data = readFileSync(join(root, path))
@@ -120,35 +120,31 @@ async function syncGallery(existing) {
         continue
       }
     }
-    urls.set(path, image.url)
     ids.push(image.id)
   }
   await post(`${API}/v2/mods/images/edit`, modForm({ images: ids.join(",") }))
   console.log(`галерея: ${ids.length} из ${GALLERY.length}`)
-  return urls
 }
 
-/** Описание: картинки docs/media/… — адресами из галереи (нет в галерее — строка с картинкой убирается). */
-function description(urls) {
+/** Картинка из репозитория по тегу выпуска (raw.githubusercontent.com; портал показывает внешние картинки). */
+function repositoryUrl(path) {
+  const repo = info.homepage.replace(/^https:\/\/github\.com\//, "")
+  return `https://raw.githubusercontent.com/${repo}/v${info.version}/${path}`
+}
+
+/** Описание: картинки docs/media/… — с GitHub по тегу выпуска. */
+function description() {
   const text = readFileSync(join(root, "tools", "release", "portal.md"), "utf8")
-  return text
-    .split("\n")
-    .flatMap((line) => {
-      const image = /\]\((docs\/media\/[^)]+)\)/.exec(line)
-      if (image === null) return [line]
-      const url = urls.get(image[1])
-      return url === undefined ? [] : [line.replace(image[1], url)]
-    })
-    .join("\n")
+  return text.replace(/\]\((docs\/media\/[^)]+)\)/g, (_, path) => `](${repositoryUrl(path)})`)
 }
 
-async function updatePage(urls) {
+async function updatePage() {
   await post(
     `${API}/v2/mods/edit_details`,
     modForm({
       title: info.title,
       summary: info.description,
-      description: description(urls),
+      description: description(),
       category: CATEGORY,
       tags: TAGS,
       license: LICENSE,
@@ -166,11 +162,11 @@ if (dryRun) {
   const existing = mod?.images ?? []
   const fresh = GALLERY.filter((path) => !existing.some((i) => i.id === sha1(readFileSync(join(root, path)))))
   console.log(`галерея: ${GALLERY.length} картинок, загрузить ${fresh.length}; теги: ${TAGS.join(", ")}`)
-  const preview = description(new Map(GALLERY.map((path) => [path, `<адрес ${basename(path)} в галерее>`])))
+  const preview = description()
   console.log(`описание: ${preview.length} символов, начало:\n${preview.split("\n").slice(0, 3).join("\n")}`)
   process.exit(0)
 }
 
 await uploadRelease(mod)
-const urls = await syncGallery((await portalMod(info.name))?.images ?? [])
-await updatePage(urls)
+await syncGallery((await portalMod(info.name))?.images ?? [])
+await updatePage()
