@@ -109,5 +109,13 @@ export function registerProgramCommands(): void {
     stop: (robotId: number) => stopMachine(machineOf(robotId)),
     console: (robotId: number) => machineOf(robotId).console,
     status: (robotId: number) => machineOf(robotId).machine.status,
+    /** Машина по сущности (unit_number): id, имя, программа и параметры — для других модов и проверок. */
+    robotInfo: (unitNumber: number) => {
+      const robot = storage.robots.byId[storage.robots.idByUnit[unitNumber] ?? -1]
+      if (robot === undefined) return undefined
+      const record = machineOf(robot.id)
+      const program = record.programId === undefined ? undefined : storage.programs.byId[record.programId]
+      return { id: robot.id, name: robot.name, program: program?.name, status: record.machine.status, args: record.args }
+    },
   })
 }

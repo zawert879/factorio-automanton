@@ -21,7 +21,8 @@
     "package": "cd mod && npx --yes factoriomod-debug@2.0.14 package && mkdir -p ../dist && mv automaton_*.zip ../dist/",
     "demo:science": "node tools/demo/science.mjs",
     "docs:record": "node tools/docs/record.mjs",
-    "bench:scale": "node tools/bench/scale.mjs"
+    "bench:scale": "node tools/bench/scale.mjs",
+    "test:sim": "node tools/test/sim.mjs"
   },
   "devDependencies": {
     "gifenc": "^1.0.3",
