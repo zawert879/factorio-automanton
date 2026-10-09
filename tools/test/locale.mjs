@@ -70,6 +70,21 @@ export function checkLocale(root) {
   for (const m of kinds.matchAll(/"([a-z-]+)"/g)) used.add(`automaton-action.${m[1]}`)
   const errors = /export type ActionError =([\s\S]*?)\n\n/.exec(actions)?.[1] ?? ""
   for (const m of errors.matchAll(/"([a-z-]+)"/g)) used.add(`automaton-error.${m[1]}`)
+  // Схемы (этап 15): узлы, разъёмы, категории и ошибки схемы.
+  const nodes = readFileSync(join(root, "src", "graph", "nodes.ts"), "utf8")
+  for (const m of nodes.matchAll(/(?:action|data)\(\s*"([a-z-]+)",\s*"([a-z]+)",\s*"([^"]*)",\s*"([^"]*)"/g)) {
+    used.add(`automaton-node.${m[1]}`)
+    used.add(`automaton-node-category.${m[2]}`)
+    for (const part of `${m[3]} ${m[4]}`.split(/\s+/).filter(Boolean)) used.add(`automaton-pin.${part.split(":")[0]}`)
+  }
+  for (const m of nodes.matchAll(/kind: "([a-z-]+)", category: "([a-z]+)"/g)) {
+    used.add(`automaton-node.${m[1]}`)
+    used.add(`automaton-node-category.${m[2]}`)
+  }
+  for (const m of nodes.matchAll(/pins\("([^"]*)"\)/g)) for (const part of m[1].split(/\s+/).filter(Boolean)) used.add(`automaton-pin.${part.split(":")[0]}`)
+  for (const m of nodes.matchAll(/\{ id: "([a-z]+)", kind:/g)) used.add(`automaton-pin.${m[1]}`)
+  const graphCode = readFileSync(join(root, "src", "graph", "codegen.ts"), "utf8")
+  for (const m of graphCode.matchAll(/fail\([^,]+, "(graph-[a-z-]+)"/g)) used.add(`automaton-diagnostic.${m[1]}`)
   for (const k of used) if (!ru.has(k)) problems.push(`в коде есть, в локали нет: ${k}`)
   return { keys: ru.size, used: used.size, problems }
 }
