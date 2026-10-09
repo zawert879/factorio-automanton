@@ -1,4 +1,13 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.3.1
+Date: 2026-10-09
+  Changes:
+    - New games start with an empty team library: no starter programs and no starter library, players write their own programs. Programs already published in existing saves stay.
+    - When the team has no programs yet, the program picker explains where to write the first one.
+    - The new program template and the tips point to the player guide on GitHub.
+  Info:
+    - /am-science publishes the example programs its factory needs.
+---------------------------------------------------------------------------------------------------
 Version: 0.3.0
 Date: 2026-10-09
   Major Features:
