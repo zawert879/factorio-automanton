@@ -5,7 +5,7 @@ import { WORKER_MK1, WORKER_MK1_PLACER } from "../names"
 import { copySettings, pasteSettings, stopRobots } from "../gui/assignTools"
 import { programTree } from "../gui/tree"
 import { assignProgram, machineOf } from "../program/machines"
-import { deleteProgram, findProgram, normalizeProgramName, programsOf, publish } from "../program/store"
+import { checkProgram, deleteProgram, findProgram, normalizeProgramName, programsOf, publish } from "../program/store"
 import { describe, expect, test, waitUntil } from "./testing"
 
 function robotAt(x: number, y: number): RobotRecord {
@@ -37,6 +37,26 @@ function cleanup(...names: string[]): void {
 }
 
 describe("модули команды", () => {
+  test("проверка без публикации (18.1): ошибки с модулями команды, версия и машины не меняются", () => {
+    cleanup("ch/main", "ch/lib")
+    published("ch/lib", "export function twice(x: number): number {\n  return x * 2\n}")
+    const main = published("ch/main", 'import { twice } from "./lib"\nprint(twice(2))').program
+    const robot = robotAt(-620, 520)
+    assignProgram(robot, main)
+    const before = machineOf(robot.id).machine
+    // Ошибка типов через модуль, неизвестный модуль, верный текст.
+    const typeError = checkProgram("ch/main", 'import { twice } from "./lib"\nprint(twice("2"))', "player")
+    expect(typeError.length > 0 && typeError[0].line === 2).toBe(true)
+    expect(checkProgram("ch/main", 'import { x } from "./нет"', "player")[0]?.code).toBe("unknown-module")
+    expect(checkProgram("ch/main", 'import { twice } from "./lib"\nprint(twice(3))', "player").length).toBe(0)
+    // Пустое имя (новая программа): импорт — от корня библиотеки.
+    expect(checkProgram("", 'import { twice } from "./ch/lib"\nprint(twice(1))', "player").length).toBe(0)
+    expect(findProgram("ch/main")!.version).toBe(main.version)
+    expect(machineOf(robot.id).machine === before).toBe(true)
+    robot.entity.destroy()
+    cleanup("ch/main", "ch/lib")
+  })
+
   test("имена с папками", () => {
     expect(normalizeProgramName(" Логистика / Перевозчик ")).toBe("Логистика/Перевозчик")
     // Буквы, которые портил s.trim() TSTL (концы л, п, Р — байты BB, BF, A0).

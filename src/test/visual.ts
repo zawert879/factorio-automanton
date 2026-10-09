@@ -10,7 +10,7 @@ import { Activity, BODY_DIRECTIONS, CHARGING_STATION, DISPLAYS, MODELS, TECH, WO
 import { renameDisplay } from "../world/displays"
 import { guiOf } from "../gui/common"
 import { openMachine } from "../gui/machine"
-import { closePrograms, editViewLine, openPrograms, publishFromWindow, showTypes } from "../gui/programs"
+import { checkFromWindow, closePrograms, editViewLine, openPrograms, publishFromWindow, showTypes } from "../gui/programs"
 import { openPicker } from "../gui/picker"
 import { assignProgram } from "../program/machines"
 import { findProgram, publish, publishProgram } from "../program/store"
@@ -215,6 +215,19 @@ for (let x = 10; x < 86; x++) c.pixel(x, 54, x % 2 === 0 ? "green" : "red")`,
     if (player !== undefined) showTypes(player)
   }
   if (tick === 225) guiShot("types-window")
+  // Проверка без публикации (18.1): ошибка — в строке просмотра, версия программы та же.
+  if (tick === 226) {
+    const player = game.get_player(1 as PlayerIndex)
+    if (player !== undefined) {
+      player.gui.screen["automaton-types"]?.destroy()
+      const window = guiOf(player).programs
+      if (window !== undefined) {
+        window.code.text = window.code.text.replace("wait(0.2)", 'wait("0.2")')
+        checkFromWindow(player, false)
+      }
+    }
+  }
+  if (tick === 227) guiShot("programs-check")
   if (tick === 230) {
     const player = game.get_player(1 as PlayerIndex)
     if (player !== undefined) writeVsCodeFolder(player)

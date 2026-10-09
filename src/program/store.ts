@@ -289,6 +289,16 @@ export function publish(request: PublishRequest): PublishResult {
   return { ok: true, program, rebuilt, stale }
 }
 
+/**
+ * Проверить программу, не публикуя (18.1): та же компиляция с модулями команды, что у публикации, но без новой
+ * версии и перезапуска машин. Пустое или неверное имя проверке не мешает: импорты — от корня библиотеки.
+ */
+export function checkProgram(name: string, source: string, force: string): Diagnostic[] {
+  if (source.length > MAX_SOURCE_BYTES) return [{ code: "program-too-large", params: [MAX_SOURCE_BYTES], line: 0, column: 0 }]
+  const compiled = compileFor(normalizeProgramName(name) ?? "", source, force)
+  return compiled.ok ? [] : compiled.diagnostics
+}
+
 /** Опубликовать по имени (тесты, remote-интерфейс). */
 export function publishProgram(name: string, source: string, author?: string): PublishResult {
   return publish({ name, source, author })

@@ -34,6 +34,7 @@ import { Diagnostic } from "../lang/lexer"
 import { ulen } from "../lang/runtime/strings"
 import { assignProgram } from "../program/machines"
 import {
+  checkProgram,
   deleteProgram,
   deletePrograms,
   dependentsOf,
@@ -210,6 +211,7 @@ export function openPrograms(player: LuaPlayer, programId?: number, robotId?: nu
   viewButton.tooltip = ["automaton-gui.view-mode-tooltip"]
   const editButton = button(buttons, ["automaton-gui.edit-mode"], "programs-edit")
   editButton.tooltip = ["automaton-gui.edit-mode-tooltip"]
+  button(buttons, ["automaton-gui.check"], "programs-check").tooltip = ["automaton-gui.check-tooltip"]
   button(buttons, ["automaton-gui.publish"], "programs-publish", "green_button")
   const assign = button(buttons, "", "programs-assign")
   const versions = buttons.add({ type: "drop-down", items: [], tags: { action: "programs-version" } })
@@ -604,10 +606,8 @@ export function registerProgramsWindow(): void {
     const { line } = element.tags as { line?: number }
     if (line !== undefined) editViewLine(player, line)
   })
-  onGuiClick("programs-view", (player) => {
-    const window = windowOf(player)
-    if (window !== undefined) setMode(window, "view")
-  })
+  onGuiClick("programs-view", (player) => checkFromWindow(player, true))
+  onGuiClick("programs-check", (player) => checkFromWindow(player, false))
   onGuiClick("programs-edit", (player) => {
     const window = windowOf(player)
     if (window === undefined) return
@@ -691,6 +691,26 @@ export function registerProgramsWindow(): void {
     label.style.maximal_width = 900
     label.style.font_color = { r: 0.5, g: 1, b: 0.5 }
   })
+}
+
+/**
+ * Проверка без публикации (18.1): «Проверить» и переход в «Просмотр». Ошибки — как после публикации, в своих
+ * строках просмотра; нет ошибок — по кнопке сообщение «Ошибок нет», при переходе в просмотр — молча.
+ */
+export function checkFromWindow(player: LuaPlayer, toView: boolean): void {
+  const window = windowOf(player)
+  if (window === undefined) return
+  const diagnostics = checkProgram(window.name.text, window.code.text, player.force.name)
+  if (diagnostics.length > 0) {
+    showErrors(window, diagnostics)
+    if (toView && window.mode !== "view") setMode(window, "view")
+    return
+  }
+  window.errorLines = {}
+  window.errors.clear()
+  layoutLines(window, true)
+  if (toView || window.mode === "view") setMode(window, "view")
+  if (!toView) note(window, ["automaton-gui.check-ok"], { r: 0.5, g: 1, b: 0.5 })
 }
 
 /** Клик по строке просмотра: правка с курсором в конце строки (строка с ошибкой — выделена). */
