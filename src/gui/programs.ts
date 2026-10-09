@@ -56,6 +56,7 @@ import { closeExchange, registerExchangeWindows } from "./exchange"
 import { DTS, DTS_EN } from "./dts.generated"
 import { folderItem, LIBRARY_COLOR, programTree, TreeEntry } from "./tree"
 import { newGraphProgram } from "../workshop/programs"
+import { publishing } from "../workshop/publish"
 import { enterWorkshop } from "../workshop/session"
 
 /** Цвет значка программы-схемы в списке. */
@@ -774,7 +775,8 @@ export function publishFromWindow(player: LuaPlayer): void {
   }
   notePublish(player)
   const current = window.programId === undefined ? undefined : storage.programs.byId[window.programId]
-  // Программа-схема из окна программ — только переименовать (код и схема — те же).
+  // Программа-схема из окна программ — только переименовать (код и схема — те же; черновик в мастерской остаётся).
+  publishing.fromWorkshop = current?.graph !== undefined
   const result = publish({
     id: window.programId,
     name: window.name.text,
@@ -784,6 +786,7 @@ export function publishFromWindow(player: LuaPlayer): void {
     graph: current?.graph,
     graphLines: current?.graphLines,
   })
+  publishing.fromWorkshop = false
   if (!result.ok) {
     showErrors(window, result.diagnostics)
     return

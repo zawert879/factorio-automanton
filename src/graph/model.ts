@@ -125,3 +125,26 @@ export function nextNodeId(graph: Graph): number {
   for (const node of graph.nodes) if (node.id > max) max = node.id
   return max + 1
 }
+
+/** Схема из чужих данных (строка обмена, JSON): только узнаваемые поля, иначе undefined. */
+export function sanitizeGraph(raw: unknown): Graph | undefined {
+  if (type(raw) !== "table") return undefined
+  const data = raw as { nodes?: unknown; wires?: unknown }
+  const nodes: GraphNode[] = []
+  const wires: GraphWire[] = []
+  for (const item of (type(data.nodes) === "table" ? data.nodes : []) as Record<string, unknown>[]) {
+    if (typeof item?.id !== "number" || typeof item.kind !== "string" || typeof item.x !== "number" || typeof item.y !== "number") return undefined
+    const values: Record<string, GraphValue | undefined> = {}
+    if (type(item.values) === "table") {
+      for (const [key, value] of pairs(item.values as Record<string, unknown>)) {
+        if (typeof key === "string" && (typeof value === "string" || typeof value === "number" || typeof value === "boolean")) values[key] = value
+      }
+    }
+    nodes.push({ id: item.id, kind: item.kind, x: item.x, y: item.y, values })
+  }
+  for (const item of (type(data.wires) === "table" ? data.wires : []) as Record<string, unknown>[]) {
+    if (typeof item?.from !== "number" || typeof item.to !== "number" || typeof item.out !== "string" || typeof item.in !== "string") return undefined
+    wires.push({ from: item.from, out: item.out, to: item.to, in: item.in })
+  }
+  return nodes.length > 0 ? { nodes, wires } : undefined
+}

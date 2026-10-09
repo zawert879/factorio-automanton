@@ -2,6 +2,8 @@
 // helpers.encode_string — сжатие и base64); строка → план импорта (новая / та же / есть с другим текстом) →
 // публикация: совпадающие — заменить новой версией, положить рядом «(2)» или пропустить; модули публикуются
 // раньше программ, которые их импортируют. Права проверяет окно (те же, что у публикации).
+import { englishGraphSource, graphToSource } from "../graph/codegen"
+import { Graph, sanitizeGraph } from "../graph/model"
 import { Diagnostic } from "../lang/lexer"
 import { trim } from "../lang/runtime/strings"
 import { findProgram, normalizeProgramName, ProgramRecord, publish } from "./store"
@@ -14,6 +16,8 @@ const MAX_PROGRAMS = 200
 export interface SharedProgram {
   name: string
   source: string
+  /** Программа-схема (этап 15): код в строке — собранный из неё. */
+  graph?: Graph
 }
 
 /** Отмеченные программы и модули, без которых они не соберутся (из их сборки). */
@@ -34,7 +38,7 @@ export function withDependencies(programs: ProgramRecord[], force: string): Prog
 
 /** Строка обмена: имена и тексты программ (в порядке списка). */
 export function exportPrograms(programs: ProgramRecord[]): string {
-  const list: SharedProgram[] = programs.map((p) => ({ name: p.name, source: p.source }))
+  const list: SharedProgram[] = programs.map((p) => ({ name: p.name, source: p.source, graph: p.graph }))
   return EXCHANGE_PREFIX + helpers.encode_string(helpers.table_to_json({ v: 1, programs: list }))!
 }
 
@@ -49,14 +53,18 @@ export function decodePrograms(text: string): DecodeResult {
   const json = helpers.decode_string(s.substring(EXCHANGE_PREFIX.length))
   const data = json === undefined ? undefined : (helpers.json_to_table(json) as { v?: unknown; programs?: unknown } | undefined)
   if (data === undefined || typeof data !== "object" || data.v !== 1 || typeof data.programs !== "object") return { ok: false, error: "import-broken" }
-  const raw = data.programs as { name?: unknown; source?: unknown }[]
+  const raw = data.programs as { name?: unknown; source?: unknown; graph?: unknown }[]
   if (raw.length > MAX_PROGRAMS) return { ok: false, error: "import-too-many", params: [MAX_PROGRAMS] }
   const programs: SharedProgram[] = []
   for (const item of raw) {
     const name = typeof item?.name === "string" ? normalizeProgramName(item.name) : undefined
     if (name === undefined || typeof item.source !== "string") return { ok: false, error: "import-broken" }
     if (programs.some((p) => p.name === name)) return { ok: false, error: "import-broken" }
-    programs.push({ name, source: item.source })
+    // Схема — код пересобирается из неё: код и схема в строке не могут разойтись.
+    const graph = item.graph === undefined ? undefined : sanitizeGraph(item.graph)
+    if (item.graph !== undefined && graph === undefined) return { ok: false, error: "import-broken" }
+    const source = graph === undefined ? item.source : graphToSource(graph, name, englishGraphSource(item.source)).source
+    programs.push({ name, source, graph })
   }
   if (programs.length === 0) return { ok: false, error: "import-broken" }
   return { ok: true, programs }
@@ -109,14 +117,15 @@ export function applyImport(items: ImportItem[], choices: Record<string, ImportC
     }
     const name = choice === "rename" ? nameAlongside(item.name, force, taken) : item.name
     taken.push(name)
-    pending.push({ name, source: item.source })
+    pending.push({ name, source: item.source, graph: item.graph })
   }
   let last: Record<string, Diagnostic[]> = {}
   while (pending.length > 0) {
     const next: SharedProgram[] = []
     last = {}
     for (const p of pending) {
-      const published = publish({ name: p.name, source: p.source, force, author })
+      const lines = p.graph === undefined ? undefined : graphToSource(p.graph, p.name, englishGraphSource(p.source)).lineNodes
+      const published = publish({ name: p.name, source: p.source, force, author, graph: p.graph, graphLines: lines })
       if (published.ok) result.published.push(p.name)
       else {
         next.push(p)

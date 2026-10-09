@@ -30,6 +30,7 @@ while (true) {
   and folders, **publishing from VS Code** when you save a file.
 - **Modules**: programs import each other (`import { chestAt } from "./lib/Помощники"`) — your own
   libraries of functions, classes and types; change a library and the programs that depend on it are rebuilt.
+- **Graphs**: a program made of nodes and wires, like Unreal blueprints, in its own workshop; the code is built from the graph.
 - **Assigning programs**: a picker window with search, copying machine settings (Shift+right-click / Shift+left-click),
   a "Programmer" selection box for a dozen machines at once.
 - **Machines**: workers Mk1–Mk3, combat machines (machine gun, rockets), flying cargo machines; a charging station.

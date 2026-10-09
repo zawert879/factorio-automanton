@@ -204,7 +204,7 @@ function literal(value: GraphValue, type: PinType, consumer?: string): string | 
   }
 }
 
-export function graphToSource(graph: Graph, title = ""): GraphSource {
+export function graphToSource(graph: Graph, title = "", english = false): GraphSource {
   const diagnostics: GraphDiagnostic[] = []
   const fail = (node: number, code: string, params: (string | number)[] = [], pin?: string) => {
     diagnostics.push({ node, code, params, pin })
@@ -598,7 +598,7 @@ export function graphToSource(graph: Graph, title = ""): GraphSource {
     out.push(text)
     if (node !== undefined) lineNodes[out.length] = node
   }
-  push(`// Собрано из схемы${title !== "" ? ` «${title}»` : ""}. Править — в мастерской.`)
+  push(english ? `// Built from the graph${title !== "" ? ` "${title}"` : ""}. Edit it in the workshop.` : `// Собрано из схемы${title !== "" ? ` «${title}»` : ""}. Править — в мастерской.`)
   if (params.length > 0) {
     const fields = params.map((p) => `${p.name}?: ${p.type === "marker" || p.type === "zone" ? "string" : tsType(p.type)}`)
     const owner = graph.nodes.find((n) => n.kind === "param")
@@ -694,4 +694,9 @@ function compatible(from: PinType, to: PinType, consumer: string): boolean {
   }
   if (consumer === "exists" || consumer === "print" || consumer === "join" || consumer === "to-text") return from !== "exec"
   return assignable(from, to)
+}
+
+/** Заголовок кода схемы английский (собрал игрок с английской игрой) — пересобирать так же. */
+export function englishGraphSource(source: string): boolean {
+  return string.sub(source, 1, 17) === "// Built from the"
 }

@@ -17,6 +17,6 @@ export function newGraphProgram(player: LuaPlayer, wanted: string): PublishResul
     return { ok: false, diagnostics: [{ code: "program-name-taken", params: [name], line: 0, column: 0 }] }
   }
   const graph = emptyGraph()
-  const source = graphToSource(graph, name)
+  const source = graphToSource(graph, name, player.locale !== "ru")
   return publish({ name, source: source.source, graph, graphLines: source.lineNodes, author: player.name, force })
 }

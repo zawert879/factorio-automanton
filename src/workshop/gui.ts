@@ -7,10 +7,10 @@ import { CATEGORIES, NODES, SettingSpec } from "../graph/nodes"
 import { NODE_BODY_PREFIX } from "../names"
 import { addCode } from "../gui/codeView"
 import { onGuiChange, onGuiChecked, onGuiClick, onGuiElemChanged, onGuiSelection, titlebar } from "../gui/common"
-import { findProgram, onProgramRemoved, ProgramRecord } from "../program/store"
-import { deleteWorkshop, drawNode, isNodeBody, NODE_TAG, nodeOfEntity, readGraph, refreshNode, slotsOf, workshopOf } from "./entities"
+import { findProgram, onProgramPublished, onProgramRemoved, ProgramRecord } from "../program/store"
+import { buildGraph, deleteWorkshop, drawNode, isNodeBody, NODE_TAG, nodeOfEntity, readGraph, refreshNode, slotsOf, workshopOf } from "./entities"
 import { newGraphProgram } from "./programs"
-import { buildWorkshop, publishWorkshop, showErrors } from "./publish"
+import { buildWorkshop, publishing, publishWorkshop, showErrors } from "./publish"
 import { currentWorkshop, enterWorkshop, exitWorkshop, onWorkshopEnter, onWorkshopExit, visitorOf, visitorsOf } from "./session"
 import { Workshop, WorkshopNode, workshopState } from "./state"
 
@@ -213,7 +213,7 @@ function openCode(player: LuaPlayer, ws: Workshop): void {
   player.gui.screen[CODE_WINDOW]?.destroy()
   const program = programOf(ws)
   if (program === undefined) return
-  const build = buildWorkshop(ws, program)
+  const build = buildWorkshop(ws, program, player.locale !== "ru")
   const frame = player.gui.screen.add({ type: "frame", name: CODE_WINDOW, direction: "vertical" })
   titlebar(frame, ["automaton-workshop.code-title", program.name], "workshop-code-close")
   const scroll = frame.add({ type: "scroll-pane" })
@@ -228,7 +228,7 @@ function openCode(player: LuaPlayer, ws: Workshop): void {
 function check(player: LuaPlayer, ws: Workshop): void {
   const program = programOf(ws)
   if (program === undefined) return
-  const build = buildWorkshop(ws, program)
+  const build = buildWorkshop(ws, program, player.locale !== "ru")
   showErrors(ws, build.errors)
   reportErrors(player, build.errors.length, build.errors.find((e) => e.node === 0)?.message)
 }
@@ -243,7 +243,7 @@ function publishFrom(player: LuaPlayer, ws: Workshop): void {
   const program = programOf(ws)
   if (program === undefined) return
   const before = program.version
-  const { build, result } = publishWorkshop(ws, program, player.name)
+  const { build, result } = publishWorkshop(ws, program, player.name, player.locale !== "ru")
   if (result === undefined || !result.ok) {
     reportErrors(player, build.errors.length, build.errors.find((e) => e.node === 0)?.message)
     return
@@ -330,6 +330,12 @@ export function registerWorkshopGui(): void {
     if (player.cursor_stack?.valid_for_read || player.cursor_ghost !== undefined) return
     const found = nodeOfEntity(selected)
     if (found !== undefined) openNodeWindow(player, found.ws, found.node)
+  })
+  // Новая версия схемы не из этой мастерской (импорт строкой) — мастерская строится заново.
+  onProgramPublished((program) => {
+    if (publishing.fromWorkshop || program.graph === undefined) return
+    const ws = workshopOf(program.id)
+    if (ws !== undefined) buildGraph(ws, program.graph)
   })
   // Программу удалили — мастерскую тоже, игроков из неё — наружу.
   onProgramRemoved((program) => {

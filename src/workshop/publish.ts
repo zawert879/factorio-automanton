@@ -9,6 +9,9 @@ import { checkProgram, ProgramRecord, publish, PublishResult } from "../program/
 import { drawNode, readGraph } from "./entities"
 import { Workshop } from "./state"
 
+/** Публикация идёт из мастерской — её не надо перестраивать (на время вызова publish, в пределах тика). */
+export const publishing = { fromWorkshop: false }
+
 export interface NodeError {
   node: number
   message: LocalisedString
@@ -39,9 +42,9 @@ function nodeOfLine(lines: Record<number, number>, line: number): number | undef
 }
 
 /** Собрать схему мастерской: ошибки схемы, а если их нет — ошибки компилятора (с модулями команды). */
-export function buildWorkshop(ws: Workshop, program: ProgramRecord): WorkshopBuild {
+export function buildWorkshop(ws: Workshop, program: ProgramRecord, english = false): WorkshopBuild {
   const { graph, problems } = readGraph(ws)
-  const source = graphToSource(graph, program.name)
+  const source = graphToSource(graph, program.name, english)
   const errors: NodeError[] = problems.map((p) => ({ node: p.node, message: [`automaton-diagnostic.${p.code}`] }))
   for (const d of source.diagnostics) errors.push({ node: d.node, message: graphDiagnosticText(d) })
   if (errors.length === 0) {
@@ -67,11 +70,13 @@ export function showErrors(ws: Workshop, errors: NodeError[]): void {
 }
 
 /** Опубликовать схему: новая версия программы (машины с ней перезапускаются), если код изменился. */
-export function publishWorkshop(ws: Workshop, program: ProgramRecord, author: string | undefined): { build: WorkshopBuild; result?: PublishResult } {
-  const build = buildWorkshop(ws, program)
+export function publishWorkshop(ws: Workshop, program: ProgramRecord, author: string | undefined, english = false): { build: WorkshopBuild; result?: PublishResult } {
+  const build = buildWorkshop(ws, program, english)
   showErrors(ws, build.errors)
   if (build.errors.length > 0) return { build }
+  publishing.fromWorkshop = true
   const result = publish({ id: program.id, name: program.name, source: build.source.source, author, force: program.force, graph: build.graph, graphLines: build.source.lineNodes })
+  publishing.fromWorkshop = false
   if (!result.ok) {
     const errors = result.diagnostics.map((d) => ({ node: nodeOfLine(build.source.source.length > 0 ? build.source.lineNodes : {}, d.line) ?? 0, message: diagnosticMessage(d) }))
     showErrors(ws, errors)

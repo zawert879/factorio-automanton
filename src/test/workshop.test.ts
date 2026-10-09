@@ -9,6 +9,8 @@ import { assignProgram, machineOf } from "../program/machines"
 import { deleteProgram, findProgram, publish } from "../program/store"
 import { buildGraph, ensureWorkshop, NODE_TAG, readGraph, removeNode, workshopOf } from "../workshop/entities"
 import { publishWorkshop } from "../workshop/publish"
+import { applyImport, decodePrograms, exportPrograms, planImport } from "../program/exchange"
+import { graphToSource } from "../graph/codegen"
 import { describe, expect, test, waitUntil } from "./testing"
 
 /** Печать трёх чисел в цикле — схема для проверок. */
@@ -107,6 +109,26 @@ describe("мастерская", () => {
       expect(record.console.slice(1, 4)).toEqual(["1", "2", "3"])
       robot.entity.destroy()
     })
+  })
+
+  test("строка обмена: схема едет вместе с кодом, при импорте код собирается из неё", () => {
+    const graph = counting()
+    const source = graphToSource(graph, "ws/обмен")
+    const old = findProgram("ws/обмен")
+    if (old !== undefined) deleteProgram(old.id)
+    const published = publish({ name: "ws/обмен", source: source.source, graph, graphLines: source.lineNodes })
+    if (!published.ok) error("не опубликована")
+    const text = exportPrograms([published.program])
+    deleteProgram(published.program.id)
+    const decoded = decodePrograms(text)
+    if (!decoded.ok) error(decoded.error)
+    expect(decoded.programs[0].graph?.nodes.length).toBe(4)
+    const result = applyImport(planImport(decoded.programs, "player"), {}, "player", "тест")
+    expect(result.published).toEqual(["ws/обмен"])
+    const imported = findProgram("ws/обмен")!
+    expect(imported.graph?.wires.length).toBe(4)
+    expect(imported.source).toBe(source.source)
+    deleteProgram(imported.id)
   })
 
   test("ошибка схемы — на узле, публикации нет", () => {

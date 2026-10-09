@@ -14,6 +14,7 @@ from JavaScript, [VSCODE.md](VSCODE.md) — writing programs in VS Code.
 - [The machine and its window](#the-machine-and-its-window)
 - [Programs](#programs)
 - [Your own libraries](#your-own-libraries)
+- [Graphs: programs without code](#graphs-programs-without-code)
 - [Sharing programs](#sharing-programs)
 - [The language in five minutes](#the-language-in-five-minutes)
 - [How a machine thinks](#how-a-machine-thinks)
@@ -201,6 +202,42 @@ Programs travel as **strings**, like blueprints: to a friend on another team, to
   history), **Alongside "(2)"** (as "Miner (2)") or **Skip**. **Import** publishes them — with the same rights as publishing.
 
 Details (what can be imported, `import * as`, `export default`) — [LANGUAGE.md](LANGUAGE.md), "Modules".
+
+## Graphs: programs without code
+
+A program can be built as a **graph** — nodes and wires, like Unreal blueprints. The graph lives in a **workshop** —
+the program's own area, which you enter without your character (it waits at the factory).
+
+![The workshop: the "Miner" graph](../media/workshop.png)
+
+1. Programs window → **New graph** (the name comes from the name field; empty — "Graph 1"). You are in the workshop
+   right away, with a Start node on the floor.
+2. On the left is the **palette**: sections (flow, movement, items, team…) and nodes. Click a node to take it in hand
+   and place it like a blueprint (Q to drop it).
+3. **Wires** — the red and green wire buttons on the shortcut bar: click one pin, then another.
+   **Red** is the flow: from Start along the "next" outputs, "yes" and "no" of If, "body" of loops.
+   **Green** is data: what to mine, where to go, a condition.
+4. **Click a node** with an empty hand for its settings: values of inputs without a wire (an item, a number, a marker
+   name), the comparison operator, the variable name.
+5. **Check** shows errors on the nodes as a red frame with text. **Publish** makes a new version, as with code.
+   **Code** shows what was built. **Exit** returns you to your character.
+
+Graph rules:
+
+- The branches of If meet at a common node, and the chain continues from it. Wires don't go back: repeat with loop
+  nodes (Repeat forever, While, Repeat N times, For each).
+- A data node (no red pins) is recalculated every time it is used; an action's result ("result" of Mine) is the value
+  after the action has run.
+- Try: an action error in the "body" branch leads to the "error" branch, with the code on the "error code" output.
+- A variable is a Variable node (name, type, initial value) plus Get and Set nodes. Your own function is a Function
+  node (name, parameters like `depot: marker`) plus a Call node.
+- Machine parameters — a Parameter node (name, type, default value): one graph, different settings on different machines.
+- To move nodes, cut and paste them (Ctrl+X, Ctrl+V): their wires move with them. Ctrl+C copies without the wires
+  to the rest of the graph.
+
+A graph program is an ordinary team program: it is assigned to machines, shows up in All machines, travels in exchange
+strings (together with its graph) and is debugged in the machine window (the node is shown next to the line). Its code
+in the programs window is read-only; Copy turns it into a code program.
 
 ## The language in five minutes
 
