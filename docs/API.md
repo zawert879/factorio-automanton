@@ -159,17 +159,29 @@ interface ItemStack { name: Item; count: number }
 `String(x)` и шаблонные строки — как в JavaScript (`[object Object]`, `1,2,3`).
 
 ```ts
-/** Строка в консоль машины (окно машины, последние 100 строк); значения — как console.log в Node. */
+/**
+ * Строка в консоль машины (окно машины, последние 100 строк); значения — как console.log в Node.
+ * @en One line to the machine console (machine window, last 100 lines); values are shown like console.log in Node.
+ */
 declare function print(...values: unknown[]): void;
-declare const console: { log(...values: unknown[]): void };   // то же, что print
+declare const console: { log(...values: unknown[]): void };   // то же, что print @en same as print
 
-/** Облачко с текстом над машиной на `seconds` секунд (по умолчанию 3). Видят все игроки. */
+/**
+ * Облачко с текстом над машиной на `seconds` секунд (по умолчанию 3). Видят все игроки.
+ * @en A speech bubble with text above the machine for `seconds` seconds (3 by default). All players see it.
+ */
 declare function say(text: string, seconds?: number): void;
 
-/** Сообщение в чат команды. Не чаще раза в 5 секунд с одной машины. */
+/**
+ * Сообщение в чат команды. Не чаще раза в 5 секунд с одной машины.
+ * @en A message to the team chat. At most once every 5 seconds per machine.
+ */
 declare function chat(text: string): void;
 
-/** Оповещение игрокам команды: значок у миникарты, клик ведёт к машине. */
+/**
+ * Оповещение игрокам команды: значок у миникарты, клик ведёт к машине.
+ * @en An alert for the team's players: an icon near the minimap, a click leads to the machine.
+ */
 declare function alert(text: string): void;
 ```
 
@@ -184,17 +196,20 @@ type Model =
   | "flyer-mk1" | "flyer-mk2";
 
 interface Robot {
-  // Всегда:
+  // Всегда: @en Always:
   readonly id: number;
   readonly name: string;
   readonly model: Model;
-  readonly valid: boolean;             // false, если машину уничтожили или подобрали
-  /** Видна ли сейчас. Поля ниже — только если видна, иначе ActionError("out-of-sight"). */
+  readonly valid: boolean;             // false, если машину уничтожили или подобрали @en false if the machine was destroyed or picked up
+  /**
+   * Видна ли сейчас. Поля ниже — только если видна, иначе ActionError("out-of-sight").
+   * @en Whether it is visible now. The fields below work only while it is visible, otherwise ActionError("out-of-sight").
+   */
   readonly inSight: boolean;
-  // Только в поле зрения:
+  // Только в поле зрения: @en Only within sight:
   readonly position: Position;
   readonly state: RobotState;
-  readonly program: string | null;     // имя программы из библиотеки
+  readonly program: string | null;     // имя программы из библиотеки @en name of the program from the library
   readonly health: number;             // 0..1
   distance(to: Target): number;
 }
@@ -204,19 +219,25 @@ type RobotState =
   | "waiting" | "thinking" | "no-fuel" | "stuck" | "error";
 
 interface Me extends Robot {
-  name: string;                        // можно переименовать себя из программы
-  label: string;                       // постоянная подпись над машиной (в отличие от say)
+  name: string;                        // можно переименовать себя из программы @en a program can rename its own machine
+  label: string;                       // постоянная подпись над машиной (в отличие от say) @en a permanent label above the machine (unlike say)
   readonly cargo: Inventory;
-  readonly fuel: number;               // 0..1 — топливо или заряд
-  readonly tank: FluidTank | null;     // бак, если есть у модели
-  readonly weapon: Weapon | null;      // оружие, если модель боевая
-  readonly reach: number;              // досягаемость до зданий, клеток (как у персонажа)
-  readonly mineReach: number;          // досягаемость до месторождения, клеток
-  readonly vision: number;             // радиус зрения, клеток
-  readonly home: Position | null;      // «дом», задаётся в окне машины
-  /** Параметры программы, заданные в окне машины. Одна программа — разные настройки у разных машин. */
+  readonly fuel: number;               // 0..1 — топливо или заряд @en 0..1 — fuel or charge
+  readonly tank: FluidTank | null;     // бак, если есть у модели @en the tank, if the model has one
+  readonly weapon: Weapon | null;      // оружие, если модель боевая @en the weapon, if it is a combat model
+  readonly reach: number;              // досягаемость до зданий, клеток (как у персонажа) @en reach to buildings, in tiles (like a character's)
+  readonly mineReach: number;          // досягаемость до месторождения, клеток @en reach to resource patches, in tiles
+  readonly vision: number;             // радиус зрения, клеток @en vision radius, in tiles
+  readonly home: Position | null;      // «дом», задаётся в окне машины @en "home", set in the machine window
+  /**
+   * Параметры программы, заданные в окне машины. Одна программа — разные настройки у разных машин.
+   * @en Program parameters set in the machine window. One program, different settings on different machines.
+   */
   args<T>(): T;
-  /** Память, которая переживает перезапуск программы и подбор машины. */
+  /**
+   * Память, которая переживает перезапуск программы и подбор машины.
+   * @en Memory that survives a program restart and picking the machine up.
+   */
   readonly memory: {
     get<T extends Value>(key: string): T | null;
     set(key: string, value: Value): void;
@@ -225,9 +246,9 @@ interface Me extends Robot {
 }
 
 interface Inventory {
-  count(item?: Item): number;          // без аргумента — всего предметов
+  count(item?: Item): number;          // без аргумента — всего предметов @en without an argument — all items
   items(): ItemStack[];
-  free(item?: Item): number;           // сколько ещё влезет (этого предмета)
+  free(item?: Item): number;           // сколько ещё влезет (этого предмета) @en how much more fits (of this item)
   isEmpty(): boolean;
   isFull(): boolean;
 }
@@ -245,38 +266,66 @@ me.label = `копаю ${ore}`;
 /**
  * Доехать до цели. К машине — только если она в поле зрения (иначе спроси у неё позицию сообщением).
  * ActionError("no-path"), если пути нет.
+ * @en Drive to the target. To a machine — only if it is within sight (otherwise ask it for its position with a message). ActionError("no-path") if there is no path.
  */
 declare function move(to: Target, opts?: { radius?: number; timeout?: number }): void;
 
-/** Есть ли путь до цели (спрашивает поиск пути, занимает несколько тиков). */
+/**
+ * Есть ли путь до цели (спрашивает поиск пути, занимает несколько тиков).
+ * @en Whether there is a path to the target (asks the pathfinder, takes a few ticks).
+ */
 declare function canReach(to: Target): boolean;
 
-/** Ехать следом за целью, пока `until` не вернёт true. false — цель потеряна из виду. */
+/**
+ * Ехать следом за целью, пока `until` не вернёт true. false — цель потеряна из виду.
+ * @en Follow the target until `until` returns true. false — the target was lost from sight.
+ */
 declare function follow(target: Robot | Entity, until: () => boolean): boolean;
 
-/** Вернуться в me.home. */
+/**
+ * Вернуться в me.home.
+ * @en Return to me.home.
+ */
 declare function goHome(): void;
 ```
 
 ## Предметы
 
 ```ts
-/** Добыть ресурс, стоя у месторождения. Без count — пока не заполнится груз. Возвращает, сколько добыто. */
+/**
+ * Добыть ресурс, стоя у месторождения. Без count — пока не заполнится груз. Возвращает, сколько добыто.
+ * @en Mine a resource while standing at the patch. Without count — until the cargo is full. Returns how much was mined.
+ */
 declare function mine(item: Item, count?: number): number;
 
-/** Взять из здания в радиусе me.reach: выход печи и сборщика, сундук, вагон. */
+/**
+ * Взять из здания в радиусе me.reach: выход печи и сборщика, сундук, вагон.
+ * @en Take from a building within me.reach: furnace and assembler output, chest, wagon.
+ */
 declare function take(from: Entity, item: Item, count?: number): number;
 
-/** Положить в здание в радиусе me.reach — в нужный слот: вход печи и сборщика, топливо котла, патроны турели, наука лаборатории. */
+/**
+ * Положить в здание в радиусе me.reach — в нужный слот: вход печи и сборщика, топливо котла, патроны турели, наука лаборатории.
+ * @en Put into a building within me.reach, into the right slot: furnace and assembler input, boiler fuel, turret ammo, lab science packs.
+ */
 declare function put(into: Entity, item: Item, count?: number): number;
 
-/** Подобрать предметы с земли вплотную. Без item — всё подряд. */
+/**
+ * Подобрать предметы с земли вплотную. Без item — всё подряд.
+ * @en Pick up items lying right next to the machine. Without item — everything.
+ */
 declare function pickup(item?: Item, count?: number): number;
 
-/** Выбросить предметы на землю. */
+/**
+ * Выбросить предметы на землю.
+ * @en Drop items on the ground.
+ */
 declare function drop(item: Item, count?: number): number;
 
-/** Передать предметы другой машине в радиусе me.reach — «из рук в руки», без сундука. */
+/**
+ * Передать предметы другой машине в радиусе me.reach — «из рук в руки», без сундука.
+ * @en Hand items to another machine within me.reach, without a chest.
+ */
 declare function give(to: Robot, item: Item, count?: number): number;
 ```
 
@@ -284,20 +333,23 @@ declare function give(to: Robot, item: Item, count?: number): number;
 
 ```ts
 interface Entity {
-  // Всегда:
+  // Всегда: @en Always:
   readonly id: number;
   readonly valid: boolean;
   readonly name: string;               // "stone-furnace"
   readonly type: string;               // "furnace"
   readonly position: Position;
-  /** Видно ли сейчас. Поля и методы ниже — только если видно, иначе ActionError("out-of-sight"). */
+  /**
+   * Видно ли сейчас. Поля и методы ниже — только если видно, иначе ActionError("out-of-sight").
+   * @en Whether it is visible now. The fields and methods below work only while it is visible, otherwise ActionError("out-of-sight").
+   */
   readonly inSight: boolean;
-  // Только в поле зрения:
+  // Только в поле зрения: @en Only within sight:
   readonly status: EntityStatus;
   readonly health: number;             // 0..1
-  readonly recipe: string | null;      // у сборщиков и печей
-  readonly progress: number;           // прогресс текущего крафта, 0..1
-  count(item: Item): number;           // во всех инвентарях здания
+  readonly recipe: string | null;      // у сборщиков и печей @en for assemblers and furnaces
+  readonly progress: number;           // прогресс текущего крафта, 0..1 @en progress of the current craft, 0..1
+  count(item: Item): number;           // во всех инвентарях здания @en in all of the building's inventories
   input(): Inventory | null;
   output(): Inventory | null;
   fuel(): Inventory | null;
@@ -308,19 +360,34 @@ type EntityStatus =
   | "working" | "no-input" | "output-full" | "no-fuel" | "no-power"
   | "no-recipe" | "disabled" | "idle";
 
-/** Починить здание или машину ремкомплектами из груза (в радиусе me.reach). */
+/**
+ * Починить здание или машину ремкомплектами из груза (в радиусе me.reach).
+ * @en Repair a building or a machine with repair packs from the cargo (within me.reach).
+ */
 declare function repair(target: Entity | Robot): void;
 
-/** [Наладка] Сменить рецепт сборщика; содержимое здания возвращается в груз. */
+/**
+ * [Наладка] Сменить рецепт сборщика; содержимое здания возвращается в груз.
+ * @en [Configuration] Change an assembler's recipe; the building's contents go back to the cargo.
+ */
 declare function setRecipe(machine: Entity, recipe: string): void;
 
-/** [Строительство] Поставить здание из груза. */
+/**
+ * [Строительство] Поставить здание из груза.
+ * @en [Construction] Place a building from the cargo.
+ */
 declare function build(item: Item, at: Position, direction?: Direction): Entity;
 
-/** [Строительство] Разобрать здание в груз. */
+/**
+ * [Строительство] Разобрать здание в груз.
+ * @en [Construction] Deconstruct a building into the cargo.
+ */
 declare function deconstruct(target: Entity): void;
 
-/** [Строительство] Повернуть здание. */
+/**
+ * [Строительство] Повернуть здание.
+ * @en [Construction] Rotate a building.
+ */
 declare function rotate(target: Entity, reverse?: boolean): void;
 ```
 
@@ -334,7 +401,7 @@ declare function rotate(target: Entity, reverse?: boolean): void;
 
 ```ts
 interface FluidTank {
-  readonly fluid: Fluid | null;        // null — бак пуст
+  readonly fluid: Fluid | null;        // null — бак пуст @en null — the tank is empty
   readonly amount: number;
   readonly capacity: number;           // Mk1 — 1000
 }
@@ -342,13 +409,20 @@ interface FluidTank {
 /**
  * [Жидкости] Набрать в бак: воду — у берега (клетка воды в me.mineReach), нефть — стоя у месторождения.
  * Без amount — до полного бака. Возвращает, сколько набрано.
+ * @en [Fluids] Fill the tank: water at the shore (a water tile within me.mineReach), crude oil while standing at the patch. Without amount — until the tank is full. Returns how much was taken.
  */
 declare function pump(fluid: Fluid, amount?: number): number;
 
-/** [Жидкости] Залить из бака в здание в радиусе me.reach (котёл, резервуар, завод). Без amount — всё, что влезет. */
+/**
+ * [Жидкости] Залить из бака в здание в радиусе me.reach (котёл, резервуар, завод). Без amount — всё, что влезет.
+ * @en [Fluids] Pour from the tank into a building within me.reach (boiler, storage tank, refinery). Without amount — as much as fits.
+ */
 declare function fill(into: Entity, amount?: number): number;
 
-/** [Жидкости] Слить из здания в бак (пар из котла, продукты нефтезавода). */
+/**
+ * [Жидкости] Слить из здания в бак (пар из котла, продукты нефтезавода).
+ * @en [Fluids] Drain from a building into the tank (steam from a boiler, refinery products).
+ */
 declare function drain(from: Entity, fluid: Fluid, amount?: number): number;
 ```
 
@@ -374,10 +448,16 @@ while (true) {
 ## Энергия
 
 ```ts
-/** Mk1: переложить топливо из груза в топливный слот. Без item — лучшее, что есть. */
+/**
+ * Mk1: переложить топливо из груза в топливный слот. Без item — лучшее, что есть.
+ * @en Mk1: move fuel from the cargo into the fuel slot. Without item — the best available.
+ */
 declare function refuel(item?: Item): void;
 
-/** Mk2+: доехать до станции (по умолчанию — ближайшей видимой) и зарядиться полностью. */
+/**
+ * Mk2+: доехать до станции (по умолчанию — ближайшей видимой) и зарядиться полностью.
+ * @en Mk2+: drive to a station (by default the nearest visible one) and charge fully.
+ */
 declare function charge(station?: Entity): void;
 ```
 
@@ -392,17 +472,35 @@ Mk1 жжёт топливо из топливного слота; Mk2 и Mk3 р�
 
 ```ts
 declare const scan: {
-  /** Машины своей команды рядом. */
+  /**
+   * Машины своей команды рядом.
+   * @en Machines of your team nearby.
+   */
   robots(radius?: number): Robot[];
-  /** Здания рядом, с фильтром по имени или типу. */
+  /**
+   * Здания рядом, с фильтром по имени или типу.
+   * @en Buildings nearby, filtered by name or type.
+   */
   entities(filter?: { name?: string | string[]; type?: string | string[]; radius?: number }): Entity[];
-  /** Предметы, лежащие на земле. */
+  /**
+   * Предметы, лежащие на земле.
+   * @en Items lying on the ground.
+   */
   items(radius?: number): GroundItem[];
-  /** Месторождения рядом, сгруппированные по ресурсу. */
+  /**
+   * Месторождения рядом, сгруппированные по ресурсу.
+   * @en Resource patches nearby, grouped by resource.
+   */
   resources(radius?: number): ResourcePatch[];
-  /** [Сенсоры] Враги: кусаки, плеваки, гнёзда, черви. */
+  /**
+   * [Сенсоры] Враги: кусаки, плеваки, гнёзда, черви.
+   * @en [Sensors] Enemies: biters, spitters, nests, worms.
+   */
   enemies(radius?: number): Enemy[];
-  /** Ближайшая вода. */
+  /**
+   * Ближайшая вода.
+   * @en The nearest water.
+   */
   water(radius?: number): Position | null;
 };
 
@@ -433,7 +531,7 @@ if (scan.enemies().length > 0) {
 расстоянии — но возвращает здания, у которых без поля зрения доступно только неизменное.
 
 ```ts
-declare function marker(name: string): Marker;     // ActionError("invalid-target"), если метки нет
+declare function marker(name: string): Marker;     // ActionError("invalid-target"), если метки нет @en ActionError("invalid-target") if there is no such marker
 declare function zone(name: string): Zone;
 
 interface Marker { readonly name: string; readonly position: Position }
@@ -444,11 +542,17 @@ interface Zone {
   contains(p: Position): boolean;
 }
 
-/** Здания в зоне: по имени ("stone-furnace") или по типу ({ type: "furnace" }). */
+/**
+ * Здания в зоне: по имени ("stone-furnace") или по типу ({ type: "furnace" }).
+ * @en Buildings in the zone: by name ("stone-furnace") or by type ({ type: "furnace" }).
+ */
 declare function find(what: string | { type: string }, where: Zone): Entity[];
 
 declare const map: {
-  /** Метка на карте для игроков (например, найденное месторождение). */
+  /**
+   * Метка на карте для игроков (например, найденное месторождение).
+   * @en A map tag for players (for example, a patch that was found).
+   */
   tag(at: Position, text: string, icon?: Item): void;
   untag(at: Position): void;
 };
@@ -471,36 +575,63 @@ declare const map: {
 
 ```ts
 interface Message<T extends Value = Value> {
-  readonly from: Robot;                // ссылка на отправителя; его позиция — только в поле зрения
+  readonly from: Robot;                // ссылка на отправителя; его позиция — только в поле зрения @en a reference to the sender; its position only within sight
   readonly topic: string;
   readonly data: T;
-  readonly sentAt: number;             // тик отправки
-  /** Ответить отправителю (для request). */
+  readonly sentAt: number;             // тик отправки @en the tick it was sent
+  /**
+   * Ответить отправителю (для request).
+   * @en Reply to the sender (for request).
+   */
   reply(data: Value): void;
 }
 
-/** Сообщение конкретной машине: по ссылке, id или имени. */
+/**
+ * Сообщение конкретной машине: по ссылке, id или имени.
+ * @en A message to a specific machine: by reference, id or name.
+ */
 declare function send(to: Robot | number | string, topic: string, data?: Value): void;
 
-/** Опубликовать обновление: получат машины, подписанные на эту (на все её темы или на эту тему). */
+/**
+ * Опубликовать обновление: получат машины, подписанные на эту (на все её темы или на эту тему).
+ * @en Publish an update: machines subscribed to this one receive it (to all its topics or to this topic).
+ */
 declare function publish(topic: string, data?: Value): void;
-/** Подписаться на публикации машины (по ссылке, id или имени): на все её темы или на одну. */
+/**
+ * Подписаться на публикации машины (по ссылке, id или имени): на все её темы или на одну.
+ * @en Subscribe to a machine's publications (by reference, id or name): to all its topics or to one.
+ */
 declare function subscribe(robot: Robot | number | string, topic?: string): void;
-/** Отписаться от машины: от темы или (без темы) совсем. */
+/**
+ * Отписаться от машины: от темы или (без темы) совсем.
+ * @en Unsubscribe from a machine: from a topic or (without a topic) entirely.
+ */
 declare function unsubscribe(robot: Robot | number | string, topic?: string): void;
 
-/** Ждать сообщение (необязательно — только по теме). По таймауту (секунды) — null. */
+/**
+ * Ждать сообщение (необязательно — только по теме). По таймауту (секунды) — null.
+ * @en Wait for a message (optionally only on a topic). On timeout (seconds) — null.
+ */
 declare function receive<T extends Value = Value>(topic?: string, timeout?: number): Message<T> | null;
 
-/** Взять сообщение, если оно уже есть, не ожидая. */
+/**
+ * Взять сообщение, если оно уже есть, не ожидая.
+ * @en Take a message if one is already there, without waiting.
+ */
 declare function tryReceive<T extends Value = Value>(topic?: string): Message<T> | null;
 
-/** Отправить и дождаться ответа. По таймауту — ActionError("timeout"). */
+/**
+ * Отправить и дождаться ответа. По таймауту — ActionError("timeout").
+ * @en Send and wait for the reply. On timeout — ActionError("timeout").
+ */
 declare function request<T extends Value = Value>(
   to: Robot | number | string, topic: string, data?: Value, timeout?: number,
 ): T;
 
-/** Ссылка на машину по id или имени (для send, сравнения, move — если видна). */
+/**
+ * Ссылка на машину по id или имени (для send, сравнения, move — если видна).
+ * @en A reference to a machine by id or name (for send, comparison, move — if it is visible).
+ */
 declare function robot(idOrName: number | string): Robot | null;
 
 declare const inbox: { readonly count: number; readonly dropped: number };
@@ -533,11 +664,20 @@ declare const board: {
   set(key: string, value: Value): void;
   delete(key: string): void;
   keys(prefix?: string): string[];
-  /** Атомарно прибавить, вернуть новое значение. */
+  /**
+   * Атомарно прибавить, вернуть новое значение.
+   * @en Atomically add and return the new value.
+   */
   increment(key: string, by?: number): number;
-  /** Атомарно заменить, только если сейчас там expected. */
+  /**
+   * Атомарно заменить, только если сейчас там expected.
+   * @en Atomically replace, only if the current value is expected.
+   */
   compareAndSet(key: string, expected: Value, value: Value): boolean;
-  /** Захватить ключ на ttl секунд. true — захватила эта машина. */
+  /**
+   * Захватить ключ на ttl секунд. true — захватила эта машина.
+   * @en Take the key for ttl seconds. true — this machine got it.
+   */
   claim(key: string, ttl?: number): boolean;
   release(key: string): void;
 };
@@ -550,7 +690,10 @@ declare const board: {
 ```ts
 declare const tasks: {
   push(queue: string, data: Value, opts?: { priority?: number }): void;
-  /** Ждать задачу (блокирует). По таймауту — null. */
+  /**
+   * Ждать задачу (блокирует). По таймауту — null.
+   * @en Wait for a task (blocks). On timeout — null.
+   */
   next<T extends Value>(queue: string, opts?: { timeout?: number; lease?: number }): Task<T> | null;
   size(queue: string): number;
 };
@@ -558,7 +701,7 @@ declare const tasks: {
 interface Task<T extends Value> {
   readonly data: T;
   done(): void;
-  fail(reason?: string): void;           // вернуть в очередь
+  fail(reason?: string): void;           // вернуть в очередь @en return it to the queue
 }
 ```
 
@@ -580,15 +723,27 @@ interface Display {
   rect(x: number, y: number, width: number, height: number, style?: ShapeStyle): void;
   line(x1: number, y1: number, x2: number, y2: number, style?: ShapeStyle): void;
   circle(x: number, y: number, radius: number, style?: ShapeStyle): void;
-  /** size — высота строки в пикселях (по умолчанию 8). */
+  /**
+   * size — высота строки в пикселях (по умолчанию 8).
+   * @en size — line height in pixels (8 by default).
+   */
   text(x: number, y: number, text: string, style?: { color?: Color; size?: number; align?: "left" | "center" | "right" }): void;
   measureText(text: string, size?: number): number;
   icon(x: number, y: number, item: Item, size?: number): void;
-  /** Полоска заполнения, value — 0..1. */
+  /**
+   * Полоска заполнения, value — 0..1.
+   * @en A fill bar, value is 0..1.
+   */
   bar(x: number, y: number, width: number, height: number, value: number, color?: Color): void;
-  /** Таблица из строк ячеек; с header первая строка выделяется. Возвращает занятый размер. */
+  /**
+   * Таблица из строк ячеек; с header первая строка выделяется. Возвращает занятый размер.
+   * @en A table from rows of cells; with header the first row is highlighted. Returns the size it took.
+   */
   table(x: number, y: number, rows: Cell[][], opts?: { header?: boolean; size?: number; columnWidths?: number[] }): { width: number; height: number };
-  /** Всё нарисованное внутри frame появляется разом, без мерцания. */
+  /**
+   * Всё нарисованное внутри frame появляется разом, без мерцания.
+   * @en Everything drawn inside frame appears at once, without flicker.
+   */
   frame(draw: () => void): void;
 }
 
@@ -614,23 +769,33 @@ type Cell = string | number | { text: string; color?: Color; icon?: Item };
 ```ts
 interface Weapon {
   readonly type: "gun" | "shotgun" | "rocket" | "flamethrower";
-  readonly ammo: ItemStack | null;       // заряжено
-  readonly range: number;                // дальность, клеток
+  readonly ammo: ItemStack | null;       // заряжено @en loaded
+  readonly range: number;                // дальность, клеток @en range, in tiles
 }
 
 /**
  * Подъехать на дальность выстрела и атаковать, пока цель не уничтожена, не пропала из виду
  * или не кончились патроны. true — цель уничтожена.
+ * @en Drive within firing range and attack until the target is destroyed, lost from sight or the ammo runs out. true — the target was destroyed.
  */
 declare function attack(target: Enemy | Entity): boolean;
 
-/** Стоять у точки и отбиваться от всех врагов в радиусе, пока until() не вернёт true. */
+/**
+ * Стоять у точки и отбиваться от всех врагов в радиусе, пока until() не вернёт true.
+ * @en Stand at the point and fight off all enemies within the radius until until() returns true.
+ */
 declare function guard(at: Target, opts?: { radius?: number; until?: () => boolean }): void;
 
-/** Объезжать точки по кругу, атакуя встреченных врагов, пока until() не вернёт true. */
+/**
+ * Объезжать точки по кругу, атакуя встреченных врагов, пока until() не вернёт true.
+ * @en Patrol the points in a loop, attacking enemies on the way, until until() returns true.
+ */
 declare function patrol(points: Target[], until?: () => boolean): void;
 
-/** Зарядить оружие патронами из груза. Без ammo — лучшими, что есть. */
+/**
+ * Зарядить оружие патронами из груза. Без ammo — лучшими, что есть.
+ * @en Load the weapon with ammo from the cargo. Without ammo — the best available.
+ */
 declare function reload(ammo?: Item): void;
 ```
 
@@ -655,7 +820,10 @@ declare function reload(ammo?: Item): void;
 declare const signals: {
   read(at: Marker, signal: string): number;
   readAll(at: Marker): Record<string, number>;
-  /** Метка выдаёт эти сигналы в сеть, пока их не перезапишут. */
+  /**
+   * Метка выдаёт эти сигналы в сеть, пока их не перезапишут.
+   * @en The marker sends these signals to the circuit network until they are overwritten.
+   */
   write(at: Marker, values: Record<string, number>): void;
 };
 ```
@@ -665,16 +833,22 @@ declare const signals: {
 ```ts
 declare function wait(seconds: number): void;
 
-/** Ждать, пока cond не вернёт true (проверка раз в `every` секунд). По таймауту — false. */
+/**
+ * Ждать, пока cond не вернёт true (проверка раз в `every` секунд). По таймауту — false.
+ * @en Wait until cond returns true (checked every `every` seconds). On timeout — false.
+ */
 declare function waitUntil(cond: () => boolean, opts?: { every?: number; timeout?: number }): boolean;
 
-/** Завершить программу (машина встаёт в idle) / начать заново. */
+/**
+ * Завершить программу (машина встаёт в idle) / начать заново.
+ * @en End the program (the machine goes idle) / start it over.
+ */
 declare function exit(): never;
 declare function restart(): never;
 
 declare const time: {
   readonly tick: number;
-  readonly seconds: number;            // с начала игры
+  readonly seconds: number;            // с начала игры @en since the start of the game
   readonly daytime: number;            // 0..1
   isNight(): boolean;
 };
@@ -688,7 +862,10 @@ declare const world: {
     isDone(tech: string): boolean;
   };
   stats: {
-    /** Сколько предмета команда произвела / потратила за период. */
+    /**
+     * Сколько предмета команда произвела / потратила за период.
+     * @en How much of an item the team produced / consumed over the period.
+     */
     produced(item: Item, period?: "1m" | "10m" | "1h"): number;
     consumed(item: Item, period?: "1m" | "10m" | "1h"): number;
   };
@@ -703,22 +880,22 @@ declare class ActionError extends Error {
 }
 
 type ErrorCode =
-  | "no-path"            // пути нет
-  | "stuck"              // путь есть, но проехать не дают (застряла)
-  | "out-of-reach"       // цель дальше досягаемости — сначала move
-  | "out-of-sight"       // состояние цели не видно — подъехать или спросить того, кто видит
-  | "invalid-target"     // цель уничтожена или не существует
-  | "no-fuel"            // кончилась энергия
-  | "no-ammo"            // кончились патроны
-  | "cargo-full"         // груз полон
-  | "not-enough-items"   // в грузе нет столько предметов
-  | "target-full"        // в здание больше не влезает
-  | "no-resource"        // рядом нет такого месторождения
-  | "cancelled"          // действие прервали (новый приказ, остановка программы)
-  | "not-researched"     // функция ещё не открыта
-  | "timeout"            // истёк таймаут
-  | "not-serializable"   // попытка передать функцию или экземпляр класса
-  | "limit-exceeded";    // превышен лимит (стек, память, размер сообщения, примитивы табло)
+  | "no-path"            // пути нет @en no path
+  | "stuck"              // путь есть, но проехать не дают (застряла) @en there is a path, but the way is blocked (stuck)
+  | "out-of-reach"       // цель дальше досягаемости — сначала move @en the target is out of reach — move first
+  | "out-of-sight"       // состояние цели не видно — подъехать или спросить того, кто видит @en the target's state is not visible — drive closer or ask someone who sees it
+  | "invalid-target"     // цель уничтожена или не существует @en the target is destroyed or does not exist
+  | "no-fuel"            // кончилась энергия @en out of energy
+  | "no-ammo"            // кончились патроны @en out of ammo
+  | "cargo-full"         // груз полон @en the cargo is full
+  | "not-enough-items"   // в грузе нет столько предметов @en not enough items in the cargo
+  | "target-full"        // в здание больше не влезает @en the building can't take any more
+  | "no-resource"        // рядом нет такого месторождения @en no such resource patch nearby
+  | "cancelled"          // действие прервали (новый приказ, остановка программы) @en the action was interrupted (a new order, the program stopped)
+  | "not-researched"     // функция ещё не открыта @en the function is not researched yet
+  | "timeout"            // истёк таймаут @en the timeout expired
+  | "not-serializable"   // попытка передать функцию или экземпляр класса @en tried to pass a function or a class instance
+  | "limit-exceeded";    // превышен лимит (стек, память, размер сообщения, примитивы табло) @en a limit was exceeded (stack, memory, message size, display primitives)
 ```
 
 ## Модели машин

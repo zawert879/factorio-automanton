@@ -26,7 +26,7 @@ if (assets.missing.length > 0) {
 }
 
 // Типы API (automaton.d.ts) — их читает проверка типов компилятора (src/lang/check.ts).
-execFileSync(process.execPath, [join(root, "tools", "dts", "generate.mjs")], { stdio: "inherit" })
+execFileSync(process.execPath, [join(root, "tools", "dts", "generate.mjs"), "--require-en"], { stdio: "inherit" })
 
 // Локаль: ru и en совпадают, ключи из кода есть.
 const locale = checkLocale(root)

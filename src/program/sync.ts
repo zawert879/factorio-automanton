@@ -19,7 +19,7 @@
 import { CustomCommandData, LuaPlayer, PlayerIndex } from "factorio:runtime"
 import { onEvent, onTick } from "../events"
 import { Diagnostic } from "../lang/lexer"
-import { DTS, SYNC_TOOL, SYNC_TOOL_HASH, TS_PLUGIN, TSCONFIG } from "../gui/dts.generated"
+import { DTS, DTS_EN, SYNC_TOOL, SYNC_TOOL_HASH, TS_PLUGIN, TSCONFIG } from "../gui/dts.generated"
 import {
   deleteProgram,
   findProgram,
@@ -352,7 +352,8 @@ const udpDisabled = new LuaSet<number>()
 export function writeVsCodeFolder(player: LuaPlayer): string {
   const dir = syncFolder(player.force.name)
   const write = (path: string, text: string) => helpers.write_file(`${dir}/${path}`, text, false, player.index)
-  write("automaton.d.ts", DTS)
+  // Описания функций — на языке игрока (18.4), как и сообщения плагина.
+  write("automaton.d.ts", player.locale === "ru" ? DTS : DTS_EN)
   // Сообщения плагина — на языке игрока.
   write("tsconfig.json", string.gsub(TSCONFIG, '"lang": "ru"', `"lang": "${player.locale === "ru" ? "ru" : "en"}"`)[0])
   write(".automaton/node_modules/automaton-ts-plugin/package.json", '{ "name": "automaton-ts-plugin", "version": "1.0.0", "main": "index.js" }\n')

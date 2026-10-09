@@ -52,7 +52,7 @@ import { onRefreshResult, onRefreshTimeout, requestRefresh, writeVsCodeFolder } 
 import { guiOf, onGuiChange, onGuiClick, onGuiSelection, titlebar } from "./common"
 import { diagnosticMessage, diagnosticText } from "./diagnostics"
 import { closeExchange, registerExchangeWindows } from "./exchange"
-import { DTS } from "./dts.generated"
+import { DTS, DTS_EN } from "./dts.generated"
 import { folderItem, LIBRARY_COLOR, programTree, TreeEntry } from "./tree"
 
 const FRAME = "automaton-programs"
@@ -466,7 +466,7 @@ export function showTypes(player: LuaPlayer): void {
   const help = frame.add({ type: "label", caption: ["automaton-gui.types-help"] })
   help.style.single_line = false
   help.style.maximal_width = 760
-  const text = frame.add({ type: "text-box", text: DTS, style: "automaton_types" })
+  const text = frame.add({ type: "text-box", text: player.locale === "ru" ? DTS : DTS_EN, style: "automaton_types" })
   text.read_only = true
   text.word_wrap = false
   text.focus()
