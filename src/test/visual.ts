@@ -12,6 +12,7 @@ import { guiOf } from "../gui/common"
 import { openMachine } from "../gui/machine"
 import { checkFromWindow, closePrograms, editViewLine, openPrograms, publishFromWindow, showTypes } from "../gui/programs"
 import { openExport, openImport, pasteImport } from "../gui/exchange"
+import { openHelp } from "../gui/help"
 import { openPicker } from "../gui/picker"
 import { assignProgram } from "../program/machines"
 import { findProgram, publish, publishProgram } from "../program/store"
@@ -265,6 +266,21 @@ for (let x = 10; x < 86; x++) c.pixel(x, 54, x % 2 === 0 ? "green" : "red")`,
     }
   }
   if (tick === 235) guiShot("picker")
+  // Справка в игре (18.5): «Первые шаги» и найденная функция с примером раздела.
+  if (tick === 236) {
+    const player = game.get_player(1 as PlayerIndex)
+    if (player !== undefined) {
+      player.gui.screen["automaton-picker"]?.destroy()
+      player.opened = undefined
+      openHelp(player)
+    }
+  }
+  if (tick === 237) guiShot("help")
+  if (tick === 238) {
+    const player = game.get_player(1 as PlayerIndex)
+    if (player !== undefined) openHelp(player, "mine")
+  }
+  if (tick === 239) guiShot("help-mine")
   // Дерево технологий (этап 6): технологии автоматонов на месте «Логистики». Экран технологий в одиночной
   // игре ставит её на паузу — поэтому снимок последний, в том же тике (shot.mjs ждёт файлы ещё пару секунд).
   if (tick === 240) {

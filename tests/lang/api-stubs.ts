@@ -104,6 +104,7 @@ const meFields: Record<string, (this: void) => Val> = {
   weapon: () => ({ ammo: { count: 30 } }),
   cargo: () => inventory(arr({ name: "iron-plate", count: 8 })),
   tank: () => ({ fluid: "water", amount: 0, capacity: 1000 }),
+  model: () => "worker-mk2",
 }
 for (const [name, fn] of Object.entries(meFields)) hostGetters.me[name] = fn
 hostSetters.me.label = (_o: Val, v: Val) => log.push(`label ${tostring(v)}`)
@@ -122,6 +123,20 @@ hostMethods.scan.items = () => arr()
 hostMethods.scan.water = () => arr()
 defineHostObject("map")
 hostMethods.map.tag = () => undefined
+
+// Сигналы, время и мир
+defineHostObject("signals")
+hostMethods.signals.read = () => 500
+hostMethods.signals.readAll = () => ({})
+hostMethods.signals.write = () => log.push("signals")
+defineHostObject("time")
+hostGetters.time.tick = () => 600
+hostGetters.time.seconds = () => 10
+hostGetters.time.daytime = () => 0.5
+hostMethods.time.isNight = () => false
+defineHostObject("world")
+hostMethods.world.recipe = () => ({ ingredients: arr({ name: "iron-plate", count: 2 }), products: arr({ name: "iron-gear-wheel", count: 1 }), seconds: 0.5 })
+hostMethods.world.item = () => ({ stackSize: 100, fuelValue: 0 })
 
 // Доска и задачи
 const boardValues: Record<string, Val> = {}
@@ -185,6 +200,9 @@ const blocking: Record<string, (this: void, ...args: Val[]) => Val> = {
   drain: () => 100,
   reload: () => undefined,
   refuel: () => undefined,
+  charge: () => undefined,
+  guard: () => undefined,
+  canReach: () => true,
   patrol: () => undefined,
   request: () => 10,
   receive: (topic: Val) => {

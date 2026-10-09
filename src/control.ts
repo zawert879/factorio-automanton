@@ -19,6 +19,7 @@ import { initSchema, migrate } from "./migrations"
 import { initDemoStorage, registerDemo } from "./demo"
 import { onEvent } from "./events"
 import { closeModWindows, registerGuiEvents } from "./gui/common"
+import { registerHelpWindow } from "./gui/help"
 import { registerMachineWindow } from "./gui/machine"
 import { registerProgramsWindow } from "./gui/programs"
 import { registerPicker } from "./gui/picker"
@@ -95,6 +96,7 @@ registerAlerts()
 registerGuiEvents()
 registerMachineWindow()
 registerProgramsWindow()
+registerHelpWindow()
 registerPicker()
 registerAssignTools()
 registerComms()

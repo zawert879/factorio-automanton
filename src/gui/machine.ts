@@ -30,6 +30,7 @@ import { stepMachine } from "../program/scheduler"
 import { loadedProgram } from "../program/store"
 import { formatValue } from "../program/api/output"
 import { guiOf, titlebar, onGuiClick, onGuiConfirm } from "./common"
+import { closeHelp } from "./help"
 import { closePicker, onProgramPicked, openPicker } from "./picker"
 import { closePrograms, openPrograms } from "./programs"
 
@@ -279,6 +280,7 @@ export function registerMachineWindow(): void {
     if (e.element.name === FRAME) closeMachine(player)
     else if (e.element.name === "automaton-programs") closePrograms(player)
     else if (e.element.name === "automaton-picker") closePicker(player)
+    else if (e.element.name === "automaton-help") closeHelp(player)
   })
   onTick((tick) => {
     if (tick % REFRESH_TICKS === 0) refreshAll()

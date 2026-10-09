@@ -185,6 +185,13 @@ declare function chat(text: string): void;
 declare function alert(text: string): void;
 ```
 
+```ts
+// Что везёт машина — в консоль, игрокам — облачко над ней
+print("груз:", me.cargo.items());
+say(`Везу ${me.cargo.count()} предметов`, 5);
+if (me.fuel < 0.1) alert(`${me.name}: кончается топливо`);
+```
+
 ## Своя машина (`me`)
 
 ```ts
@@ -289,6 +296,13 @@ declare function follow(target: Robot | Entity, until: () => boolean): boolean;
 declare function goHome(): void;
 ```
 
+```ts
+// Доехать до метки «склад», а если пути нет — вернуться домой
+const depot = marker("склад");
+if (canReach(depot)) move(depot, { radius: 2 });
+else goHome();
+```
+
 ## Предметы
 
 ```ts
@@ -327,6 +341,14 @@ declare function drop(item: Item, count?: number): number;
  * @en Hand items to another machine within me.reach, without a chest.
  */
 declare function give(to: Robot, item: Item, count?: number): number;
+```
+
+```ts
+// Накопать 20 угля и сложить в ближайший сундук
+mine("coal", 20);
+const chest = scan.entities({ type: "container" })[0];
+move(chest);
+put(chest, "coal");
 ```
 
 ## Здания
@@ -389,6 +411,14 @@ declare function deconstruct(target: Entity): void;
  * @en [Construction] Rotate a building.
  */
 declare function rotate(target: Entity, reverse?: boolean): void;
+```
+
+```ts
+// Печь у метки «печь»: забрать готовые плиты, без топлива — подложить угля
+move(marker("печь"), { radius: 2 });
+const furnace = scan.entities({ type: "furnace" })[0];
+take(furnace, "iron-plate");
+if (furnace.status === "no-fuel") put(furnace, "coal", 5);
 ```
 
 - Всё — в радиусе `me.reach` (иначе `out-of-reach`), около полсекунды на действие.
@@ -459,6 +489,14 @@ declare function refuel(item?: Item): void;
  * @en Mk2+: drive to a station (by default the nearest visible one) and charge fully.
  */
 declare function charge(station?: Entity): void;
+```
+
+```ts
+// Mk1 подкладывает уголь из груза, Mk2 и выше — едут на зарядную станцию
+if (me.fuel < 0.2) {
+  if (me.model === "worker-mk1") refuel("coal");
+  else charge();
+}
 ```
 
 Mk1 жжёт топливо из топливного слота; Mk2 и Mk3 работают от аккумулятора (10 и 25 МДж) и топливо
@@ -556,6 +594,13 @@ declare const map: {
   tag(at: Position, text: string, icon?: Item): void;
   untag(at: Position): void;
 };
+```
+
+```ts
+// Все печи зоны «плавильня»; найденное месторождение — метка на карте для игроков
+for (const furnace of find("stone-furnace", zone("плавильня"))) print(furnace.status);
+const patches = scan.resources();
+if (patches.length > 0) map.tag(patches[0].center, `${patches[0].item}: ${patches[0].amount}`, patches[0].item);
 ```
 
 ## Связь
@@ -705,6 +750,17 @@ interface Task<T extends Value> {
 }
 ```
 
+```ts
+// Учёт на доске, работа — из очереди «доставка»
+board.increment("уголь", 20);
+tasks.push("доставка", { item: "coal", to: "котельная" });
+const task = tasks.next<{ item: Item; to: string }>("доставка", { timeout: 30 });
+if (task !== null) {
+  move(marker(task.data.to), { radius: 2 });
+  task.done();
+}
+```
+
 ## Табло
 
 `[Табло]` открывает сущность «Табло»: малое — 3×2 клетки, 96×64 пикселя; большое — 6×4 клетки,
@@ -756,6 +812,17 @@ type Color =
 type Cell = string | number | { text: string; color?: Color; icon?: Item };
 ```
 
+```ts
+// Табло «склад»: заголовок и полоска — сколько угля в сундуке зоны «склад»
+const screen = display("склад");
+const chest = find("wooden-chest", zone("склад"))[0];
+screen.frame(() => {
+  screen.clear("black");
+  screen.text(4, 4, "Склад", { color: "yellow" });
+  screen.bar(4, 20, screen.width - 8, 6, chest.count("coal") / 1600, "green");
+});
+```
+
 **Ограничения.** До 2 000 примитивов на табло; соседние пиксели одного цвета в строке склеиваются в один
 примитив. Кадр (`frame`) — не чаще 10 раз в секунду (чаще — показывается последний, когда подойдёт время);
 рисуются только изменившиеся примитивы. Табло называют при установке; переименовать — `/am-name` под курсором.
@@ -799,6 +866,12 @@ declare function patrol(points: Target[], until?: () => boolean): void;
 declare function reload(ammo?: Item): void;
 ```
 
+```ts
+// Охрана: зарядить оружие и стоять у поста, пока не наступит ночь
+reload();
+guard(marker("пост"), { radius: 15, until: () => time.isNight() });
+```
+
 - Боевой Mk1 — пулемёт (магазины: `firearm-magazine` 5 урона за выстрел, `piercing-rounds-magazine` 8,
   `uranium-rounds-magazine` 24), дальность 15, 350 здоровья; Mk2 — ракетомёт (`rocket` 200, `explosive-rocket` 300),
   дальность 24, 700 здоровья. Исследования урона игры действуют. Выстрел тратит один заряд из оружейного
@@ -826,6 +899,13 @@ declare const signals: {
    */
   write(at: Marker, values: Record<string, number>): void;
 };
+```
+
+```ts
+// Сигнальная метка «бак»: воды меньше 1000 — выставить в сеть сигнал P
+const tank = marker("бак");
+move(tank, { radius: 2 });
+if (signals.read(tank, "water") < 1000) signals.write(tank, { "signal-P": 1 });
 ```
 
 ## Время и мир
@@ -872,6 +952,16 @@ declare const world: {
 };
 ```
 
+```ts
+// Ночью — домой и ждать утра; рецепт — из справочника игры
+if (time.isNight()) {
+  goHome();
+  waitUntil(() => !time.isNight(), { every: 10 });
+}
+const gear = world.recipe("iron-gear-wheel");
+if (gear !== null) print("шестерня из:", gear.ingredients);
+```
+
 ## Ошибки
 
 ```ts
@@ -896,6 +986,16 @@ type ErrorCode =
   | "timeout"            // истёк таймаут @en the timeout expired
   | "not-serializable"   // попытка передать функцию или экземпляр класса @en tried to pass a function or a class instance
   | "limit-exceeded";    // превышен лимит (стек, память, размер сообщения, примитивы табло) @en a limit was exceeded (stack, memory, message size, display primitives)
+```
+
+```ts
+// Сундук полон — подождать, остальные ошибки — дальше (машина остановится с текстом ошибки)
+try {
+  put(scan.entities({ type: "container" })[0], "coal");
+} catch (e) {
+  if (e instanceof ActionError && e.code === "target-full") wait(5);
+  else throw e;
+}
 ```
 
 ## Модели машин

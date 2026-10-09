@@ -1,6 +1,6 @@
 // Интерфейс (этап 5): клавиша открытия окна машины, моноширинный шрифт и стили редактора кода.
 import { PrototypeData } from "factorio:common"
-import { CustomInputPrototype, FontPrototype } from "factorio:prototype"
+import { CustomInputPrototype, FontPrototype, ShortcutPrototype } from "factorio:prototype"
 
 declare const data: PrototypeData
 
@@ -34,7 +34,25 @@ const pasteSettings: CustomInputPrototype = {
   consuming: "none",
 }
 
-data.extend([open, copySettings, pasteSettings, codeFont, consoleFont])
+// Справка в игре (18.5): ярлык на панели быстрого доступа и F1 (меняется в настройках управления).
+const helpShortcut: ShortcutPrototype = {
+  type: "shortcut",
+  name: "automaton-help",
+  action: "lua",
+  toggleable: true,
+  icon: "__core__/graphics/icons/unknown.png",
+  icon_size: 64,
+  small_icon: "__core__/graphics/icons/unknown.png",
+  small_icon_size: 64,
+}
+const helpInput: CustomInputPrototype = {
+  type: "custom-input",
+  name: "automaton-help",
+  key_sequence: "F1",
+  consuming: "none",
+}
+
+data.extend([open, copySettings, pasteSettings, codeFont, consoleFont, helpShortcut, helpInput])
 
 const styles = data.raw["gui-style"]!.default as Record<string, unknown>
 // Редактор кода: размер задаётся по экрану игрока; отступы фиксированы — номера строк рядом

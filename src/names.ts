@@ -19,6 +19,9 @@ export const SIGNAL_MARKER = "automaton-signal-marker"
 export const MARKER_ENTITIES: readonly string[] = [MARKER, SIGNAL_MARKER]
 /** «Программатор» — инструмент выделения зон: zone("имя"). */
 export const PROGRAMMER = "automaton-programmer"
+/** Справка в игре (18.5): ярлык на панели быстрого доступа и клавиша (F1). */
+export const HELP_SHORTCUT = "automaton-help"
+export const HELP_INPUT = "automaton-help"
 
 /** Что делает машина — от этого зависит анимация её тела. */
 export type Activity = "idle" | "run" | "mine"

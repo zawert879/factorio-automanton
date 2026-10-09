@@ -96,6 +96,120 @@ const dts = header + "\n" + localize(declarations.join("\n"), "ru")
 const dtsEn = headerEn + "\n" + localize(declarations.join("\n"), "en")
 writeFileSync(join(root, "mod", "automaton.d.ts"), dts)
 writeFileSync(join(root, "mod", "automaton.en.d.ts"), dtsEn)
+// Справка в игре (18.5): разделы docs/API.md с объявлениями → записи (объявление верхнего уровня: имя, текст,
+// описание) на двух языках и пример раздела (первый блок кода раздела без объявлений).
+const SECTION_EN = {
+  "Базовые типы": "Basic types",
+  "Вывод": "Output",
+  "Своя машина (me)": "Your machine (me)",
+  "Движение": "Movement",
+  "Предметы": "Items",
+  "Здания": "Buildings",
+  "Жидкости": "Fluids",
+  "Энергия": "Energy",
+  "Зрение": "Vision",
+  "Карта": "Map",
+  "Связь": "Messaging",
+  "Доска и задачи": "Board and tasks",
+  "Табло": "Displays",
+  "Бой": "Combat",
+  "Сигналы": "Signals",
+  "Время и мир": "Time and world",
+  "Ошибки": "Errors",
+  "Модели машин": "Machine models",
+  "Исследования": "Research",
+}
+
+/** Объявления верхнего уровня блока: строки до следующего declare / interface / type / комментария на глубине 0. */
+function statements(block) {
+  const out = []
+  let cur = []
+  let code = false
+  let depth = 0
+  let inDoc = false
+  const flush = () => {
+    if (cur.length > 0 && code) out.push(cur.join("\n"))
+    if (code) cur = []
+    code = false
+  }
+  for (const line of block.split("\n")) {
+    const trimmed = line.trim()
+    if (depth === 0 && !inDoc) {
+      if (trimmed === "") {
+        if (code) flush()
+        continue
+      }
+      if (code && /^(declare |interface |type |\/\*\*|\/\/)/.test(line)) flush()
+    }
+    cur.push(line)
+    if (inDoc || trimmed.startsWith("/**")) {
+      inDoc = !trimmed.endsWith("*/")
+      continue
+    }
+    const bare = line.replace(/\/\/.*$/, "").replace(/"[^"]*"/g, "")
+    if (!trimmed.startsWith("//")) code = true
+    depth += (bare.match(/[{([]/g) ?? []).length - (bare.match(/[})\]]/g) ?? []).length
+  }
+  flush()
+  return out
+}
+
+function entryOf(statement) {
+  const lines = statement.split("\n")
+  const docLines = []
+  while (lines.length > 0 && /^\s*(\/\*\*|\*|\/\/)/.test(lines[0])) docLines.push(lines.shift())
+  const signature = lines.join("\n")
+  const name = /^(?:declare (?:function|const|let|class|namespace)|interface|type) ([A-Za-z_$][\w$]*)/m.exec(signature)?.[1]
+  const doc = docLines.map((l) => l.replace(/^\s*(\/\*\*|\*\/|\*|\/\/)\s?/, "").replace(/\*\/$/, "").trim()).filter(Boolean).join(" ")
+  const keys = [...new Set([...signature.matchAll(/\b([A-Za-z_$][\w$]*)\s*[(:?]/g)].map((m) => m[1].toLowerCase()))].join(" ")
+  return { name, signature, doc, keys }
+}
+
+const guide = readFileSync(join(root, "docs", "PLAYER_GUIDE.md"), "utf8")
+const firstBlock = /## Первые 15 минут[\s\S]*?\n( *)```ts\n([\s\S]*?)\n *```/.exec(guide)
+if (firstBlock === null) throw new Error("PLAYER_GUIDE.md: нет кода в «Первые 15 минут»")
+const firstProgram = firstBlock[2].split("\n").map((l) => l.slice(firstBlock[1].length)).join("\n")
+const help = []
+{
+  let section
+  for (const part of api.split(/^## /m).slice(1)) {
+    const title = part.split("\n")[0].replace(/`/g, "").trim()
+    section = { title: [title, SECTION_EN[title] ?? title], entries: [], example: undefined }
+    for (const m of part.matchAll(/```ts\n([\s\S]*?)```/g)) {
+      const body = m[1]
+      const isDeclaration = /\bdeclare\b/.test(body) || body.startsWith("type Item")
+      if (!isDeclaration) {
+        section.example ??= body.replace(/\n$/, "")
+        continue
+      }
+      const ru = statements(localize(body, "ru")).map(entryOf)
+      const en = statements(localize(body, "en")).map(entryOf)
+      ru.forEach((entry, i) => {
+        if (entry.name === undefined) return
+        const last = section.entries[section.entries.length - 1]
+        // Перегрузки (несколько declare function с одним именем подряд) — одна запись.
+        if (last !== undefined && last.name === entry.name) {
+          last.signature = [`${last.signature[0]}\n${entry.signature}`, `${last.signature[1]}\n${en[i].signature}`]
+          return
+        }
+        section.entries.push({ name: entry.name, keys: entry.keys, signature: [entry.signature, en[i].signature], doc: [entry.doc, en[i].doc] })
+      })
+    }
+    if (section.entries.length === 0) continue
+    if (SECTION_EN[title] === undefined) untranslated.push(`раздел «${title}» (SECTION_EN в tools/dts/generate.mjs)`)
+    help.push(section)
+  }
+}
+writeFileSync(
+  join(root, "src", "gui", "help.generated.ts"),
+  "// Создаётся tools/dts/generate.mjs из docs/API.md — не править руками. Пары строк — [русский, английский].\n" +
+    "export interface HelpEntry { name: string; keys: string; signature: [string, string]; doc: [string, string] }\n" +
+    "export interface HelpSection { title: [string, string]; entries: HelpEntry[]; example?: string }\n" +
+    `export const HELP: HelpSection[] = ${JSON.stringify(help, null, 1)}\n` +
+    // «Первые шаги» в справке: первая программа из руководства игрока («Первые 15 минут»).
+    `export const FIRST_PROGRAM = ${JSON.stringify(firstProgram)}\n`,
+)
+
 // Перевод описаний обязателен: npm test (--require-en) и npm run dts (--check) падают на непереведённом.
 if (untranslated.length > 0) {
   const text = `docs/API.md: без перевода (@en) — ${untranslated.length}:\n${untranslated.map((t) => `  ${t}`).join("\n")}`

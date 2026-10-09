@@ -29,7 +29,7 @@ import {
   TextBoxGuiElement,
   TextFieldGuiElement,
 } from "factorio:runtime"
-import { highlight, markError, Paint, richLine } from "../lang/highlight"
+import { highlight, markError, richLine } from "../lang/highlight"
 import { Diagnostic } from "../lang/lexer"
 import { ulen } from "../lang/runtime/strings"
 import { assignProgram } from "../program/machines"
@@ -49,6 +49,7 @@ import {
   rightsDenied,
 } from "../program/store"
 import { onRefreshResult, onRefreshTimeout, requestRefresh, writeVsCodeFolder } from "../program/sync"
+import { PALETTE } from "./codeView"
 import { guiOf, onGuiChange, onGuiClick, onGuiSelection, titlebar } from "./common"
 import { diagnosticMessage, diagnosticText } from "./diagnostics"
 import { closeExchange, registerExchangeWindows } from "./exchange"
@@ -68,19 +69,6 @@ const VIEW_MAX_LINES = 2000
 /** Ширина номеров строк в просмотре (стиль automaton_code_number) и отступ справа. */
 const VIEW_GUTTER = 52 + 6
 
-/** Цвета подсветки на светлом фоне поля. */
-const PALETTE: Record<Paint, string | undefined> = {
-  plain: undefined,
-  keyword: "#6a35b8",
-  control: "#8e2a9c",
-  constant: "#0b6e75",
-  number: "#0b6e75",
-  string: "#a1420b",
-  comment: "#6f7a52",
-  function: "#1d52a3",
-  type: "#1f7a4d",
-  error: "#d0201a",
-}
 const ERROR_TEXT = "#c0392b"
 
 const TEMPLATE = `// Новая программа. Все функции с описаниями — «Типы для VS Code»; руководство и примеры —
