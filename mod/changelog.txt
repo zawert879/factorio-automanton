@@ -1,4 +1,14 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.6.0
+Date: 2026-10-10
+  Features:
+    - Fuel slot in the machine window: standing next to a machine, click it with fuel in hand to refuel the machine, with an empty hand to take the fuel out.
+    - Cargo in the machine window: click with an item in hand to put it into the cargo, click an item with an empty hand to take it to your inventory.
+    - refuel(item, robot): a machine refuels another Mk1 machine within reach from its own cargo; the other machine's program does not have to do anything.
+    - Other machines' fuel is visible to programs: robot.fuel (0..1), within sight.
+  Bugfixes:
+    - The player guide said fuel goes "into the machine window", but there was no way to do it.
+---------------------------------------------------------------------------------------------------
 Version: 0.5.0
 Date: 2026-10-09
   Major Features:
