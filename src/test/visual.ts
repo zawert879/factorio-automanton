@@ -11,6 +11,7 @@ import { renameDisplay } from "../world/displays"
 import { guiOf } from "../gui/common"
 import { openMachine } from "../gui/machine"
 import { checkFromWindow, closePrograms, editViewLine, openPrograms, publishFromWindow, showTypes } from "../gui/programs"
+import { openExport, openImport, pasteImport } from "../gui/exchange"
 import { openPicker } from "../gui/picker"
 import { assignProgram } from "../program/machines"
 import { findProgram, publish, publishProgram } from "../program/store"
@@ -228,6 +229,27 @@ for (let x = 10; x < 86; x++) c.pixel(x, 54, x % 2 === 0 ? "green" : "red")`,
     }
   }
   if (tick === 227) guiShot("programs-check")
+  // Обмен программами строкой (18.3): экспорт с модулем, отмеченным самим; импорт с совпадающим именем.
+  if (tick === 228) {
+    const player = game.get_player(1 as PlayerIndex)
+    const main = findProgram("Добыча/Удвоитель", "player")
+    if (player !== undefined && main !== undefined) openExport(player, main.id)
+  }
+  if (tick === 229) guiShot("export")
+  if (tick === 230) {
+    const player = game.get_player(1 as PlayerIndex)
+    if (player !== undefined) {
+      player.gui.screen["automaton-export"]?.destroy()
+      openImport(player)
+      const programs = [
+        { name: "lib/Счёт", source: findProgram("lib/Счёт", "player")!.source },
+        { name: "Добыча/Удвоитель", source: `import { twice } from "../lib/Счёт"\nprint(twice(21))` },
+        { name: "Добыча/Утроитель", source: `import { twice } from "../lib/Счёт"\nprint(twice(3) + 3)` },
+      ]
+      pasteImport(player, `am1:${helpers.encode_string(helpers.table_to_json({ v: 1, programs }))}`)
+    }
+  }
+  if (tick === 231) guiShot("import")
   if (tick === 230) {
     const player = game.get_player(1 as PlayerIndex)
     if (player !== undefined) writeVsCodeFolder(player)

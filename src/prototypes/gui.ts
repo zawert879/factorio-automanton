@@ -72,6 +72,14 @@ styles.automaton_console_line = {
   single_line: false,
   maximal_width: 560,
 }
+// Строка обмена программами (18.3): переносится по ширине окна.
+styles.automaton_exchange = {
+  type: "textbox_style",
+  font: "automaton-code",
+  rich_text_setting: "disabled",
+  width: 520,
+  height: 90,
+}
 styles.automaton_json = {
   type: "textbox_style",
   font: "automaton-code",

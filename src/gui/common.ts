@@ -1,6 +1,7 @@
 // Общее для окон мода: разбор событий GUI по действию (tags.action элемента), заголовок окна.
 import { FrameGuiElement, LocalisedString, LuaGuiElement, LuaPlayer, PlayerIndex } from "factorio:runtime"
 import { onEvent } from "../events"
+import type { ExportWindow, ImportWindow } from "./exchange"
 import type { MachineWindow } from "./machine"
 import type { PickerWindow } from "./picker"
 import type { ProgramsWindow } from "./programs"
@@ -10,6 +11,9 @@ export interface GuiState {
   machine?: MachineWindow
   programs?: ProgramsWindow
   picker?: PickerWindow
+  /** Обмен программами строкой (18.3). */
+  exportWindow?: ExportWindow
+  importWindow?: ImportWindow
   /** Недавно выбранные программы (окно выбора), новые первыми. */
   recent?: number[]
   /** «Обновить из папки»: программы без файлов, о которых спросили «удалить?». */
@@ -28,11 +32,12 @@ export function guiOf(player: LuaPlayer): GuiState {
 
 type Handler = (this: void, player: LuaPlayer, element: LuaGuiElement) => void
 
-const handlers: Record<"click" | "change" | "confirm" | "selection", Record<string, Handler>> = {
+const handlers: Record<"click" | "change" | "confirm" | "selection" | "checked", Record<string, Handler>> = {
   click: {},
   change: {},
   confirm: {},
   selection: {},
+  checked: {},
 }
 
 export function onGuiClick(action: string, handler: Handler): void {
@@ -46,6 +51,9 @@ export function onGuiConfirm(action: string, handler: Handler): void {
 }
 export function onGuiSelection(action: string, handler: Handler): void {
   handlers.selection[action] = handler
+}
+export function onGuiChecked(action: string, handler: Handler): void {
+  handlers.checked[action] = handler
 }
 
 function dispatch(kind: keyof typeof handlers, element: LuaGuiElement | undefined, playerIndex: PlayerIndex): void {
@@ -62,6 +70,7 @@ export function registerGuiEvents(): void {
   onEvent(defines.events.on_gui_text_changed, (e) => dispatch("change", e.element, e.player_index))
   onEvent(defines.events.on_gui_confirmed, (e) => dispatch("confirm", e.element, e.player_index))
   onEvent(defines.events.on_gui_selection_state_changed, (e) => dispatch("selection", e.element, e.player_index))
+  onEvent(defines.events.on_gui_checked_state_changed, (e) => dispatch("checked", e.element, e.player_index))
 }
 
 /** Заголовок окна: подпись, перетаскивание, кнопка закрытия. */
@@ -102,6 +111,8 @@ export function closeModWindows(): void {
     state.machine = undefined
     state.programs = undefined
     state.picker = undefined
+    state.exportWindow = undefined
+    state.importWindow = undefined
     state.refreshMissing = undefined
   }
 }

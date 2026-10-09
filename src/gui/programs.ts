@@ -29,7 +29,7 @@ import {
   TextBoxGuiElement,
   TextFieldGuiElement,
 } from "factorio:runtime"
-import { escapeRichText, highlight, markError, Paint, richLine } from "../lang/highlight"
+import { highlight, markError, Paint, richLine } from "../lang/highlight"
 import { Diagnostic } from "../lang/lexer"
 import { ulen } from "../lang/runtime/strings"
 import { assignProgram } from "../program/machines"
@@ -50,6 +50,8 @@ import {
 } from "../program/store"
 import { onRefreshResult, onRefreshTimeout, requestRefresh, writeVsCodeFolder } from "../program/sync"
 import { guiOf, onGuiChange, onGuiClick, onGuiSelection, titlebar } from "./common"
+import { diagnosticMessage, diagnosticText } from "./diagnostics"
+import { closeExchange, registerExchangeWindows } from "./exchange"
 import { DTS } from "./dts.generated"
 import { folderItem, LIBRARY_COLOR, programTree, TreeEntry } from "./tree"
 
@@ -220,6 +222,8 @@ export function openPrograms(player: LuaPlayer, programId?: number, robotId?: nu
   button(buttons, ["automaton-gui.vscode-folder"], "programs-vscode")
   const refresh = button(buttons, ["automaton-gui.refresh"], "programs-refresh")
   refresh.tooltip = ["automaton-gui.refresh-tooltip"]
+  button(buttons, ["automaton-gui.export-programs"], "programs-export").tooltip = ["automaton-gui.export-tooltip"]
+  button(buttons, ["automaton-gui.import-programs"], "programs-import").tooltip = ["automaton-gui.import-tooltip"]
 
   player.opened = frame
   const window: ProgramsWindow = {
@@ -260,6 +264,7 @@ export function closePrograms(player: LuaPlayer): void {
   if (state.programs?.frame.valid) state.programs.frame.destroy()
   state.programs = undefined
   player.gui.screen[TYPES_FRAME]?.destroy()
+  closeExchange(player)
 }
 
 function windowOf(player: LuaPlayer): ProgramsWindow | undefined {
@@ -418,19 +423,6 @@ function showNotes(window: ProgramsWindow, program: ProgramRecord): void {
   }
 }
 
-/** Ошибка компиляции понятным текстом: «[модуль:]строка:столбец текст». */
-export function diagnosticText(d: Diagnostic): LocalisedString {
-  return ["", `${d.module !== undefined ? `${d.module}:` : ""}${d.line}:${d.column}  `, diagnosticMessage(d)]
-}
-
-/** Текст ошибки без места; rich — для подписи с rich text (знаки кода в параметрах — как есть, не теги). */
-function diagnosticMessage(d: Diagnostic, rich = false): LocalisedString {
-  const params: LocalisedString[] = d.params.map((p, i) =>
-    d.code === "unsupported" && i === 0 ? [`automaton-feature.${p}`] : rich ? escapeRichText(tostring(p)) : tostring(p),
-  )
-  return [`automaton-diagnostic.${d.code}`, ...params]
-}
-
 function showErrors(window: ProgramsWindow, diagnostics: Diagnostic[]): void {
   window.errors.clear()
   window.errorLines = {}
@@ -519,6 +511,7 @@ function askDeleteMissing(player: LuaPlayer, missing: string[]): void {
 
 export function registerProgramsWindow(): void {
   registerAssign()
+  registerExchangeWindows()
   onRefreshResult((player, published, failed, missing) => showRefreshResult(player, published, failed, missing))
   onRefreshTimeout((player) => {
     player.print(["automaton-gui.refresh-timeout"])
