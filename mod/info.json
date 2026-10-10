@@ -1,11 +1,11 @@
 {
   "name": "automaton",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "title": "Automaton",
   "author": "zawert",
   "homepage": "https://github.com/zawert879/factorio-automanton",
   "factorio_version": "2.0",
-  "description": "Overhaul: belts, drills, inserters, logistic robots and the offshore pump are gone — programmable automatons do their work. Write programs in TypeScript right in the game or in VS Code: mining, smelting, fluids, construction, messaging, displays, combat, flying haulers.",
+  "description": "Overhaul: belts, drills, inserters, logistic robots and the offshore pump are gone — programmable automatons do their work. Write programs in TypeScript right in the game or in VS Code, or build them from nodes and wires: mining, smelting, fluids, construction, messaging, displays, combat, flying haulers.",
   "dependencies": [
     "base >= 2.0.0"
   ],

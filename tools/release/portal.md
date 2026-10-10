@@ -16,6 +16,7 @@ while (true) {
 ## What's inside
 
 - **Programmable machines.** Programs are compiled in the game and shared by the whole team; publishing a new version restarts the machines that run it. Errors are shown with line numbers, types are checked on publish.
+- **Graphs — programs without code**: build a program from nodes and wires, like Unreal blueprints, in the program's own workshop; nodes for the whole machine API, errors and debugging right on the nodes.
 - **Editor in the game** with syntax highlighting, a check without publishing, in-game help (F1), a debugger with breakpoints and variables, and **VS Code integration**: autocompletion, documentation on hover, publishing on save, a separate program folder per save.
 - **Sharing**: programs as a string (like blueprint strings); blueprints keep the machines' programs and parameters.
 - **Modules**: `import` / `export` between team programs, your own libraries, folders.
@@ -27,7 +28,7 @@ while (true) {
 
 ## Getting started
 
-Start a new freeplay game: you get two automatons and markers. Click a machine, press "Programs…" → "New", write a program (or paste one from the guide), publish it, assign it to the machine and press Run. **Press F1** in the game for help on every function, with examples.
+Start a new freeplay game: you get two automatons and markers. Click a machine, press "Programs…" → "New" (or "New graph" to build it from nodes), write a program (or paste one from the guide), publish it, assign it to the machine and press Run. **Press F1** in the game for help on every function, with examples.
 
 - [Player guide](https://github.com/zawert879/factorio-automanton/blob/main/docs/en/PLAYER_GUIDE.md) — first steps, recipes, progression, debugging
 - [Writing programs in VS Code](https://github.com/zawert879/factorio-automanton/blob/main/docs/en/VSCODE.md)

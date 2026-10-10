@@ -1,4 +1,17 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.7.0
+Date: 2026-10-10
+  Major Features:
+    - Graphs: build a program from nodes and wires, like Unreal blueprints, in the program's own workshop (Programs window → New graph). The palette has nodes for the whole machine API, plus If, loops, Try, variables and your own functions; red wires carry the flow, green wires carry data. Check and Publish show errors right on the nodes; the code built from the graph is shown read-only.
+  Features:
+    - Red and green wire buttons in the workshop palette (no Circuit network research needed).
+    - Move nodes with cut and paste (Ctrl+X, Ctrl+V): their wires move with them.
+    - Debugging in the workshop: nodes show where each machine running the program is; pick a machine to set breakpoints on nodes, step and continue.
+    - Graph programs travel in exchange strings together with their graph.
+    - The machine window shows the graph node next to the current line.
+  Info:
+    - Player guide: "Graphs: programs without code" (Russian and English).
+---------------------------------------------------------------------------------------------------
 Version: 0.6.0
 Date: 2026-10-10
   Features:

@@ -28,6 +28,7 @@ const GALLERY = [
   "docs/media/combat.gif",
   "docs/media/display.gif",
   "docs/media/editor.gif",
+  "docs/media/workshop.png",
   "docs/media/machine-window.png",
   "docs/media/picker.png",
 ]
