@@ -51,7 +51,9 @@ elseif step == 3 and wait > 20 then
   R.waitNode = waitNode
   startOut = remote.call(W, "pin", "sim/схема", 1, "out:next")
   waitIn = waitNode and remote.call(W, "pin", "sim/схема", waitNode, "in:exec")
-  player.cursor_stack.set_stack{name = "red-wire"}
+  -- Провод — кнопкой палитры (без исследования «Сеть цепей» у игры своих кнопок нет).
+  remote.call(W, "wire", player.index, "red-wire")
+  R.wireInHand = player.cursor_stack.valid_for_read and player.cursor_stack.name or "empty"
   step, wait = 4, 0
 -- 2. Красный провод: «Старт» → «Ждать».
 elseif step == 4 and startOut and at(startOut) then sim.control_press{control = "build", notify = false}; step, wait = 5, 0
@@ -132,6 +134,7 @@ const check = (ok, text) => {
 }
 check(r.enter === true && r.controller === 2 && r.surface.startsWith("automaton-workshop-") && r.character, "вход: режим без персонажа на поверхности мастерской")
 check(r.cursor === "blueprint" && r.afterPick === 2, "палитра: узел в руке чертежом, поставлен кликом")
+check(r.wireInHand === "red-wire", "кнопка палитры: красный провод в руке")
 check(arr(r.wires).includes(`1.next>${r.waitNode}.exec`), "красный провод кликами: «Старт» → «Ждать»")
 check(r.nodeWindow === true, "клик по узлу — окно настроек")
 check(r.afterPaste?.nodes === 2 && arr(r.afterPaste?.wires).length === 1 && r.afterPaste?.problems === 0, "вырезать и вставить: узел перенесён, провод цел")

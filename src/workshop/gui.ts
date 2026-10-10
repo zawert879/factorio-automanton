@@ -78,6 +78,12 @@ function openPalette(player: LuaPlayer): void {
   const visitor = visitorOf(player)
   const category = visitor?.category ?? "flow"
   const frame = player.gui.screen.add({ type: "frame", name: PALETTE, direction: "vertical", caption: ["automaton-workshop.palette-title"] })
+  // Провода — свои кнопки: кнопки игры на панели быстрого доступа появляются только с исследованием «Сеть цепей».
+  const wires = frame.add({ type: "flow", direction: "horizontal" })
+  for (const wire of ["red-wire", "green-wire"]) {
+    const button = wires.add({ type: "button", caption: [`automaton-workshop.${wire}`], tooltip: [`automaton-workshop.${wire}-tooltip`], tags: { action: "workshop-wire", wire } })
+    button.style.width = 113
+  }
   const index = math.max(1, CATEGORIES.indexOf(category as never) + 1)
   frame.add({
     type: "drop-down",
@@ -98,6 +104,14 @@ function openPalette(player: LuaPlayer): void {
   hint.style.maximal_width = 230
   hint.style.font_color = { r: 0.7, g: 0.7, b: 0.7 }
   frame.location = { x: math.floor(8 * player.display_scale), y: math.floor(120 * player.display_scale) }
+}
+
+/** Провод в руку (красный — порядок, зелёный — данные): клик по разъёму, клик по другому. */
+export function giveWire(player: LuaPlayer, wire: string): void {
+  const hand = player.cursor_stack
+  if (hand === undefined) return
+  hand.clear()
+  hand.set_stack({ name: wire })
 }
 
 /** Значения по умолчанию из настроек вида узла (имя, тип, оператор). */
@@ -330,6 +344,10 @@ export function registerWorkshopGui(): void {
   })
   onGuiClick("workshop-code-close", (player) => player.gui.screen[CODE_WINDOW]?.destroy())
   onGuiClick("workshop-node-close", (player) => closeNodeWindow(player))
+  onGuiClick("workshop-wire", (player, element) => {
+    const wire = (element.tags as unknown as { wire?: string }).wire
+    if (wire === "red-wire" || wire === "green-wire") giveWire(player, wire)
+  })
   onGuiClick("workshop-pick", (player, element) => {
     const ws = currentWorkshop(player)
     const kind = (element.tags as unknown as { kind?: string }).kind
@@ -440,6 +458,10 @@ function registerRemote(): void {
     exit: (index: number) => {
       const player = playerOf(index)
       if (player !== undefined) exitWorkshop(player)
+    },
+    wire: (index: number, wire: string) => {
+      const player = playerOf(index)
+      if (player !== undefined && currentWorkshop(player) !== undefined && (wire === "red-wire" || wire === "green-wire")) giveWire(player, wire)
     },
     pick: (index: number, kind: string) => {
       const player = playerOf(index)

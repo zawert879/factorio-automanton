@@ -214,7 +214,7 @@ the program's own area, which you enter without your character (it waits at the 
    right away, with a Start node on the floor.
 2. On the left is the **palette**: sections (flow, movement, items, team…) and nodes. Click a node to take it in hand
    and place it like a blueprint (Q to drop it).
-3. **Wires** — the red and green wire buttons on the shortcut bar: click one pin, then another.
+3. **Wires** — the Red and Green buttons at the top of the palette put a wire in your hand: click one pin, then another.
    **Red** is the flow: from Start along the "next" outputs, "yes" and "no" of If, "body" of loops.
    **Green** is data: what to mine, where to go, a condition.
 4. **Click a node** with an empty hand for its settings: values of inputs without a wire (an item, a number, a marker
