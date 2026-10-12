@@ -150,6 +150,13 @@ describe("мастерская", () => {
     expect(breakLine(program, say.id) !== undefined).toBe(true)
     const surface = game.get_surface("nauvis")!
     const position = { x: -770.5, y: 700.5 }
+    // Своя чистая площадка: на разных картах здесь бывают деревья и вода (машина встала бы рядом).
+    surface.request_to_generate_chunks(position, 1)
+    surface.force_generate_chunk_requests()
+    for (const e of surface.find_entities_filtered({ area: [[-774, 697], [-767, 704]] })) if (e.type !== "character") e.destroy()
+    const tiles = []
+    for (let x = -773; x < -767; x++) for (let y = 698; y < 703; y++) tiles.push({ name: "grass-1", position: { x, y } })
+    surface.set_tiles(tiles, true, true, true)
     surface.create_entity({ name: MODELS[0].placer, position, force: "player", raise_built: true })
     const robot = findRobot(surface.find_entities_filtered({ name: MODELS[0].entity, position, radius: 0.5 })[0])!
     assignProgram(robot, program)

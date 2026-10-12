@@ -12,6 +12,7 @@
 // или неизвестной функцией, рекурсия. Признак распространяется до неподвижной точки.
 import * as A from "./ast"
 import { BLOCKING_HOST_METHODS, Builtin, BUILTINS, HIGHER_ORDER_METHODS } from "./builtins"
+import { isHostClass } from "./hostClasses"
 import { Diagnostic } from "./lexer"
 import { ModuleUnit } from "./modules"
 
@@ -689,6 +690,9 @@ export function analyze(program: A.Program, units?: ModuleUnit[]): Analysis {
             else scope.fn.callsUnknown = true
           } else if (resolution !== undefined && resolution.builtin.kind !== "library-class") {
             report("not-a-class", [expr.callee.name], expr.callee)
+          } else if (resolution !== undefined && isHostClass(resolution.builtin.name)) {
+            // Объекты игры (19.2) создаёт только игра.
+            report("host-class-new", [expr.callee.name], expr.callee)
           }
         } else {
           walkExpr(expr.callee, scope)

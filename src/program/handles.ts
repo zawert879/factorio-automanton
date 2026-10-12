@@ -4,6 +4,9 @@
 //
 // Видимость: неизменное (id, имя, тип, позиция здания, valid) читается всегда; состояние — только
 // в поле зрения машины, иначе ActionError("out-of-sight").
+//
+// Классы (19.2): у обёртки здания __c — класс по типу прототипа (Furnace, Chest, …; враг — Enemy), свойства и
+// методы — из таблиц класса (src/lang/runtime/core.ts), они наследуют таблицы Building.
 import { LuaEntity, LuaInventory, MapPosition } from "factorio:runtime"
 import { currentAction } from "../automaton/actions"
 import { distanceToEntity } from "../automaton/actions"
@@ -13,7 +16,9 @@ import { robotPosition } from "../automaton/flight"
 import { modelOfRecord, robotVision } from "../automaton/models"
 import { isMoving } from "../automaton/movement"
 import { RobotRecord } from "../automaton/registry"
-import { defineHostObject, hostGetters, hostMethods, Val } from "../lang/runtime/core"
+import { defineHostObject, hostGetters, hostKindClass, hostMethods, hostSetters, Val } from "../lang/runtime/core"
+import { isHostSubclass } from "../lang/hostClasses"
+import { CHARGING_STATION } from "../names"
 import { actionError, currentRobot } from "./context"
 import { programArray, programPosition, readPosition } from "./values"
 
@@ -36,6 +41,55 @@ export function forgetEntityHandle(unitNumber: number): void {
   storage.handles.entities[unitNumber] = undefined
 }
 
+/** Класс здания по типу прототипа (4C); остальные здания — Building. */
+const CLASS_BY_TYPE: Record<string, string> = {
+  container: "Chest",
+  "logistic-container": "Chest",
+  furnace: "Furnace",
+  "assembling-machine": "Assembler",
+  "rocket-silo": "RocketSilo",
+  lab: "Lab",
+  boiler: "Boiler",
+  generator: "Generator",
+  reactor: "Reactor",
+  "storage-tank": "StorageTank",
+  pipe: "Pipe",
+  "pipe-to-ground": "Pipe",
+  pump: "Pipe",
+  "ammo-turret": "Turret",
+  "artillery-turret": "Turret",
+  "fluid-turret": "FlameTurret",
+  "cargo-wagon": "CargoWagon",
+  "fluid-wagon": "FluidWagon",
+  locomotive: "Locomotive",
+  car: "Vehicle",
+  "spider-vehicle": "Vehicle",
+}
+
+/** Класс объекта игры для обёртки здания: враги — Enemy, станция зарядки — по имени, остальное — по типу. */
+export function buildingClass(entity: LuaEntity): string {
+  if (entity.force.name === "enemy") return "Enemy"
+  if (entity.name === CHARGING_STATION) return "ChargingStation"
+  return CLASS_BY_TYPE[entity.type] ?? "Building"
+}
+
+/**
+ * Отбор зданий класса kind (zone.find(Furnace), scan.buildings({ kind: Chest })): фильтр для поиска движка
+ * (типы или имя; у Building — без фильтра) и проверка найденного.
+ */
+export function kindFilter(kind: string): { type?: string[]; name?: string } {
+  if (kind === "Building") return {}
+  if (kind === "ChargingStation") return { name: CHARGING_STATION }
+  const types: string[] = []
+  for (const [prototypeType, cls] of pairs(CLASS_BY_TYPE)) if (isHostSubclass(cls, kind)) types.push(prototypeType)
+  table.sort(types)
+  return { type: types }
+}
+
+export function isOfClass(entity: LuaEntity, kind: string): boolean {
+  return isHostSubclass(buildingClass(entity), kind)
+}
+
 export function entityHandle(entity: LuaEntity): Val {
   const unit = entity.unit_number
   if (unit !== undefined) {
@@ -43,7 +97,17 @@ export function entityHandle(entity: LuaEntity): Val {
     if (existing !== undefined) return existing
   }
   const position = entity.position
-  const handle = { __t: "host", __h: "entity", __e: entity, __id: unit, __name: entity.name, __type: entity.type, __x: position.x, __y: position.y }
+  const handle = {
+    __t: "host",
+    __h: "entity",
+    __c: buildingClass(entity),
+    __e: entity,
+    __id: unit,
+    __name: entity.name,
+    __type: entity.type,
+    __x: position.x,
+    __y: position.y,
+  }
   if (unit !== undefined) {
     storage.handles.entities[unit] = handle
     script.register_on_object_destroyed(entity)
@@ -148,9 +212,14 @@ export function cargoHandle(record: RobotRecord): Val {
 }
 
 // ---------- Здания ----------
+// Свойства и методы всех зданий — в таблицах Building (подклассы их наследуют). Обёртки без __c (сохранения до
+// 19.2, которые миграция не застала) — по виду "entity": те же таблицы.
 
-defineHostObject("entity")
-const entityGetters = hostGetters.entity
+hostKindClass.entity = "Building"
+hostGetters.entity = hostGetters.Building
+hostMethods.entity = hostMethods.Building
+hostSetters.entity = hostSetters.Building
+const entityGetters = hostGetters.Building
 entityGetters.id = (o: Val) => o.__id
 entityGetters.valid = (o: Val) => (o.__e as LuaEntity).valid
 entityGetters.name = (o: Val) => o.__name
@@ -174,7 +243,7 @@ entityGetters.progress = (o: Val) => {
   requireSight(o.__e)
   return entityProgress(o.__e)
 }
-const entityMethods = hostMethods.entity
+const entityMethods = hostMethods.Building
 entityMethods.count = (o: Val, _k: Val, item: Val) => {
   requireSight(o.__e)
   const name = itemName(item)
@@ -188,11 +257,18 @@ for (const which of ["input", "output", "fuel"] as const) {
     return inventory === undefined ? undefined : inventoryHandle({ __e: entity, __which: which })
   }
 }
+// Содержимое сундука, вагона, багажника и патроны турели — это «вход» здания (src/automaton/inspect.ts).
+for (const cls of ["Chest", "CargoWagon", "Vehicle"]) hostMethods[cls].inventory = entityMethods.input
+hostMethods.Turret.ammo = entityMethods.input
 entityMethods.fluid = (o: Val, _k: Val, name: Val) => {
   requireSight(o.__e)
   return entityFluid(o.__e, name === undefined ? undefined : tostring(name))
 }
 rawset(entityMethods, "toString", (o: Val) => `${o.__name}#${tostring(o.__id ?? "?")}`)
+
+// Враги — обёртки зданий с классом Enemy: только то, что объявлено у Enemy.
+for (const key of ["id", "valid", "inSight", "name", "position", "health"]) hostGetters.Enemy[key] = entityGetters[key]
+rawset(hostMethods.Enemy, "toString", entityMethods.toString)
 
 // ---------- Машины ----------
 
@@ -226,6 +302,7 @@ export function robotHealth(record: RobotRecord): number {
 }
 
 defineHostObject("robot")
+hostKindClass.robot = "Robot"
 const robotGetters = hostGetters.robot
 robotGetters.id = (o: Val) => o.__id
 robotGetters.name = (o: Val) => storage.robots.byId[o.__id]?.name

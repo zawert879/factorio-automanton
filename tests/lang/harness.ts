@@ -2,7 +2,17 @@
 // Каждый отрезок — «тик»; блокирующие вызовы-заглушки завершаются через заданное число тиков.
 import { compile } from "../../src/lang/codegen"
 import { completeWait, loadProgram, Machine, newMachine, runSlice } from "../../src/lang/runtime"
-import { blockingCall, defineHostObject, host, hostBlocking, hostGetters, hostMethods, makeError, Val } from "../../src/lang/runtime/core"
+import {
+  blockingCall,
+  defineHostObject,
+  host,
+  hostBlocking,
+  hostGetters,
+  hostKindClass,
+  hostMethods,
+  makeError,
+  Val,
+} from "../../src/lang/runtime/core"
 import { toStringValue } from "../../src/lang/runtime/values"
 
 let output: string[] = []
@@ -33,6 +43,7 @@ host.mine = (k: Val, item: Val, count: Val) =>
 host.put = (k: Val) => blockingCall(k, "put", (f) => (f.ticks = 1))
 for (const name of ["wait", "move", "mine", "put"]) hostBlocking[name] = true
 defineHostObject("me")
+hostKindClass.me = "Machine"
 hostGetters.me.name = () => "test-bot"
 hostGetters.me.id = () => 7
 hostMethods.me.say = (_o: Val, _k: Val, text: Val) => printArgs(text)

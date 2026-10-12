@@ -1,5 +1,6 @@
 // Встроенные имена языка программ: API машины (docs/API.md) и стандартная библиотека.
 // Компилятору нужно знать имя, вид и блокирует ли вызов (ждёт действия → функция возобновляемая).
+import { HOST_CLASSES } from "./hostClasses"
 
 export type BuiltinKind =
   /** Функция API: move, print… */
@@ -8,7 +9,7 @@ export type BuiltinKind =
   | "host-object"
   /** Объект стандартной библиотеки: Math, Object, Array, JSON… */
   | "library-object"
-  /** Класс стандартной библиотеки или API: Map, Set, Error, ActionError. */
+  /** Класс стандартной библиотеки или API: Map, Set, Error, ActionError, классы объектов игры. */
   | "library-class"
   /** Функция стандартной библиотеки: parseInt, isNaN… */
   | "library-function"
@@ -81,7 +82,8 @@ export const BLOCKING_HOST_METHODS: Record<string, Record<string, boolean>> = {
 
 const HOST_OBJECTS = ["me", "console", "scan", "map", "board", "tasks", "signals", "time", "world", "inbox"]
 const LIBRARY_OBJECTS = ["Math", "Object", "Array", "JSON", "Number", "String"]
-const LIBRARY_CLASSES = ["Map", "Set", "Error", "TypeError", "RangeError", "SyntaxError", "ActionError"]
+// Классы объектов игры (19.2) — тоже встроенные классы: значения для instanceof и поиска по классу.
+const LIBRARY_CLASSES = ["Map", "Set", "Error", "TypeError", "RangeError", "SyntaxError", "ActionError", ...HOST_CLASSES.map(([name]) => name)]
 const LIBRARY_FUNCTIONS = ["parseInt", "parseFloat", "isNaN", "isFinite", "Boolean"]
 const VALUES = ["undefined", "NaN", "Infinity"]
 

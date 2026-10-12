@@ -160,7 +160,7 @@ function entryOf(statement) {
   const docLines = []
   while (lines.length > 0 && /^\s*(\/\*\*|\*|\/\/)/.test(lines[0])) docLines.push(lines.shift())
   const signature = lines.join("\n")
-  const name = /^(?:declare (?:function|const|let|class|namespace)|interface|type) ([A-Za-z_$][\w$]*)/m.exec(signature)?.[1]
+  const name = /^(?:declare (?:function|const|let|(?:abstract )?class|namespace)|interface|type) ([A-Za-z_$][\w$]*)/m.exec(signature)?.[1]
   const doc = docLines.map((l) => l.replace(/^\s*(\/\*\*|\*\/|\*|\/\/)\s?/, "").replace(/\*\/$/, "").trim()).filter(Boolean).join(" ")
   const keys = [...new Set([...signature.matchAll(/\b([A-Za-z_$][\w$]*)\s*[(:?]/g)].map((m) => m[1].toLowerCase()))].join(" ")
   return { name, signature, doc, keys }

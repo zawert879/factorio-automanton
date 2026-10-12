@@ -5,8 +5,11 @@
 //
 // Как добавить: увеличить SCHEMA_VERSION и дописать шаг MIGRATIONS[новая версия].
 
+import { LuaEntity } from "factorio:runtime"
+import { buildingClass } from "./program/handles"
+
 /** Текущая версия схемы storage. */
-export const SCHEMA_VERSION = 2
+export const SCHEMA_VERSION = 3
 
 const MIGRATIONS: Record<number, (this: void) => void> = {
   // 2 (этапы 7–11): у машины — модель, бак и оружейный слот; у полётов — места в круге пересчёта.
@@ -17,6 +20,15 @@ const MIGRATIONS: Record<number, (this: void) => void> = {
       record.tank ??= { amount: 0, temperature: 15 }
     }
     if (storage.flight !== undefined) storage.flight.slot ??= {}
+  },
+  // 3 (19.2): у обёрток зданий — класс (Furnace, Chest, …): по нему instanceof и методы. Обёртки — общие таблицы,
+  // программы и доска держат те же, что в storage.handles.
+  3: () => {
+    for (const [, handle] of pairs(storage.handles?.entities ?? {})) {
+      if (handle === undefined || handle.__c !== undefined) continue
+      const entity = handle.__e as LuaEntity
+      if (entity.valid) handle.__c = buildingClass(entity)
+    }
   },
 }
 

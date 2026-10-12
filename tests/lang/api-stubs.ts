@@ -7,6 +7,7 @@ import {
   host,
   hostBlocking,
   hostGetters,
+  hostKindClass,
   hostMethods,
   hostSetters,
   program,
@@ -29,8 +30,10 @@ function hostObject(kind: string, fields: Val): Val {
   return fields
 }
 
+/** Здание с классом по имени (19.2): печь — Furnace, сундук — Chest, остальное — Building. */
 function entity(id: number, name: string, x: number, y: number): Val {
-  return hostObject("entity", { __id: id, __name: name, __x: x, __y: y })
+  const cls = string.find(name, "furnace")[0] !== undefined ? "Furnace" : string.find(name, "chest")[0] !== undefined ? "Chest" : "Building"
+  return hostObject("entity", { __c: cls, __id: id, __name: name, __x: x, __y: y })
 }
 
 function robot(id: number, name: string, programName: string): Val {
@@ -43,7 +46,11 @@ function message(topic: string, data: Val, from: Val): Val {
 
 let nextId = 100
 
-defineHostObject("entity")
+// Здания — таблицы класса Building (как в игре, src/program/handles.ts): подклассы их наследуют.
+hostKindClass.entity = "Building"
+hostKindClass.robot = "Robot"
+hostGetters.entity = hostGetters.Building
+hostMethods.entity = hostMethods.Building
 hostGetters.entity.id = (o: Val) => o.__id
 hostGetters.entity.name = (o: Val) => o.__name
 hostGetters.entity.valid = () => true
@@ -80,6 +87,9 @@ hostMethods.message.reply = (o: Val, _k: Val, data: Val) => log.push(`reply to $
 
 defineHostObject("zone")
 hostGetters.zone.name = (o: Val) => o.__name
+hostKindClass.zone = "Zone"
+hostMethods.zone.find = (_o: Val, _k: Val, what: Val) =>
+  arr(type(what) === "table" && what.__builtin === "Chest" ? entity(nextId++, "steel-chest", 3, 3) : entity(nextId++, "stone-furnace", 5, 5))
 
 defineHostObject("screen")
 hostGetters.screen.width = () => 128

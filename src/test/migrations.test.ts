@@ -2,6 +2,7 @@
 import { findRobot } from "../automaton/registry"
 import { MODELS } from "../names"
 import { migrate, SCHEMA_VERSION } from "../migrations"
+import { entityHandle } from "../program/handles"
 import { describe, expect, test } from "./testing"
 
 describe("миграции", () => {
@@ -21,12 +22,23 @@ describe("миграции", () => {
     old.model = undefined
     old.tank = undefined
     storage.schemaVersion = 1
-    expect(migrate().join(",")).toBe("2")
+    expect(migrate().join(",")).toBe("2,3")
     expect(robot.model).toBe(MODELS[0].entity)
     expect(robot.tank.amount).toBe(0)
     expect(storage.schemaVersion).toBe(SCHEMA_VERSION)
     // Повторно — ничего не делает.
     expect(migrate().length).toBe(0)
     robot.entity.destroy()
+  })
+
+  test("со схемы 2: у обёрток зданий появляется класс", () => {
+    const surface = game.get_surface("nauvis")!
+    const furnace = surface.create_entity({ name: "stone-furnace", position: { x: -905, y: 650 }, force: "player" })!
+    const handle = entityHandle(furnace)
+    handle.__c = undefined
+    storage.schemaVersion = 2
+    expect(migrate().join(",")).toBe("3")
+    expect(handle.__c).toBe("Furnace")
+    furnace.destroy()
   })
 })

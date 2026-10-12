@@ -107,11 +107,11 @@ take(chest, "coal", 10)                      // D
 | [Своя машина](#своя-машина-me) | `me`: груз, топливо, здоровье, параметры программы, память, подпись | сразу |
 | [Движение](#движение) | `move`, `canReach`, `follow`, `goHome` | сразу |
 | [Предметы](#предметы) | `mine`, `take`, `put`, `pickup`, `drop`, `give` | сразу |
-| [Здания](#здания) | состояние (в поле зрения), `repair` / `setRecipe` / `build`, `deconstruct`, `rotate` | сразу / [Наладка] / [Строительство] |
+| [Здания](#здания) | классы зданий (`Furnace`, `Chest`, …), состояние (в поле зрения), `repair` / `setRecipe` / `build`, `deconstruct`, `rotate` | сразу / [Наладка] / [Строительство] |
 | [Жидкости](#жидкости) | `pump`, `fill`, `drain` | [Жидкости] |
 | [Энергия](#энергия) | `refuel`, `charge` | сразу / Mk2 |
-| [Зрение](#зрение) | `scan.robots`, `scan.entities`, `scan.items`, `scan.resources`, `scan.enemies`, `scan.water` | сразу, радиус растёт исследованиями |
-| [Карта](#карта) | метки, зоны, `find`, `map.tag` | сразу |
+| [Зрение](#зрение) | `scan.robots`, `scan.buildings`, `scan.entities`, `scan.items`, `scan.resources`, `scan.enemies`, `scan.water` | сразу, радиус растёт исследованиями |
+| [Карта](#карта) | метки, зоны, `zone.find`, `find`, `map.tag` | сразу |
 | [Связь](#связь) | `send`, `publish`, `subscribe`, `receive`, `request`, `robot` | [Радиосвязь] |
 | [Доска и задачи](#доска-и-задачи) | `board` (общая память), `tasks` (очереди заданий) | [Радиосвязь] |
 | [Табло](#табло) | `display`: пиксельный холст — линии, фигуры, текст, иконки, таблицы | [Табло] |
@@ -128,11 +128,11 @@ type Fluid = string;     // "water", "crude-oil", ...
 type Position = { x: number; y: number };
 type Area = { from: Position; to: Position };
 type Direction = "north" | "east" | "south" | "west";
-type Target = Position | Entity | Robot | Marker | Zone;
+type Target = Position | Building | Machine | Marker | Zone;
 
 type Value =
   | null | boolean | number | string
-  | Entity | Robot | Position
+  | Building | Machine | Position
   | Value[]
   | { [key: string]: Value };
 
@@ -150,7 +150,7 @@ interface ItemStack { name: Item; count: number }
 | Экземпляр класса | `Route { from: "склад", keep: 20 }` (свой `toString` — его текст) |
 | `Map`, `Set` | `Map(2) { "a" => 1, "b" => 2 }`, `Set(2) { 1, 2 }` |
 | Ошибка | `ActionError: no path (no-path)` |
-| Здание, машина | `Entity(stone-furnace #12 @ 10.5, 5.5)`, `Robot(АМ-7 #7)` (`me` — тоже) |
+| Здание, машина | `Furnace(stone-furnace #12 @ 10.5, 5.5)` — класс здания и имя, `Robot(АМ-7 #7)` (`me` — тоже) |
 | Метка, зона, табло | `Marker(склад)`, `Zone(плавильня)`, `Display(штаб)` |
 | Груз, сообщение, задача | `Inventory { coal: 7 }`, `Message(Robot(АМ-3 #3), "тема": данные)`, `Task(работа #4: данные)` |
 | Функция, класс, цикл | `[Function]`, `[class Route]`, `[Circular]` |
@@ -202,7 +202,12 @@ type Model =
   | "combat-mk1" | "combat-mk2"
   | "flyer-mk1" | "flyer-mk2";
 
-interface Robot {
+/**
+ * Общее у машин: своей (me) и другой (Robot). Проверка — x instanceof Machine.
+ * @en What all machines share: your own (me) and another one (Robot). Check with x instanceof Machine.
+ */
+declare abstract class Machine {
+  protected constructor();
   // Всегда: @en Always:
   readonly id: number;
   readonly name: string;
@@ -222,11 +227,19 @@ interface Robot {
   distance(to: Target): number;
 }
 
+/**
+ * Другая машина своей команды: robot(), scan.robots(), msg.from. Создать нельзя — только найти.
+ * @en Another machine of your team: robot(), scan.robots(), msg.from. It can't be created, only found.
+ */
+declare class Robot extends Machine {
+  private constructor();
+}
+
 type RobotState =
   | "idle" | "moving" | "mining" | "transferring" | "pumping" | "building" | "fighting"
   | "waiting" | "thinking" | "no-fuel" | "stuck" | "error";
 
-interface Me extends Robot {
+interface Me extends Machine {
   name: string;                        // можно переименовать себя из программы @en a program can rename its own machine
   label: string;                       // постоянная подпись над машиной (в отличие от say) @en a permanent label above the machine (unlike say)
   readonly cargo: Inventory;
@@ -368,7 +381,7 @@ interface Entity {
    */
   readonly inSight: boolean;
   // Только в поле зрения: @en Only within sight:
-  readonly status: EntityStatus;
+  readonly status: BuildingStatus;
   readonly health: number;             // 0..1
   readonly recipe: string | null;      // у сборщиков и печей @en for assemblers and furnaces
   readonly progress: number;           // прогресс текущего крафта, 0..1 @en progress of the current craft, 0..1
@@ -379,9 +392,10 @@ interface Entity {
   fluid(name?: Fluid): number;
 }
 
-type EntityStatus =
+type BuildingStatus =
   | "working" | "no-input" | "output-full" | "no-fuel" | "no-power"
   | "no-recipe" | "disabled" | "idle";
+type EntityStatus = BuildingStatus;
 
 /**
  * Починить здание или машину ремкомплектами из груза (в радиусе me.reach).
@@ -427,6 +441,229 @@ if (furnace.status === "no-fuel") put(furnace, "coal", 5);
 - `build`: место занято — `target-full`, предмета нет в грузе — `not-enough-items`. Машины программой не ставятся.
 - `deconstruct`: только здания своей команды; содержимое здания тоже уходит в груз, не влезает — `cargo-full`.
   Деревья, камни и руда — это добыча (`mine`), а не разборка.
+
+### Классы зданий
+
+У каждого вида зданий свой класс — с тем, что у него есть: у печи — вход, выход и топливо, у сундука — содержимое,
+у резервуара — жидкость. Найти здания класса — `zone("…").find(Furnace)`, `scan.buildings({ kind: Chest })`;
+проверить, что пришло сообщением, — `x instanceof Furnace`. Создать здание через `new` нельзя.
+
+```ts
+/**
+ * Класс зданий для поиска: Furnace, Chest, … (zone.find(Furnace), scan.buildings({ kind: Chest })).
+ * @en A building class to search by: Furnace, Chest, … (zone.find(Furnace), scan.buildings({ kind: Chest })).
+ */
+type BuildingKind<T extends Building> = { prototype: T };
+
+/**
+ * Любое здание. Здания без своих методов (столбы, стены, лампы, комбинаторы, рельсы…) — просто Building.
+ * @en Any building. Buildings without methods of their own (poles, walls, lamps, combinators, rails…) are just Building.
+ */
+declare class Building {
+  protected constructor();
+  // Всегда: @en Always:
+  readonly id: number;
+  readonly valid: boolean;
+  readonly name: string;               // "stone-furnace"
+  readonly type: string;               // "furnace" — тип прототипа Factorio @en "furnace" — the Factorio prototype type
+  readonly position: Position;
+  /**
+   * Видно ли сейчас. Поля и методы ниже — только если видно, иначе ActionError("out-of-sight").
+   * @en Whether it is visible now. The fields and methods below work only while it is visible, otherwise ActionError("out-of-sight").
+   */
+  readonly inSight: boolean;
+  // Только в поле зрения: @en Only within sight:
+  readonly status: BuildingStatus;
+  readonly health: number;             // 0..1
+}
+
+/**
+ * Сундук: деревянный, железный, стальной, сундук хранения.
+ * @en A chest: wooden, iron, steel, storage chest.
+ */
+declare class Chest extends Building {
+  private constructor();
+  inventory(): Inventory;
+  count(item?: Item): number;
+}
+
+/**
+ * Печь: каменная, стальная, электрическая. Рецепт печь выбирает сама — по руде.
+ * @en A furnace: stone, steel, electric. The furnace picks the recipe itself, by the ore.
+ */
+declare class Furnace extends Building {
+  private constructor();
+  readonly recipe: string | null;
+  readonly progress: number;           // прогресс текущей плавки, 0..1 @en progress of the current smelting, 0..1
+  input(): Inventory;
+  output(): Inventory;
+  fuel(): Inventory | null;            // у электрической — null @en null for an electric one
+  count(item?: Item): number;          // во всех слотах @en in all slots
+}
+
+/**
+ * Сборщик: сборочные автоматы, химзавод, нефтезавод, центрифуга.
+ * @en An assembler: assembling machines, chemical plant, oil refinery, centrifuge.
+ */
+declare class Assembler extends Building {
+  private constructor();
+  readonly recipe: string | null;
+  readonly progress: number;           // 0..1
+  input(): Inventory;
+  output(): Inventory;
+  count(item?: Item): number;
+  /**
+   * Жидкость в здании (без name — всего).
+   * @en Fluid in the building (without name — all of it).
+   */
+  fluid(name?: Fluid): number;
+}
+
+/**
+ * Ракетная шахта.
+ * @en A rocket silo.
+ */
+declare class RocketSilo extends Building {
+  private constructor();
+  readonly recipe: string | null;
+  readonly progress: number;           // 0..1 — постройка ракеты @en 0..1 — building the rocket
+  input(): Inventory;
+  output(): Inventory;
+  count(item?: Item): number;
+}
+
+/**
+ * Лаборатория.
+ * @en A lab.
+ */
+declare class Lab extends Building {
+  private constructor();
+  input(): Inventory;
+  count(item?: Item): number;
+}
+
+/**
+ * Котёл и теплообменник.
+ * @en A boiler and a heat exchanger.
+ */
+declare class Boiler extends Building {
+  private constructor();
+  fuel(): Inventory | null;            // у теплообменника — null @en null for a heat exchanger
+  count(item?: Item): number;
+  fluid(name?: Fluid): number;
+}
+
+/**
+ * Паровой двигатель и паровая турбина.
+ * @en A steam engine and a steam turbine.
+ */
+declare class Generator extends Building {
+  private constructor();
+  fluid(name?: Fluid): number;
+}
+
+/**
+ * Ядерный реактор.
+ * @en A nuclear reactor.
+ */
+declare class Reactor extends Building {
+  private constructor();
+  fuel(): Inventory;
+  count(item?: Item): number;
+}
+
+/**
+ * Резервуар.
+ * @en A storage tank.
+ */
+declare class StorageTank extends Building {
+  private constructor();
+  fluid(name?: Fluid): number;
+}
+
+/**
+ * Труба, подземная труба, помпа.
+ * @en A pipe, an underground pipe, a pump.
+ */
+declare class Pipe extends Building {
+  private constructor();
+  fluid(name?: Fluid): number;
+}
+
+/**
+ * Турель с патронами: пулемётная, артиллерийская.
+ * @en A turret with ammo: gun turret, artillery turret.
+ */
+declare class Turret extends Building {
+  private constructor();
+  ammo(): Inventory;
+  count(item?: Item): number;
+}
+
+/**
+ * Огнемётная турель.
+ * @en A flamethrower turret.
+ */
+declare class FlameTurret extends Building {
+  private constructor();
+  fluid(name?: Fluid): number;
+}
+
+/**
+ * Грузовой вагон.
+ * @en A cargo wagon.
+ */
+declare class CargoWagon extends Building {
+  private constructor();
+  inventory(): Inventory;
+  count(item?: Item): number;
+}
+
+/**
+ * Вагон-цистерна.
+ * @en A fluid wagon.
+ */
+declare class FluidWagon extends Building {
+  private constructor();
+  fluid(name?: Fluid): number;
+}
+
+/**
+ * Локомотив.
+ * @en A locomotive.
+ */
+declare class Locomotive extends Building {
+  private constructor();
+  fuel(): Inventory;
+  count(item?: Item): number;
+}
+
+/**
+ * Машина игрока: автомобиль, танк, паук.
+ * @en A player vehicle: car, tank, spidertron.
+ */
+declare class Vehicle extends Building {
+  private constructor();
+  inventory(): Inventory;              // багажник @en the trunk
+  fuel(): Inventory | null;            // у паука — null @en null for a spidertron
+  count(item?: Item): number;
+}
+
+/**
+ * Станция зарядки машин Mk2+.
+ * @en A charging station for Mk2+ machines.
+ */
+declare class ChargingStation extends Building {
+  private constructor();
+}
+```
+
+```ts
+// Печи зоны «плавильня» — сразу класса Furnace: у них есть output()
+for (const furnace of zone("плавильня").find(Furnace)) {
+  if (furnace.output().count() > 0) print(`печь #${furnace.id}: ${furnace.output().count()} плит`);
+}
+```
 
 ## Жидкости
 
@@ -532,6 +769,11 @@ declare const scan: {
    */
   entities(filter?: { name?: string | string[]; type?: string | string[]; radius?: number }): Entity[];
   /**
+   * Здания рядом. С kind — только этого класса и сразу с его методами: scan.buildings({ kind: Furnace }) → Furnace[].
+   * @en Buildings nearby. With kind — only of that class and right away with its methods: scan.buildings({ kind: Furnace }) → Furnace[].
+   */
+  buildings<T extends Building = Building>(filter?: { kind?: BuildingKind<T>; name?: string | string[]; radius?: number }): T[];
+  /**
    * Предметы, лежащие на земле.
    * @en Items lying on the ground.
    */
@@ -555,7 +797,12 @@ declare const scan: {
 
 interface GroundItem { item: Item; count: number; position: Position }
 interface ResourcePatch { item: Item; amount: number; tiles: number; center: Position; nearest: Position }
-interface Enemy {
+/**
+ * Враг: кусака, плевака, гнездо, червь.
+ * @en An enemy: biter, spitter, nest, worm.
+ */
+declare class Enemy {
+  private constructor();
   readonly id: number;
   readonly valid: boolean;
   readonly inSight: boolean;
@@ -583,12 +830,36 @@ if (scan.enemies().length > 0) {
 declare function marker(name: string): Marker;     // ActionError("invalid-target"), если метки нет @en ActionError("invalid-target") if there is no such marker
 declare function zone(name: string): Zone;
 
-interface Marker { readonly name: string; readonly position: Position }
-interface Zone {
+/**
+ * Метка на карте (ставит игрок).
+ * @en A marker on the map (placed by a player).
+ */
+declare class Marker {
+  private constructor();
+  readonly name: string;
+  readonly position: Position;
+}
+
+/**
+ * Зона — прямоугольник, выделенный «Программатором».
+ * @en A zone — a rectangle selected with the "Programmer".
+ */
+declare class Zone {
+  private constructor();
   readonly name: string;
   readonly area: Area;
   readonly center: Position;
   contains(p: Position): boolean;
+  /**
+   * Здания класса в зоне (и, если задано, с этим именем): zone("плавильня").find(Furnace) → Furnace[].
+   * @en Buildings of the class in the zone (and with this name, if given): zone("smelter").find(Furnace) → Furnace[].
+   */
+  find<T extends Building>(kind: BuildingKind<T>, name?: string | string[]): T[];
+  /**
+   * Здания в зоне с этим именем ("stone-furnace") или все.
+   * @en Buildings in the zone with this name ("stone-furnace"), or all of them.
+   */
+  find(name?: string | string[]): Building[];
 }
 
 /**

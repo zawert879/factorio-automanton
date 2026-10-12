@@ -45,6 +45,8 @@ export interface TypeMember {
   /** Метод в описании типа: m(a: T): R. */
   method: boolean
   type?: TypeNode
+  /** private / protected у члена объявленного класса (declare class): закрытый конструктор — new нельзя. */
+  access?: "private" | "protected"
 }
 
 // ---------- Выражения ----------
@@ -172,7 +174,7 @@ export type Stmt = Loc &
     /** Объявления (только в режиме declarations — automaton.d.ts и описание библиотеки). */
     | { kind: "DeclareFunction"; name: string; type: TypeNode }
     | { kind: "DeclareVar"; name: string; type: TypeNode }
-    | { kind: "DeclareClass"; name: string; typeParams: TypeParamDecl[]; superClass?: string; members: TypeMember[] }
+    | { kind: "DeclareClass"; name: string; typeParams: TypeParamDecl[]; superClass?: string; members: TypeMember[]; abstract?: boolean }
     | { kind: "ExprStmt"; expression: Expr }
     | { kind: "If"; test: Expr; consequent: Stmt; alternate?: Stmt }
     | { kind: "While"; test: Expr; body: Stmt }

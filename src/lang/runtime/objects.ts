@@ -1,11 +1,13 @@
 // Свойства, методы, вызовы и классы — медленные пути операций пролога (GET → getx и т. д.).
 import {
   charge,
+  classes,
   describe,
   err,
   Fn,
   host,
   hostBlocking,
+  hostClassOf,
   hostGetters,
   hostMethods,
   hostSetters,
@@ -46,7 +48,7 @@ export function getx(this: void, o: Val, k: Val): Val {
     const tag = o.__t
     if (tag === "Map" || tag === "Set") return k === "size" ? o.__size : undefined
     if (tag === "host") {
-      const getter = hostGetters[o.__h]?.[k]
+      const getter = hostGetters[o.__c ?? o.__h]?.[k]
       return getter !== undefined ? getter(o) : undefined
     }
     const cls = o.__cls
@@ -83,12 +85,12 @@ export function setx(this: void, o: Val, k: Val, v: Val): void {
       err("set-property", "array", k)
     }
     if (o.__t === "host") {
-      const setter = hostSetters[o.__h]?.[k]
+      const setter = hostSetters[o.__c ?? o.__h]?.[k]
       if (setter !== undefined) {
         setter(o, v)
         return
       }
-      err("set-property", o.__h, k)
+      err("set-property", o.__c ?? o.__h, k)
     }
     err("set-property", describe(o), k)
   }
@@ -208,7 +210,7 @@ export function method(this: void, o: Val, name: string, resumable: boolean): Fn
     const tag = o.__t
     if (tag === "Map") return (resumable && mapMethodsResumable[name]) || mapMethods[name] || objectMethods[name] || noMethod(o, name)
     if (tag === "Set") return (resumable && setMethodsResumable[name]) || setMethods[name] || objectMethods[name] || noMethod(o, name)
-    if (tag === "host") return hostMethods[o.__h]?.[name] ?? noMethod(o, name)
+    if (tag === "host") return hostMethods[o.__c ?? o.__h]?.[name] ?? noMethod(o, name)
     if (o.__k !== undefined) {
       // Унаследованный статический метод.
       let parent = o.__s
@@ -274,7 +276,8 @@ export function has(this: void, o: Val, k: Val): boolean {
 export function instanceOf(this: void, o: Val, cls: Val): boolean {
   if (type(cls) !== "table" || cls.__k === undefined) err("not-a-class")
   if (type(o) !== "table") return false
-  let c = o.__cls
+  // Объект игры (19.2): класс — по обёртке, иерархия — встроенных классов (Furnace → Building).
+  let c = o.__t === "host" ? classes[hostClassOf(o) ?? ""] : o.__cls
   while (c !== undefined) {
     // Встроенные классы сравниваются по имени: после загрузки сохранения таблица класса — копия.
     if (c === cls || (cls.__builtin !== undefined && c.__builtin === cls.__builtin)) return true

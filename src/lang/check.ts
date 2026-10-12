@@ -305,7 +305,9 @@ function loadGlobals(): Globals {
       const ctorObj = membersToObject(ctorMembers, ctx)
       const ctors = ctorObj.k === "obj" ? ctorObj.o.ctors : []
       const instance: Type = { k: "ref", name: decl.name, args: [] }
-      values.set(decl.name, obj({ ctors: (ctors.length > 0 ? ctors : [{ tparams: [], params: [{ name: "message", t: ANY, opt: true, rest: false }], ret: instance }]).map((s) => ({ ...s, ret: instance })), name: `typeof ${decl.name}` }))
+      // prototype — тип экземпляра: поиск по классу объектов игры (zone.find(Furnace), 19.2) выводит из него T.
+      const props = new Map<string, Prop>([["prototype", { t: instance, opt: false }]])
+      values.set(decl.name, obj({ props, ctors: (ctors.length > 0 ? ctors : [{ tparams: [], params: [{ name: "message", t: ANY, opt: true, rest: false }], ret: instance }]).map((s) => ({ ...s, ret: instance })), name: `typeof ${decl.name}` }))
     }
   }
   for (const stmt of declarations) {
@@ -552,15 +554,19 @@ export function checkProgram(program: A.Program, units?: ModuleUnit[]): Diagnost
         else for (const m of param.ts) if (m.k !== "array" && m.k !== "null") infer(m, arg, names, bindings, depth + 1)
         return
       }
-      case "ref":
+      case "ref": {
+        const resolved = resolve(param, types)
         if (arg.k === "obj" && arg.o.name?.startsWith(param.name + "<")) {
-          const resolved = resolve(param, types)
           if (resolved.k === "obj") for (const [name, prop] of resolved.o.props) {
             const own = arg.o.props.get(name)
             if (own !== undefined) infer(prop.t, own.t, names, bindings, depth + 1)
           }
+        } else if (resolved.k === "obj" || resolved.k === "union" || resolved.k === "array") {
+          // Псевдоним с параметром (BuildingKind<T> = { prototype: T }) — по раскрытому типу.
+          infer(resolved, arg, names, bindings, depth + 1)
         }
         return
+      }
       case "obj":
         if (arg.k !== "obj") return
         if (param.o.calls.length > 0 && arg.o.calls.length > 0) infer(param.o.calls[0].ret, arg.o.calls[0].ret, names, bindings, depth + 1)
@@ -607,7 +613,7 @@ export function checkProgram(program: A.Program, units?: ModuleUnit[]): Diagnost
       for (const a of args) typeOf(a.kind === "Spread" ? a.argument : a, scope)
       return sigs.length === 1 ? sigs[0].ret : ANY
     }
-    const sig = candidates[0]
+    const sig = candidates.length > 1 ? overload(candidates, args, scope) : candidates[0]
     const names = new Set(sig.tparams.map((p) => p.name))
     const bindings = new Map<string, Type>()
     typeArgs.forEach((ta, i) => {
@@ -648,6 +654,32 @@ export function checkProgram(program: A.Program, units?: ModuleUnit[]): Diagnost
     }
     for (const p of sig.tparams) if (!bindings.has(p.name)) bindings.set(p.name, p.def ?? ANY)
     return subst(sig.ret, bindings)
+  }
+
+  /**
+   * Перегрузка, к которой подходят аргументы (zone.find(Furnace) и zone.find("stone-furnace")): первая, где
+   * каждый аргумент-не-функция совместим с параметром (параметры с обобщениями не проверяются); нет такой — первая.
+   */
+  function overload(candidates: Sig[], args: (A.Expr | A.Spread)[], scope: Scope): Sig {
+    const argTypes = args.map((a) => (a.kind === "Spread" || a.kind === "Function" ? undefined : typeOf(a, scope)))
+    for (const sig of candidates) {
+      const names = new Set(sig.tparams.map((p) => p.name))
+      const fits = argTypes.every((t, i) => {
+        const p = paramFor(sig, i)
+        if (t === undefined || p === undefined) return true
+        const expected = p.rest ? restElement(p) : p.t
+        if (mentions(expected, names)) return objectish(t) === objectish(res(expected))
+        return assignable(t, expected)
+      })
+      if (fits) return sig
+    }
+    return candidates[0]
+  }
+
+  /** Объект или нет — для параметров с обобщениями при выборе перегрузки ({ prototype: T } — не строка). */
+  function objectish(t: Type): boolean {
+    t = res(t)
+    return t.k === "obj" || t.k === "ref" || t.k === "param"
   }
 
   function signaturesOf(t: Type): Sig[] | undefined {
@@ -1172,6 +1204,14 @@ export function checkProgram(program: A.Program, units?: ModuleUnit[]): Diagnost
       if ((test.operator === "&&" && whenTrue) || (test.operator === "||" && !whenTrue)) {
         applyNarrowing(test.left, scope, whenTrue)
         applyNarrowing(test.right, scope, whenTrue)
+      } else if (test.operator === "||" && whenTrue) {
+        // x instanceof A || x instanceof B — истинно: x — A или B (сужено в обеих частях).
+        const left = narrowScope(test.left, scope, true)
+        const right = narrowScope(test.right, scope, true)
+        for (const [name, t] of left.vars) {
+          const other = right.vars.get(name)
+          if (other !== undefined) scope.narrow(name, union([t, other]))
+        }
       }
       return
     }

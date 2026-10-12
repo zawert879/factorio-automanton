@@ -27,7 +27,8 @@ function robotText(id: number): string {
 setHostInspector((x, inner) => {
   switch (x.__h) {
     case "entity":
-      return `Entity(${x.__name} #${x.__id} @ ${formatNumber(x.__x)}, ${formatNumber(x.__y)})`
+      // Класс здания (19.2): Furnace(stone-furnace #12 @ 10.5, 5.5).
+      return `${x.__c ?? "Building"}(${x.__name} #${x.__id} @ ${formatNumber(x.__x)}, ${formatNumber(x.__y)})`
     case "robot":
       return robotText(x.__id)
     case "me":

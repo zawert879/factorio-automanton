@@ -36,9 +36,28 @@ const BAD: [string, string, string][] = [
   ["поле класса присваивание", `class A { n = 0 }\nconst a = new A()\na.n = "x"`, "type-not-assignable@3"],
   ["конструктор: аргумент", `class A { constructor(readonly n: number) {} }\nnew A("x")`, "type-not-assignable@2"],
   ["наследование: метод предка", `class A { hi(): string { return "a" } }\nclass B extends A {}\nnew B().bye()`, "type-no-property@3"],
+  ["класс здания: нет метода", `const c = zone("склад").find(Chest)[0]\nc.output()`, "type-no-property@2"],
+  ["здание по имени — просто Building", `const b = zone("склад").find("stone-furnace")[0]\nprint(b.recipe)`, "type-no-property@2"],
+  ["класс здания из scan.buildings", `const f = scan.buildings({ kind: Furnace })[0]\nf.inventory()`, "type-no-property@2"],
+  ["new у объекта игры", `const f = new Furnace()`, "host-class-new@1"],
 ]
 
 const GOOD: [string, string][] = [
+  [
+    "классы объектов игры: поиск по классу, перегрузки, instanceof, BuildingKind<T>",
+    `for (const f of zone("плавильня").find(Furnace)) print(f.output().count(), f.recipe, f.fuel()?.count())
+const chests = scan.buildings({ kind: Chest, radius: 5 })
+print(chests[0].inventory().count("coal"))
+print(zone("склад").find().length + zone("склад").find("wooden-chest").length + zone("склад").find(Chest, ["iron-chest"]).length)
+const t = receive("цель")?.data
+if (t instanceof Furnace || t instanceof Chest) print(t.count("coal"))
+if (t instanceof Machine) print(t.id, t.position.x)
+function nearest<T extends Building>(kind: BuildingKind<T>): T | null { return scan.buildings({ kind })[0] ?? null }
+const a = nearest(Assembler)
+if (a !== null) print(a.recipe, a.fluid("water"))
+const r = robot("Оркестратор")
+print(me instanceof Machine, r instanceof Robot, me.distance(zone("склад")))`,
+  ],
   [
     "сужение: instanceof и дискриминант",
     `type Shape = { kind: "circle"; r: number } | { kind: "square"; side: number }

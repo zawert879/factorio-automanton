@@ -1,12 +1,14 @@
 // Зрение (4.6): scan.robots / entities / items / resources / enemies / water — только в радиусе зрения
 // (Mk1 — 10 клеток), от ближнего к дальнему. Каждый взгляд стоит энергии, больше радиус — дороже.
+// scan.buildings (19.2) — как entities, но с фильтром по классу: scan.buildings({ kind: Furnace }).
 import { LuaEntity, MapPosition } from "factorio:runtime"
 import { spend } from "../../automaton/energy"
 import { defineHostObject, hostMethods, Val } from "../../lang/runtime/core"
 import { robotVision } from "../../automaton/models"
 import { MARKER_ENTITIES, ROBOT_ENTITIES, ROBOT_PLACERS } from "../../names"
 import { actionError, currentRobot } from "../context"
-import { entityHandle, robotHandle } from "../handles"
+import { entityHandle, isOfClass, kindFilter, robotHandle } from "../handles"
+import { buildingKind, nameList } from "./common"
 import { programArray, programPosition } from "../values"
 import { findCached } from "../cache"
 import { RobotRecord } from "../../automaton/registry"
@@ -49,17 +51,6 @@ function byDistance<T>(items: T[], position: (this: void, item: T) => MapPositio
   return keyed.slice(0, MAX_RESULTS).map((k) => k.item)
 }
 
-function names(value: Val): string | string[] | undefined {
-  if (value === undefined) return undefined
-  if (type(value) === "string") return value as string
-  if (type(value) === "table" && value.__n !== undefined) {
-    const list: string[] = []
-    for (let i = 1; i <= value.__n; i++) list.push(tostring(value[i]))
-    return list
-  }
-  actionError("invalid-target", "filter must be a string or an array of strings")
-}
-
 const scan = defineHostObject("scan")
 void scan
 
@@ -86,14 +77,34 @@ hostMethods.scan.entities = (_o: Val, _k: Val, filter: Val) => {
   const f = type(filter) === "table" ? filter : {}
   const r = look(f.radius)
   const filters: Record<string, unknown> = { force: robot.entity.force_index }
-  const name = names(f.name)
-  const kind = names(f.type)
+  const name = nameList(f.name)
+  const kind = nameList(f.type)
   if (name !== undefined) filters.name = name
   if (kind !== undefined) filters.type = kind
   const found = seen(robot, "entities", r, filters)
   const buildings: LuaEntity[] = []
   for (const entity of found) {
     if (SKIPPED_TYPES[entity.type] || MARKER_ENTITIES.includes(entity.name) || ROBOT_PLACERS.includes(entity.name)) continue
+    buildings.push(entity)
+  }
+  return programArray(byDistance(buildings, (e) => e.position).map((e) => entityHandle(e)))
+}
+
+hostMethods.scan.buildings = (_o: Val, _k: Val, filter: Val) => {
+  const robot = currentRobot()
+  const f = type(filter) === "table" ? filter : {}
+  const kind = buildingKind(f.kind) ?? "Building"
+  const r = look(f.radius)
+  const byKind = kindFilter(kind)
+  const filters: Record<string, unknown> = { force: robot.entity.force_index }
+  const name = nameList(f.name) ?? byKind.name
+  if (name !== undefined) filters.name = name
+  if (byKind.type !== undefined) filters.type = byKind.type
+  const found = seen(robot, "entities", r, filters)
+  const buildings: LuaEntity[] = []
+  for (const entity of found) {
+    if (SKIPPED_TYPES[entity.type] || MARKER_ENTITIES.includes(entity.name) || ROBOT_PLACERS.includes(entity.name)) continue
+    if (kind !== "Building" && !isOfClass(entity, kind)) continue
     buildings.push(entity)
   }
   return programArray(byDistance(buildings, (e) => e.position).map((e) => entityHandle(e)))

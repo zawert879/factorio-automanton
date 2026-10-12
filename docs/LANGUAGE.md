@@ -156,7 +156,8 @@ const chest = H.chestAt("склад")
 Выводятся типы переменных, результатов вызовов (в том числе обобщённых: `map`, `reduce`, `find`,
 `Map<K, V>`, `receive<T>`), параметров лямбд из контекста (`xs.map(s => s.length)`), классов
 и интерфейсов (структурно). Сужение: `=== null` / `!== undefined`, `typeof x === "string"`,
-`e instanceof ActionError`, поле-дискриминант (`s.kind === "circle"`), ранний выход
+`e instanceof ActionError` и классы объектов игры (`x instanceof Furnace || x instanceof Chest`), поле-дискриминант
+(`s.kind === "circle"`), ранний выход
 (`if (x === undefined) return`).
 
 Не проверяется (это подскажет VS Code): «возможно `null`/`undefined`», лишние свойства в объектных

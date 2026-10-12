@@ -157,7 +157,8 @@ What is checked:
 Inferred: types of variables, call results (including generic ones: `map`, `reduce`, `find`,
 `Map<K, V>`, `receive<T>`), lambda parameters from context (`xs.map(s => s.length)`), classes
 and interfaces (structurally). Narrowing: `=== null` / `!== undefined`, `typeof x === "string"`,
-`e instanceof ActionError`, a discriminant field (`s.kind === "circle"`), early return
+`e instanceof ActionError` and game object classes (`x instanceof Furnace || x instanceof Chest`), a discriminant
+field (`s.kind === "circle"`), early return
 (`if (x === undefined) return`).
 
 Not checked (VS Code will point these out): "possibly `null`/`undefined`", excess properties in object

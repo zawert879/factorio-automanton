@@ -2,6 +2,7 @@
 import { ActionKind, ActionParams, currentAction, lastActionResult, startAction } from "../../automaton/actions"
 import { err, program, Q, Val, Y } from "../../lang/runtime/core"
 import { actionError, actionErrorValue, ActionErrorCode, currentRobot } from "../context"
+import { isHostSubclass } from "../../lang/hostClasses"
 
 /** Начать ожидание: программа встанет на паузу, кадр ожидания {__host = имя} завершит игра. */
 export function startWaiting(name: string, init?: (this: void, frame: Val) => void): LuaMultiReturn<[Val, Val?]> {
@@ -71,4 +72,24 @@ export function ticks(seconds: Val, fallback: number): number {
 
 export function text(value: Val): string {
   return type(value) === "string" ? (value as string) : tostring(value)
+}
+
+/** Имя или массив имён (фильтр поиска зданий); undefined — без фильтра. */
+export function nameList(value: Val): string | string[] | undefined {
+  if (value === undefined) return undefined
+  if (type(value) === "string") return value as string
+  if (type(value) === "table" && value.__n !== undefined) {
+    const list: string[] = []
+    for (let i = 1; i <= value.__n; i++) list.push(tostring(value[i]))
+    return list
+  }
+  actionError("invalid-target", "filter must be a string or an array of strings")
+}
+
+/** Класс зданий из аргумента (Furnace, Chest, …: значение встроенного класса объектов игры) или undefined. */
+export function buildingKind(value: Val): string | undefined {
+  if (type(value) !== "table" || value.__hostClass !== true) return undefined
+  const name = value.__builtin as string
+  if (!isHostSubclass(name, "Building")) actionError("invalid-target", `${name} is not a building class`)
+  return name
 }

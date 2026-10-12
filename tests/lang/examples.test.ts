@@ -3,7 +3,7 @@
 import { describe, expect, test } from "../../src/test/testing"
 import "./api-stubs"
 import { EXAMPLES } from "./examples.generated"
-import { run } from "./harness"
+import { outputOf, run } from "./harness"
 
 /** Стартовые программы по именам — модули для примеров (import из "./lib/Помощники"). */
 const modules: Record<string, string> = {}
@@ -19,4 +19,16 @@ describe("примеры из документации исполняются", 
       }
     })
   }
+})
+
+describe("классы объектов игры", () => {
+  test("instanceof — по классу обёртки, в том числе после копирования состояния", () => {
+    const source = `const f = zone("плавильня").find(Furnace)[0]
+const K = Furnace
+wait(1)
+print(f instanceof Furnace, f instanceof Building, f instanceof Chest, f instanceof Machine, f instanceof K)
+const c = zone("склад").find(Chest)[0]
+print(c instanceof Chest, c instanceof Furnace, me instanceof Machine, me instanceof Robot, robot(1) instanceof Robot)`
+    expect(outputOf(source, { copy: true, quantum: 3 })).toBe("true true false false true|true false true false true")
+  })
 })

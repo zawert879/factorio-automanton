@@ -295,6 +295,8 @@ export function parse(source: string, options: ParseOptions = {}): ParseResult {
     expect("{")
     const members: A.TypeMember[] = []
     while (!isPunct("}")) {
+      // private / protected / public — у членов объявленного класса (declare class), перед именем.
+      const access = (is("private") || is("protected") || is("public")) && peek(1).kind !== "punctuator" ? next().value : undefined
       const readonly = is("readonly") && peek(1).kind !== "punctuator" ? (next(), true) : false
       if (isPunct("(") || isPunct("<")) {
         // Сигнатура вызова: (a: T): R — объект, который можно вызвать.
@@ -319,16 +321,20 @@ export function parse(source: string, options: ParseOptions = {}): ParseResult {
           const typeParams = parseTypeParamDecls()
           const params = parseFunctionTypeParams()
           const result = eat(":") ? parseType() : { ...loc(), kind: "KeywordType" as const, name: "void" }
-          members.push({ name, optional, readonly, method: true, type: { ...loc(), kind: "FunctionType", params, result, typeParams } })
+          members.push({ name, optional, readonly, method: true, type: { ...loc(), kind: "FunctionType", params, result, typeParams }, access: memberAccess(access) })
         } else {
           expect(":")
-          members.push({ name, optional, readonly, method: false, type: parseType() })
+          members.push({ name, optional, readonly, method: false, type: parseType(), access: memberAccess(access) })
         }
       }
       if (!eat(";") && !eat(",") && !peek().newlineBefore && !isPunct("}")) fail("expected-token", [";", describe(peek())])
     }
     expect("}")
     return members
+  }
+
+  function memberAccess(word: string | undefined): "private" | "protected" | undefined {
+    return word === "private" || word === "protected" ? word : undefined
   }
 
   function parsePrimaryType(): A.TypeNode {
@@ -1102,12 +1108,13 @@ export function parse(source: string, options: ParseOptions = {}): ParseResult {
       consumeSemicolon()
       return { ...start, kind: "DeclareVar", name, type }
     }
+    const isAbstract = is("abstract") && is("class", 1) ? (next(), true) : false
     if (eat("class")) {
       const name = identifierName()
       const typeParams = parseTypeParamDecls()
       const superClass = eat("extends") ? identifierName() : undefined
       const members = parseObjectType()
-      return { ...start, kind: "DeclareClass", name, typeParams, superClass, members }
+      return { ...start, kind: "DeclareClass", name, typeParams, superClass, members, abstract: isAbstract || undefined }
     }
     return fail("unsupported", ["declare"])
   }
@@ -1141,7 +1148,8 @@ export function parse(source: string, options: ParseOptions = {}): ParseResult {
       return token.value === "import" ? parseImport(start) : parseExport(start)
     }
     const unsupported = UNSUPPORTED_STATEMENTS[token.value]
-    if (unsupported !== undefined && (token.kind === "keyword" || (token.kind === "identifier" && peek(1).kind === "identifier"))) {
+    const declaration = options.declarations && token.value === "declare"
+    if (unsupported !== undefined && !declaration && (token.kind === "keyword" || (token.kind === "identifier" && peek(1).kind === "identifier"))) {
       fail("unsupported", [unsupported])
     }
     if (token.kind === "identifier") {

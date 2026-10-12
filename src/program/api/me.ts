@@ -3,7 +3,7 @@
 import { fuelLevel } from "../../automaton/energy"
 import { tankCapacity, tankOf } from "../../automaton/tank"
 import { robotPosition } from "../../automaton/flight"
-import { charge, defineHostObject, hostGetters, hostMethods, hostSetters, Val } from "../../lang/runtime/core"
+import { charge, defineHostObject, hostGetters, hostKindClass, hostMethods, hostSetters, Val } from "../../lang/runtime/core"
 import { actionError, currentMachine, currentRobot } from "../context"
 import { modelOfRecord, robotBattery, robotVision } from "../../automaton/models"
 import { cargoHandle, distanceBetween, ROBOT_REACH, robotHandle, robotHealth, robotProgramName, robotState } from "../handles"
@@ -11,6 +11,8 @@ import { copyValue, programPosition } from "../values"
 import { text } from "./common"
 
 defineHostObject("me")
+// me instanceof Machine (19.2); Robot — только другие машины.
+hostKindClass.me = "Machine"
 const getters = hostGetters.me
 getters.id = () => currentRobot().id
 getters.name = () => currentRobot().name

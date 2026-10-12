@@ -1,20 +1,22 @@
-// Карта (4.9): marker, zone, find, map.tag. Время и мир (4.7): wait, waitUntil, exit, restart, time, world.
+// Карта (4.9): marker, zone, find, map.tag; zone.find (19.2) — здания класса в зоне. Время и мир (4.7): wait,
+// waitUntil, exit, restart, time, world.
 import { BoundingBox, LuaEntity } from "factorio:runtime"
-import { controlFlow, defineHostObject, host, hostBlocking, hostGetters, hostMethods, program, Val } from "../../lang/runtime/core"
+import { controlFlow, defineHostObject, host, hostBlocking, hostGetters, hostKindClass, hostMethods, program, Val } from "../../lang/runtime/core"
 import { lib } from "../../lang/runtime/library"
 import { truthy } from "../../lang/runtime/values"
 import { MARKER_ENTITIES, modelOf } from "../../names"
 import { findMarker } from "../../world/markers"
 import { findZone, zoneCenter } from "../../world/zones"
 import { actionError, currentMachine, currentRobot } from "../context"
-import { entityHandle } from "../handles"
+import { entityHandle, isOfClass, kindFilter } from "../handles"
 import { registerPoll, resume, sleepUntil } from "../scheduler"
 import { programArray, programPosition, readPosition } from "../values"
-import { finishWaiting, item, startWaiting, text, ticks } from "./common"
+import { buildingKind, finishWaiting, item, nameList, startWaiting, text, ticks } from "./common"
 
 // ---------- Метки и зоны ----------
 
 defineHostObject("marker")
+hostKindClass.marker = "Marker"
 hostGetters.marker.name = (o: Val) => storage.markers.byId[o.__id]?.name ?? o.__name
 hostGetters.marker.position = (o: Val) => {
   const marker = storage.markers.byId[o.__id]
@@ -37,6 +39,7 @@ function zoneOf(o: Val) {
 }
 
 defineHostObject("zone")
+hostKindClass.zone = "Zone"
 hostGetters.zone.name = (o: Val) => o.__name
 hostGetters.zone.area = (o: Val) => {
   const area = zoneOf(o).area
@@ -57,23 +60,32 @@ host.zone = (name: Val) => {
   return { __t: "host", __h: "zone", __name: zone.name }
 }
 
+interface ZoneFilter {
+  name?: string | string[]
+  type?: string | string[]
+  /** Класс зданий (19.2): найденное проверяется по классу. */
+  kind?: string
+}
+
 /** Здания в зоне на любом расстоянии (без поля зрения доступно только неизменное). */
-host.find = (what: Val, where: Val) => {
+function findInZone(where: Val, what: ZoneFilter): Val {
   const robot = currentRobot()
   if (type(where) !== "table" || where.__h !== "zone") actionError("invalid-target", "find needs a zone")
   const zone = zoneOf(where)
-  const filter: { area: BoundingBox; force: unknown; name?: string; type?: string } = { area: zone.area, force: robot.entity.force }
-  if (type(what) === "string") filter.name = what as string
-  else if (type(what) === "table" && type(what.type) === "string") filter.type = what.type
-  else actionError("invalid-target", 'find needs a name or { type: "…" }')
+  const filter: { area: BoundingBox; force: unknown; name?: string | string[]; type?: string | string[] } = { area: zone.area, force: robot.entity.force }
+  if (what.name !== undefined) filter.name = what.name
+  if (what.type !== undefined) filter.type = what.type
+  const kind = what.kind
   // Кэш зоны (13.3): тот же запрос, пока в зоне ничего не строили и не сносили, и все здания живы.
-  const key = `${robot.entity.force_index}|${filter.name ?? ""}|${filter.type ?? ""}`
+  const list = (v: string | string[] | undefined) => (v === undefined ? "" : type(v) === "table" ? (v as string[]).join(",") : (v as string))
+  const key = `${robot.entity.force_index}|${list(filter.name)}|${list(filter.type)}|${kind ?? ""}`
   const cached = zone.found?.[key] as Val[] | undefined
   if (cached !== undefined && cached.every((h) => (h.__e as LuaEntity).valid)) return programArray([...cached])
   const found = zone.surface.find_entities_filtered(filter as never)
   const entities: LuaEntity[] = []
   for (const entity of found) {
     if (entity.type === "unit" || entity.type === "character" || MARKER_ENTITIES.includes(entity.name) || modelOf(entity.name) !== undefined) continue
+    if (kind !== undefined && kind !== "Building" && !isOfClass(entity, kind)) continue
     entities.push(entity)
   }
   // Порядок — по номеру здания: не зависит от того, в каком порядке их отдал движок.
@@ -82,6 +94,20 @@ host.find = (what: Val, where: Val) => {
   zone.found ??= {}
   zone.found[key] = result
   return programArray([...result])
+}
+
+host.find = (what: Val, where: Val) => {
+  if (type(what) === "string") return findInZone(where, { name: what as string })
+  if (type(what) === "table" && type(what.type) === "string") return findInZone(where, { type: what.type as string })
+  actionError("invalid-target", 'find needs a name or { type: "…" }')
+}
+
+/** zone.find(Furnace, имя?) — здания класса; zone.find(имя?) — по имени или все. */
+hostMethods.zone.find = (o: Val, _k: Val, what: Val, name: Val) => {
+  const kind = buildingKind(what)
+  if (kind === undefined) return findInZone(o, { name: nameList(what), kind: "Building" })
+  const byKind = kindFilter(kind)
+  return findInZone(o, { name: nameList(name) ?? byKind.name, type: byKind.type, kind })
 }
 
 defineHostObject("map")

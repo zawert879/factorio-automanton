@@ -3,7 +3,10 @@
 // Значения программ (LANGUAGE.md, «Представление в Lua»): числа, строки, логические, nil,
 // массивы {__n = длина, [1..n]}, объекты (таблицы со строковыми ключами), экземпляры {__cls = класс},
 // классы {__k, __name, __s, __m, __g, __ctor}, функции {__f, __e}, Map/Set {__t = "Map"/"Set"},
-// объекты API {__t = "host", __h = имя}. Служебные ключи начинаются с __ — программе они недоступны.
+// объекты API {__t = "host", __h = имя} (у объектов игры с классом — ещё __c, 19.2). Служебные ключи
+// начинаются с __ — программе они недоступны.
+
+import { HOST_CLASSES } from "../hostClasses"
 
 export type Val = any
 export type Fn = (this: void, ...args: any[]) => any
@@ -179,7 +182,7 @@ export function describe(this: void, x: Val): string {
   if (x.__n !== undefined) return "array"
   if (x.__f !== undefined || x.__hf !== undefined || x.__lf !== undefined || x.__k !== undefined) return "function"
   if (x.__t === "Map" || x.__t === "Set") return x.__t
-  if (x.__t === "host") return x.__h
+  if (x.__t === "host") return x.__c ?? x.__h
   return "object"
 }
 
@@ -204,6 +207,25 @@ export function defineHostObject(this: void, name: string): Val {
   hostGetters[name] = hostGetters[name] ?? {}
   hostSetters[name] = hostSetters[name] ?? {}
   return o
+}
+
+// ---------- Классы объектов игры (19.2) ----------
+// Обёртка объекта игры с полем __c (здания: класс по типу прототипа) берёт свойства и методы из таблиц
+// своего класса, они наследуют таблицы родителя (Furnace → Building). Без __c — по виду обёртки __h.
+
+/** Класс объекта игры по виду обёртки без своего __c: robot → Robot. Заполняет игровой слой. */
+export const hostKindClass: Record<string, string> = {}
+
+for (const [name, parent] of HOST_CLASSES) {
+  builtinClass(name, parent === undefined ? undefined : classes[parent]).__hostClass = true
+  for (const registry of [hostMethods, hostGetters, hostSetters]) {
+    registry[name] = parent === undefined ? {} : setmetatable({}, { __index: registry[parent] })
+  }
+}
+
+/** Класс объекта игры (имя) или undefined, если это не объект игры с классом. */
+export function hostClassOf(this: void, o: Val): string | undefined {
+  return o.__c ?? hostKindClass[o.__h]
 }
 
 /** Завершить программу (exit) или начать заново (restart): маркер, который catch не перехватывает. */
