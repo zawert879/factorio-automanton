@@ -16,7 +16,8 @@ export interface PinSpec {
   nullable?: boolean
 }
 
-export type SettingKind = "text" | "number" | "boolean" | "enum" | "type" | "params"
+/** params — таблица параметров функции (имя и тип), function — выбор функции (своей схемы или библиотеки). */
+export type SettingKind = "text" | "number" | "boolean" | "enum" | "type" | "params" | "function"
 
 export interface SettingSpec {
   id: string
@@ -414,7 +415,8 @@ define({
   ],
 })
 define({ kind: "return", category: "functions", exec: true, noNext: true, inputs: pins("value:value?"), outputs: [] })
-define({ kind: "call", category: "functions", exec: true, inputs: [], outputs: [], settings: [{ id: "name", kind: "text", default: "deliver" }] })
+// Своя функция — по имени; функция библиотеки — ещё library и снимок подписи (params, returns, nullable), см. signatures.ts.
+define({ kind: "call", category: "functions", exec: true, inputs: [], outputs: [], settings: [{ id: "name", kind: "function", default: "deliver" }] })
 
 // ---------- Вывод ----------
 

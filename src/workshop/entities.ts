@@ -444,7 +444,8 @@ export function readGraph(ws: Workshop): { graph: Graph; problems: WireProblem[]
   for (const id of ids) {
     const node = ws.nodes[id]!
     const corner = nodeCorner(node.body)
-    nodes.push({ id, kind: node.kind, x: corner.x, y: corner.y, values: node.values })
+    // Копия значений: опубликованная схема не должна меняться вместе с черновиком.
+    nodes.push({ id, kind: node.kind, x: corner.x, y: corner.y, values: { ...node.values } })
   }
   const wires: GraphWire[] = []
   const problems: WireProblem[] = []

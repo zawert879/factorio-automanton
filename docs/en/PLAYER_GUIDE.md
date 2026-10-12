@@ -210,8 +210,8 @@ the program's own area, which you enter without your character (it waits at the 
 
 ![The workshop: the "Miner" graph](../media/workshop.png)
 
-1. Programs window → **New graph** (the name comes from the name field; empty — "Graph 1"). You are in the workshop
-   right away, with a Start node on the floor.
+1. Programs window → **New graph** → a name in the small window (a free "Graph 1" is suggested). You are in the
+   workshop right away, with a Start node on the floor. **Edit** opens the workshop of a graph from the list.
 2. On the left is the **palette**: sections (flow, movement, items, team…) and nodes. Click a node to take it in hand
    and place it like a blueprint (Q to drop it).
 3. **Wires** — the Red and Green buttons at the top of the palette put a wire in your hand: click one pin, then another.
@@ -230,10 +230,22 @@ Graph rules:
   after the action has run.
 - Try: an action error in the "body" branch leads to the "error" branch, with the code on the "error code" output.
 - A variable is a Variable node (name, type, initial value) plus Get and Set nodes. Your own function is a Function
-  node (name, parameters like `depot: marker`) plus a Call node.
+  node: a name, parameters in a table (name and type; "+ parameter", "✕") and what it returns. A Call node calls it —
+  pick the function from the list in its window, and its pins follow the function's parameters.
 - Machine parameters — a Parameter node (name, type, default value): one graph, different settings on different machines.
 - To move nodes, cut and paste them (Ctrl+X, Ctrl+V): their wires move with them. Ctrl+C copies without the wires
   to the rest of the graph.
+
+A **graph library** is a graph without Start, with only functions. Its functions are visible to the other team
+programs, like `export function` in code:
+
+- the list in the Call window has the functions of this graph and of the team's libraries ("deliver — lib/Delivery"):
+  both graphs and code, as long as the function's parameters are of simple types (number, text, yes/no, item, fluid,
+  position, building and its classes, machine, marker, zone, target, value, lists of buildings and machines). Functions
+  that take a function (`attempt` from `lib/Помощники`) are not listed;
+- a code program imports a graph library as usual: `import { deliver } from "./lib/Delivery"`;
+- changed a library? The programs that use it are rebuilt, as with a code library; the pins of Call nodes are updated
+  when you enter the workshop of a graph that calls it. Renamed it? The Call nodes are fixed automatically.
 
 A graph program is an ordinary team program: it is assigned to machines, shows up in All machines, travels in exchange
 strings (together with its graph) and is debugged in the machine window (the node is shown next to the line). Its code

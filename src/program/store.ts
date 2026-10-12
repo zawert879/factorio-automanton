@@ -13,7 +13,7 @@ import { LuaPlayer } from "factorio:runtime"
 import { compile, CompileResult, MAX_SOURCE_BYTES, ProgramVariable } from "../lang/codegen"
 import { Diagnostic } from "../lang/lexer"
 import { Graph } from "../graph/model"
-import { englishGraphSource, graphToSource } from "../graph/codegen"
+import { englishGraphSource, graphToSource, renameLibraryInGraph } from "../graph/codegen"
 import { relativeModulePath, resolveModulePath, rewriteImportPaths } from "../lang/modules"
 import { loadProgram, Program } from "../lang/runtime"
 
@@ -285,6 +285,8 @@ function rebuildDependents(module: ProgramRecord, oldName: string | undefined, a
   // Сначала все новые тексты (зависимые могут импортировать друг друга), потом сборка.
   const overlay = new Map<string, string>()
   if (oldName !== undefined) {
+    // Схемы помнят библиотеку вызова по полному имени (20.1): узлы «Вызвать» — под новым именем.
+    for (const p of affected) if (p.graph !== undefined) renameLibraryInGraph(p.graph, oldName, module.name)
     for (const p of affected) {
       const source = rewriteImportPaths(p.source, (spec) => {
         const target = resolveModulePath(p.name, spec)

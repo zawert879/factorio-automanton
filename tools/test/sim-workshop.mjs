@@ -1,6 +1,6 @@
 // npm run test:sim (вторая часть) — мастерская схем настоящим игроком (15.4–15.6): вход в режиме без персонажа,
 // узел из палитры (чертёж в руке), красный провод кликами, клик по узлу — окно настроек, вырезать и вставить
-// с проводом, публикация, выход к персонажу. Игра С ОКНОМ на секунды; итог — result.json.
+// с проводом, публикация, параметры «Функции» таблицей (20.1), выход к персонажу. Игра С ОКНОМ на секунды; итог — result.json.
 import { spawn } from "node:child_process"
 import { existsSync, readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
@@ -25,6 +25,7 @@ pcall(function() game.simulation.camera_surface_index = player.surface.index end
 game.simulation.camera_position = {20, 6}
 step, wait = 1, 0
 function graph() return remote.call(W, "graph", "sim/схема") end
+function nodeValues(id) return remote.call(W, "values", "sim/схема", id) or {} end
 function finish()
   helpers.write_file("automaton-sim/result.json", helpers.table_to_json(R), false)
   step = 1000
@@ -93,8 +94,51 @@ elseif step == 14 and wait > 20 then
   R.afterPaste = { nodes = #g.nodes, wires = g.wires, problems = g.problems }
   for _, n in ipairs(g.nodes) do if n.kind == "wait" then R.movedY = n.y end end
   R.publish = remote.call(W, "publish", player.index)
+  step, wait = 20, 0
+-- 5. «Функция» из палитры, окно узла: «+ параметр» — строка таблицы и параметр; имя печатается, окно не перерисовывается.
+elseif step == 20 and wait > 10 then
+  remote.call(W, "pick", player.index, "function")
+  step, wait = 21, 0
+elseif step == 21 and at({44, 4}) then sim.control_press{control = "build", notify = false}; step, wait = 22, 0
+elseif step == 22 and wait > 20 then
+  player.clear_cursor()
+  for _, n in ipairs(graph().nodes) do if n.kind == "function" then fnNode = n.id end end
+  R.fnNode = fnNode
+  fnBody = fnNode and remote.call(W, "body", "sim/схема", fnNode)
+  step, wait = 23, 0
+elseif step == 23 and fnBody and at({fnBody.x, fnBody.y - 0.6}) then sim.control_press{control = "open-gui", notify = true}; step, wait = 24, 0
+elseif step == 24 and wait > 10 then
+  addAt = sim.get_widget_position{type = "text-button-localised-substring", data = "automaton-workshop.add-param"}
+  R.addButton = addAt ~= nil
+  step, wait = 25, 0
+  if not addAt then step = 15 end
+elseif step == 25 and at(addAt) then sim.mouse_click(); step, wait = 26, 0
+elseif step == 26 and wait > 10 then
+  R.afterAdd = nodeValues(fnNode).params
+  fieldAt = sim.get_widget_position{type = "textfield", data = "p1"}
+  R.field = fieldAt ~= nil
+  step, wait = 27, 0
+  if not fieldAt then step = 15 end
+elseif step == 27 and at(fieldAt) then sim.mouse_click(); step, wait = 28, 0
+elseif step == 28 and wait > 5 then
+  -- Щелчок симуляции фокус в поле не ставит — фокус скриптом; дальше ввод как с клавиатуры (курсор над полем).
+  -- Латиницей: кириллицу sim.write не печатает (у игрока — печатается).
+  local window = player.gui.screen["automaton-workshop-node"]
+  local function field(el)
+    if el.type == "textfield" and el.text == "p1" then return el end
+    for _, c in pairs(el.children) do local f = field(c); if f then return f end end
+  end
+  local f = window and field(window)
+  windowIndex = window and window.index
+  if f then f.focus(); sim.write{text = "dest"} end
+  step, wait = 29, 0
+elseif step == 29 and wait > 10 then
+  local window = player.gui.screen["automaton-workshop-node"]
+  R.sameWindow = window ~= nil and window.index == windowIndex
+  R.afterType = nodeValues(fnNode).params
+  if window then window.destroy() end
   step, wait = 15, 0
--- 5. Выйти: снова персонаж на обычной карте.
+-- 6. Выйти: снова персонаж на обычной карте.
 elseif step == 15 and wait > 10 then
   remote.call(W, "exit", player.index)
   R.exitController = player.controller_type
@@ -149,5 +193,7 @@ check(r.afterGreen?.wires === 1 && r.afterGreen?.problems === 0, "зелёный
 check(r.nodeWindow === true, "клик по узлу — окно настроек")
 check(r.afterPaste?.nodes === 2 && arr(r.afterPaste?.wires).length === 1 && r.afterPaste?.problems === 0, "вырезать и вставить: узел перенесён, провод цел")
 check(r.publish?.errors === 0 && r.publish?.version === 2, "публикация из мастерской: новая версия")
+check(r.addButton === true && r.afterAdd === "p1: number", "окно «Функции»: «+ параметр» — параметр p1 (число)")
+check(r.field === true && /^(p1)?dest: number$/.test(r.afterType ?? "") && r.sameWindow === true, "имя параметра печатается в таблице, окно не перерисовывается")
 check(r.exitController === 1 && r.exitSurface === "nauvis" && r.exitCharacter, "выход: снова персонаж на карте")
 if (failures.length > 0) process.exit(1)

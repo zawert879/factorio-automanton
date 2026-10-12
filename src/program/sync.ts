@@ -19,6 +19,7 @@
 import { CustomCommandData, LuaPlayer, PlayerIndex } from "factorio:runtime"
 import { onEvent, onTick } from "../events"
 import { Diagnostic } from "../lang/lexer"
+import { publishing } from "../workshop/publish"
 import { DTS, DTS_EN, SYNC_TOOL, SYNC_TOOL_HASH, TS_PLUGIN, TSCONFIG } from "../gui/dts.generated"
 import {
   deleteProgram,
@@ -315,7 +316,11 @@ function handle(request: Request, sender: string, player: LuaPlayer | undefined)
       if (typeof request.to !== "string") return { ok: false, error: "bad request" }
       // Уже переименована (в игре: файлы перенесла сама игра) — тихо.
       if (program === undefined) return findProgram(request.to, force) !== undefined ? { ok: true, already: true } : { ok: false, error: "no program" }
-      return publishReply(publish({ id: program.id, name: request.to, source: program.source, force, author: player?.name ?? "VS Code" }), force)
+      // Схема остаётся схемой (без graph запись потеряла бы её), а черновик в её мастерской — черновиком.
+      publishing.fromWorkshop = program.graph !== undefined
+      const renamed = publish({ id: program.id, name: request.to, source: program.source, force, author: player?.name ?? "VS Code", graph: program.graph, graphLines: program.graphLines })
+      publishing.fromWorkshop = false
+      return publishReply(renamed, force)
     }
     case "refresh-started":
       // Утилита получила «Обновить из папки» — ждать её ответа больше не нужно.

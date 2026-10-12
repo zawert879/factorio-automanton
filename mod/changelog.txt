@@ -10,13 +10,15 @@ Date: 2026-10-12
     - Was → now: pump(fluid) → me.tank.pump(fluid); fill(b) → b.fill(); drain(b, fluid) → b.drain(fluid); refuel(item) → me.energy.refuel(item); refuel(item, robot) → robot.refuel(item); charge() → me.energy.charge(); me.fuel and robot.fuel → me.energy.level and robot.energy.level.
     - Was → now: attack, guard, patrol, reload(…) → me.weapon.attack(…) and so on (me.weapon is null on non-combat models); send, publish, subscribe, unsubscribe, receive, tryReceive, request(…) and inbox → radio.send(…) and so on, radio.inbox; find("name", zone(z)) → zone(z).find("name") or zone(z).find(Furnace); scan.entities(…) → scan.buildings(…); Entity → Building.
     - fill, drain and pump on a machine without a tank fail with the new error code no-tank.
+    - New graph asks for a name in its own window (a free "Graph N" is suggested); Edit on a graph program opens its workshop.
   Features:
+    - Graph libraries: a graph without Start is a library — its functions are exported and can be called from other graphs and imported by code programs.
+    - The Call node picks a function from a list: the functions of this graph and of the team's libraries (graphs, and code functions with parameters of simple types). Its pins follow the chosen function; the graph's code gets an import.
+    - Function parameters are edited as a table: name and type, "+ parameter" and "✕".
     - New example program Refueler (Заправщик): brings coal to whoever asks and checks with instanceof whether that is a machine or a building.
     - Graphs keep their nodes; their code is rebuilt with the new API.
   Info:
     - Player guide, README, in-game help (F1) and VS Code types use the new API (Russian and English).
-  Changes:
-    - New graph asks for a name in its own window (a free "Graph N" is suggested); Edit on a graph program opens its workshop.
   Bugfixes:
     - A green wire could be connected to the red flow pins (and a red one to data pins) and was read as a valid wire: such a wire is now removed right away, and a wrong-colour wire from a blueprint is an error on the node.
     - Gates did not open for machines, and the pathfinder treated a closed gate as a wall: a machine could not get into an area walled off with gates. Machines now path through gates, and gates open in front of them.

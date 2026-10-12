@@ -18,6 +18,13 @@ import { openHelp } from "../gui/help"
 import { openPicker } from "../gui/picker"
 import { assignProgram } from "../program/machines"
 import { findProgram, publish, publishProgram } from "../program/store"
+import { GraphBuilder } from "../graph/builder"
+import { graphToSource } from "../graph/codegen"
+import { Graph } from "../graph/model"
+import { libraryFunctions, signatureValues } from "../graph/signatures"
+import { openNodeWindow } from "../workshop/gui"
+import { refreshLibraryCalls } from "../workshop/libraries"
+import { enterWorkshop, exitWorkshop } from "../workshop/session"
 import { writeVsCodeFolder } from "../program/sync"
 
 const CENTER = { x: 300, y: 300 }
@@ -336,9 +343,36 @@ for (let x = 10; x < 86; x++) c.pixel(x, 54, x % 2 === 0 ? "green" : "red")`,
     }
   }
   if (tick === 303) guiShot("new-graph-taken")
+  // Библиотеки из схем (20.1): у «Вызвать» — список своих функций и функций библиотек, у «Функции» — параметры таблицей.
+  if (tick === 304) {
+    const player = game.get_player(1 as PlayerIndex)
+    if (player !== undefined) {
+      player.gui.screen.clear()
+      const lib = graphProgram("lib/Доставка", libraryGraph())
+      graphProgram("Курьер", courierGraph())
+      const main = findProgram("Курьер", "player")!
+      const ws = enterWorkshop(player, main)
+      refreshLibraryCalls(ws)
+      for (const [, node] of pairs(ws.nodes)) if (node.kind === "call") openNodeWindow(player, ws, node)
+      void lib
+    }
+  }
+  if (tick === 306) guiShot("workshop-call")
+  if (tick === 307) {
+    const player = game.get_player(1 as PlayerIndex)
+    if (player !== undefined) {
+      const ws = enterWorkshop(player, findProgram("lib/Доставка", "player")!)
+      for (const [, node] of pairs(ws.nodes)) if (node.kind === "function") openNodeWindow(player, ws, node)
+    }
+  }
+  if (tick === 309) guiShot("workshop-params")
+  if (tick === 310) {
+    const player = game.get_player(1 as PlayerIndex)
+    if (player !== undefined) exitWorkshop(player)
+  }
   // Дерево технологий (этап 6): технологии автоматонов на месте «Логистики». Экран технологий в одиночной
   // игре ставит её на паузу — поэтому снимок последний, в том же тике (shot.mjs ждёт файлы ещё пару секунд).
-  if (tick === 305) {
+  if (tick === 312) {
     const player = game.get_player(1 as PlayerIndex)
     if (player !== undefined) {
       player.opened = undefined
@@ -350,3 +384,28 @@ for (let x = 10; x < 86; x++) c.pixel(x, 54, x % 2 === 0 ? "green" : "red")`,
     script.on_nth_tick(1, undefined)
   }
 })
+
+/** Библиотека-схема для снимков: «отвезти(куда, что, сколько)» — к метке и положить в сундук. */
+function libraryGraph(): Graph {
+  const b = new GraphBuilder()
+  const fn = b.node("function", { name: "отвезти", params: "куда: marker, что: item, сколько: number", returns: "none" })
+  const move = b.node("move")
+  b.exec(fn, move).data(fn, move, "to", "куда")
+  return b.layout()
+}
+
+/** Схема «Курьер»: «Старт» → «Вызвать» отвезти из lib/Доставка. */
+function courierGraph(): Graph {
+  const lib = graphToSource(libraryGraph(), "lib/Доставка").source
+  const fn = libraryFunctions(lib)[0]
+  const b = new GraphBuilder()
+  const start = b.node("start")
+  const call = b.node("call", { name: fn.name, library: "lib/Доставка", ...signatureValues(fn), куда: "склад", что: "iron-plate", сколько: 20 })
+  b.exec(start, call)
+  return b.layout()
+}
+
+function graphProgram(name: string, graph: Graph): void {
+  const source = graphToSource(graph, name)
+  publish({ name, source: source.source, graph, graphLines: source.lineNodes, force: "player" })
+}

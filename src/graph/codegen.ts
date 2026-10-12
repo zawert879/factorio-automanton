@@ -6,6 +6,7 @@
 import { assignable, ELEMENT_TYPES, Graph, GraphDiagnostic, GraphNode, GraphValue, PinType, TS_TYPES } from "./model"
 import { HELPERS, NODES, NodeSpec, PinSpec, quote, settingType } from "./nodes"
 import { HOST_CLASSES } from "../lang/hostClasses"
+import { relativeModulePath } from "../lang/modules"
 
 export interface GraphSource {
   ok: boolean
@@ -32,8 +33,17 @@ interface Source {
 interface FunctionInfo {
   node: GraphNode
   ident: string
-  params: { name: string; type: PinType }[]
+  params: GraphParam[]
   returns: PinType | undefined
+}
+
+/** Параметр функции: свой (у «Функции») или из снимка подписи функции библиотеки (у «Вызвать»). */
+export interface GraphParam {
+  name: string
+  type: PinType
+  optional?: boolean
+  /** Приведение аргумента: «entity as Furnace» — провод несёт Building, параметр — Furnace. */
+  cast?: string
 }
 
 const KEYWORDS = new Set([
@@ -73,15 +83,40 @@ export function validName(name: unknown, allowGlobal = false): name is string {
   return !has(name, NOT_NAME_CHAR)
 }
 
-/** Параметры функции из настройки: «куда: marker, сколько: number». */
-export function parseParams(text: GraphValue | undefined): { name: string; type: PinType }[] {
-  const result: { name: string; type: PinType }[] = []
+/** Параметры функции из настройки: «куда: marker, сколько?: number, печь: entity as Furnace». */
+export function parseParams(text: GraphValue | undefined): GraphParam[] {
+  const result: GraphParam[] = []
   if (typeof text !== "string") return result
   for (const [part] of string.gmatch(text, "[^,]+")) {
-    const [name, type] = string.match(part, "^%s*([^:%s]+)%s*:?%s*([%w]*)%s*$")
-    if (name !== undefined) result.push({ name, type: type !== undefined && type !== "" ? (type as PinType) : "value" })
+    const [name, optional, type, rest] = string.match(part, "^%s*([^:%s?]+)%s*(%??)%s*:?%s*([%w]*)%s*(.-)%s*$")
+    if (name === undefined) continue
+    const [cast] = string.match(rest ?? "", "^as%s+([%w_%[%]]+)$")
+    result.push({ name, type: type !== undefined && type !== "" ? (type as PinType) : "value", optional: optional === "?" ? true : undefined, cast })
   }
   return result
+}
+
+/** Параметры в строку настройки (обратно к parseParams). */
+export function formatParams(params: GraphParam[]): string {
+  return params.map((p) => `${p.name}${p.optional ? "?" : ""}: ${p.type}${p.cast === undefined ? "" : ` as ${p.cast}`}`).join(", ")
+}
+
+/** Библиотека, из которой вызывается функция (у вызова своей функции — undefined). */
+export function callLibrary(node: { values: Record<string, GraphValue | undefined> }): string | undefined {
+  const library = node.values.library
+  return typeof library === "string" && library !== "" ? library : undefined
+}
+
+/** Библиотеку переименовали: вызовы её функций в схеме — под новым именем. Итог — было ли что менять. */
+export function renameLibraryInGraph(graph: Graph, oldName: string, newName: string): boolean {
+  let changed = false
+  for (const node of graph.nodes) {
+    if (node.kind === "call" && node.values.library === oldName) {
+      node.values.library = newName
+      changed = true
+    }
+  }
+  return changed
 }
 
 /** Разъёмы узла с учётом настроек и схемы (параметры, переменные, функции, элемент списка). */
@@ -117,11 +152,13 @@ export function resolvePins(node: GraphNode, graph: Graph, sourceType?: (node: G
       outputs = parseParams(node.values.params).map((p) => ({ id: p.name, type: p.type }))
       break
     case "call": {
-      const fn = functionNode(graph, node.values.name)
+      // Функция библиотеки — по снимку подписи в самом узле, своя — по узлу «Функция».
+      const fn = callLibrary(node) !== undefined ? node : functionNode(graph, node.values.name)
       if (fn !== undefined) {
-        inputs = parseParams(fn.values.params).map((p) => ({ id: p.name, type: p.type }))
+        inputs = parseParams(fn.values.params).map((p) => ({ id: p.name, type: p.type, optional: p.optional }))
         const returns = settingType(fn.values.returns, "value")
-        outputs = fn.values.returns === undefined || fn.values.returns === "none" ? [] : [{ id: "result", type: returns }]
+        const nullable = fn.values.nullable === true ? true : undefined
+        outputs = fn.values.returns === undefined || fn.values.returns === "none" ? [] : [{ id: "result", type: returns, nullable }]
       } else {
         inputs = []
         outputs = []
@@ -313,8 +350,35 @@ export function graphToSource(graph: Graph, title = "", english = false): GraphS
   }
   for (const node of graph.nodes) {
     if ((node.kind === "variable-get" || node.kind === "variable-set") && !declared[`${node.values.name}`]) fail(node.id, "graph-no-variable", [`${node.values.name ?? ""}`])
-    if (node.kind === "call" && functionNode(graph, node.values.name) === undefined) fail(node.id, "graph-no-function", [`${node.values.name ?? ""}`])
+    if (node.kind === "call" && (callLibrary(node) === undefined ? functionNode(graph, node.values.name) === undefined : !validName(node.values.name, true))) {
+      fail(node.id, "graph-no-function", [`${node.values.name ?? ""}`])
+    }
   }
+  // Функции библиотек: import { имя } from "путь"; имя занято (своя функция, переменная, API, другая библиотека) — псевдоним.
+  const taken: Record<string, boolean | undefined> = {}
+  for (const name of Object.keys(declared)) taken[name] = true
+  for (const p of params) taken[paramConst(p.name)] = true
+  for (const info of functions) taken[info.ident] = true
+  const imports: { library: string; node: number; names: { name: string; alias: string }[] }[] = []
+  const aliases: Record<string, Record<string, string | undefined> | undefined> = {}
+  for (const node of graph.nodes) {
+    const library = node.kind === "call" ? callLibrary(node) : undefined
+    const name = node.values.name
+    if (library === undefined || typeof name !== "string" || aliases[library]?.[name] !== undefined) continue
+    let entry = imports.find((i) => i.library === library)
+    if (entry === undefined) {
+      entry = { library, node: node.id, names: [] }
+      imports.push(entry)
+    }
+    let alias = name
+    for (let n = 2; taken[alias] || GLOBALS.has(alias) || KEYWORDS.has(alias); n++) alias = `${name}_${n}`
+    taken[alias] = true
+    entry.names.push({ name, alias })
+    const byName = aliases[library] ?? {}
+    byName[name] = alias
+    aliases[library] = byName
+  }
+  table.sort(imports, (a, b) => a.library < b.library)
   if (starts === 0 && functions.length === 0) fail(0, "graph-no-start")
   if (starts > 1) for (const node of graph.nodes) if (node.kind === "start") fail(node.id, "graph-two-starts")
 
@@ -546,9 +610,17 @@ export function graphToSource(graph: Graph, title = "", english = false): GraphS
         return outs.next
       }
       case "call": {
-        const fn = functions.find((f) => f.ident === node.values.name)
+        const library = callLibrary(node)
+        const list = library === undefined ? functions.find((f) => f.ident === node.values.name)?.params ?? [] : parseParams(node.values.params)
+        const callee = library === undefined ? `${node.values.name}` : aliases[library]?.[`${node.values.name}`] ?? `${node.values.name}`
         const args = argsOf(node)
-        const text = `${node.values.name}(${(fn?.params ?? []).map((p) => args[p.name] ?? "undefined").join(", ")})`
+        const parts = list.map((p) => {
+          const arg = args[p.name]
+          return arg === undefined || p.cast === undefined ? arg : `${wrap(arg)} as ${p.cast}`
+        })
+        // Необязательные аргументы в конце без значения — не передавать.
+        while (parts.length > 0 && parts[parts.length - 1] === undefined && list[parts.length - 1].optional) parts.pop()
+        const text = `${callee}(${parts.map((a) => a ?? "undefined").join(", ")})`
         const pins = pinsOf(node)
         const result = pins?.outputs[0]
         line(result !== undefined && usedOutput(node.id) ? `${resultVar(node, result)} = ${text};` : `${text};`, depth, node.id)
@@ -599,6 +671,10 @@ export function graphToSource(graph: Graph, title = "", english = false): GraphS
     if (node !== undefined) lineNodes[out.length] = node
   }
   push(english ? `// Built from the graph${title !== "" ? ` "${title}"` : ""}. Edit it in the workshop.` : `// Собрано из схемы${title !== "" ? ` «${title}»` : ""}. Править — в мастерской.`)
+  for (const entry of imports) {
+    const names = entry.names.map((n) => (n.alias === n.name ? n.name : `${n.name} as ${n.alias}`))
+    push(`import { ${names.join(", ")} } from ${quote(relativeModulePath(title, entry.library))};`, entry.node)
+  }
   if (params.length > 0) {
     const fields = params.map((p) => `${p.name}?: ${p.type === "marker" || p.type === "zone" ? "string" : tsType(p.type)}`)
     const owner = graph.nodes.find((n) => n.kind === "param")
@@ -620,8 +696,9 @@ export function graphToSource(graph: Graph, title = "", english = false): GraphS
   appendBlock(main, 0)
   for (const { info, block: fb } of fnBlocks) {
     out.push("")
-    const signature = info.params.map((p) => `${p.name}: ${tsType(p.type)}`).join(", ")
-    push(`function ${info.ident}(${signature})${info.returns === undefined ? "" : `: ${tsType(info.returns)}`} {`, info.node.id)
+    const signature = info.params.map((p) => `${p.name}${p.optional ? "?" : ""}: ${tsType(p.type)}`).join(", ")
+    // Схема без «Старта» — библиотека (20.1): её функции видны другим программам.
+    push(`${starts === 0 ? "export " : ""}function ${info.ident}(${signature})${info.returns === undefined ? "" : `: ${tsType(info.returns)}`} {`, info.node.id)
     appendBlock(fb, 1)
     if (info.returns !== undefined) push(`  throw new Error(${quote(`функция ${info.ident} закончилась без «Вернуть»`)});`, info.node.id)
     push("}", info.node.id)

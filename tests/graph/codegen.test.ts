@@ -3,10 +3,11 @@ import { describe, expect, test } from "../../src/test/testing"
 import { compile } from "../../src/lang/codegen"
 import { GraphBuilder } from "../../src/graph/builder"
 import { graphToSource } from "../../src/graph/codegen"
-import { Graph } from "../../src/graph/model"
+import { Graph, GraphNode, GraphValue } from "../../src/graph/model"
+import { libraryFunctions, signatureValues } from "../../src/graph/signatures"
 import { NODES } from "../../src/graph/nodes"
 import "../lang/api-stubs"
-import { run } from "../lang/harness"
+import { outputOf, run } from "../lang/harness"
 
 function contains(text: string, part: string): boolean {
   const [at] = string.find(text, part, 1, true)
@@ -146,5 +147,95 @@ describe("схема → код", () => {
       const special = ["start", "if", "forever", "while", "repeat", "foreach", "break", "continue", "try", "param", "variable", "variable-get", "variable-set", "function", "return", "call"]
       if (!special.includes(kind)) expect(`${kind}: ${spec.code !== undefined}`).toBe(`${kind}: true`)
     }
+  })
+})
+
+// ---------- Библиотеки из схем (20.1) ----------
+
+/** Библиотека-схема «удвоить(x: number): number» без «Старта». */
+function doubler(): Graph {
+  const b = new GraphBuilder()
+  const fn = b.node("function", { name: "удвоить", params: "x: number", returns: "number" })
+  const mul = b.node("math", { op: "*", b: 2 })
+  const ret = b.node("return")
+  b.exec(fn, ret).data(fn, mul, "a", "x").data(mul, ret, "value")
+  return b.layout()
+}
+
+/** Узел «Вызвать» функцию библиотеки: имя, библиотека и снимок подписи. */
+function libraryCall(b: GraphBuilder, library: string, librarySource: string, name: string, values: Record<string, GraphValue | undefined> = {}): GraphNode {
+  const fn = libraryFunctions(librarySource).find((f) => f.name === name)
+  if (fn === undefined) error(`нет функции ${name}`)
+  const node = b.node("call", { name, library, ...signatureValues(fn) })
+  for (const [key, value] of pairs(values)) node.values[key] = value
+  return node
+}
+
+describe("библиотеки из схем", () => {
+  test("схема без «Старта» — библиотека: функции с export, код — библиотека", () => {
+    const text = graphToSource(doubler(), "lib/Удвоение").source
+    expect(contains(text, "export function удвоить(x: number): number {")).toBe(true)
+    const compiled = compile(text, { name: "lib/Удвоение" })
+    expect(compiled.ok).toBe(true)
+    expect(compiled.library).toBe(true)
+    // Со «Стартом» — обычная программа: функции не экспортируются.
+    expect(contains(source(miner()), "export ")).toBe(false)
+  })
+
+  test("схема вызывает функцию схемы-библиотеки: import по относительному пути, исполняется", () => {
+    const lib = graphToSource(doubler(), "lib/Удвоение").source
+    const b = new GraphBuilder()
+    const start = b.node("start")
+    const call = libraryCall(b, "lib/Удвоение", lib, "удвоить", { x: 21 })
+    const print = b.node("print")
+    b.seq(start, call, print).data(call, print, "value", "result")
+    const result = graphToSource(b.layout(), "Работа/Главная")
+    expect(result.diagnostics.length).toBe(0)
+    expect(contains(result.source, 'import { удвоить } from "../lib/Удвоение";')).toBe(true)
+    // Строка импорта — на узле вызова: ошибка «нет такой библиотеки» покажется на нём.
+    const importLine = result.source.split("\n").findIndex((l) => string.sub(l, 1, 6) === "import") + 1
+    expect(result.lineNodes[importLine]).toBe(call.id)
+    expect(outputOf(result.source, { name: "Работа/Главная", modules: { "lib/Удвоение": lib } })).toBe("42")
+  })
+
+  test("совпало имя со своей функцией — псевдоним", () => {
+    const lib = graphToSource(doubler(), "Удвоение").source
+    const b = new GraphBuilder()
+    const start = b.node("start")
+    const own = b.node("call", { name: "удвоить" })
+    const call = libraryCall(b, "Удвоение", lib, "удвоить", { x: 5 })
+    const print = b.node("print")
+    const fn = b.node("function", { name: "удвоить", params: "", returns: "none" })
+    b.seq(start, own, call, print).data(call, print, "value", "result")
+    void fn
+    const text = source(b.layout())
+    expect(contains(text, 'import { удвоить as удвоить_2 } from "./Удвоение";')).toBe(true)
+    expect(contains(text, "удвоить_2(5)")).toBe(true)
+    expect(outputOf(text, { name: "тест", modules: { Удвоение: lib } })).toBe("10")
+  })
+
+  test("функция библиотеки-кода: аргумент «здание» приводится к классу параметра, необязательные в конце не передаются", () => {
+    const lib = [
+      "export function загрузить(печь: Furnace, сколько: number, что?: Item): number {",
+      "  return сколько;",
+      "}",
+    ].join("\n")
+    const b = new GraphBuilder()
+    const start = b.node("start")
+    const chest = b.node("chest-at", { marker: "печь" })
+    const call = libraryCall(b, "lib/Печи", lib, "загрузить", { сколько: 3 })
+    b.seq(start, chest, call).data(chest, call, "печь")
+    const text = source(b.layout())
+    expect(contains(text, "загрузить(r2! as Furnace, 3);")).toBe(true)
+    const compiled = compile(text, { name: "тест", resolve: (n) => (n === "lib/Печи" ? { name: n, source: lib } : undefined) })
+    expect(compiled.diagnostics.map((d) => d.code)).toEqual([])
+  })
+
+  test("нет функции у вызова — ошибка на узле", () => {
+    const b = new GraphBuilder()
+    const start = b.node("start")
+    const call = b.node("call", { name: "нет" })
+    b.seq(start, call)
+    expect(codes(b.graph)).toEqual([`graph-no-function@${call.id}`])
   })
 })

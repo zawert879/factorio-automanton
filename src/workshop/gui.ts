@@ -2,13 +2,16 @@
 // узел в руку чертежом), окно настроек узла (клик по узлу): значения входов без провода и настройки.
 import { LocalisedString, LuaGuiElement, LuaPlayer, PlayerIndex } from "factorio:runtime"
 import { onCustomInput, onEvent } from "../events"
+import { callLibrary, formatParams, GraphParam, parseParams } from "../graph/codegen"
 import { GraphValue, PinType } from "../graph/model"
 import { CATEGORIES, NODES, SettingSpec } from "../graph/nodes"
 import { NODE_BODY_PREFIX } from "../names"
 import { addCode } from "../gui/codeView"
 import { onGuiChange, onGuiChecked, onGuiClick, onGuiElemChanged, onGuiSelection, titlebar } from "../gui/common"
-import { findProgram, onProgramPublished, onProgramRemoved, ProgramRecord } from "../program/store"
+import { findProgram, onProgramPublished, onProgramRemoved, onProgramRenamed, ProgramRecord } from "../program/store"
+import { trim } from "../lang/runtime/strings"
 import { buildGraph, checkWiresLater, deleteWorkshop, drawNode, isNodeBody, isPin, NODE_TAG, nodeOfEntity, readGraph, refreshNode, slotsOf, workshopOf } from "./entities"
+import { applyCall, callChoices, refreshLibraryCalls, renameLibraryCalls } from "./libraries"
 import { newGraphProgram } from "./programs"
 import { buildWorkshop, publishing, publishWorkshop, showErrors } from "./publish"
 import { breakLine, machinesOf } from "./debug"
@@ -179,7 +182,7 @@ function addField(parent: LuaGuiElement, key: string, kind: PinType | SettingSpe
   }
 }
 
-function openNodeWindow(player: LuaPlayer, ws: Workshop, node: WorkshopNode): void {
+export function openNodeWindow(player: LuaPlayer, ws: Workshop, node: WorkshopNode): void {
   player.gui.screen[NODE_WINDOW]?.destroy()
   const visitor = visitorOf(player)
   if (visitor === undefined) return
@@ -193,7 +196,9 @@ function openNodeWindow(player: LuaPlayer, ws: Workshop, node: WorkshopNode): vo
   let fields = 0
   for (const setting of spec?.settings ?? []) {
     table.add({ type: "label", caption: [`automaton-pin.${setting.id}`], style: "bold_label" })
-    addField(table, setting.id, setting.kind, node.values[setting.id] ?? setting.default, setting.options)
+    if (setting.kind === "params") addParamsEditor(table, node.values.params)
+    else if (setting.kind === "function") addFunctionPicker(table, ws, node)
+    else addField(table, setting.id, setting.kind, node.values[setting.id] ?? setting.default, setting.options)
     fields++
   }
   for (const slot of slotsOf(ws, node).slots) {
@@ -229,8 +234,98 @@ function openNodeWindow(player: LuaPlayer, ws: Workshop, node: WorkshopNode): vo
   frame.auto_center = true
 }
 
+// ---------- Параметры функции и выбор функции (20.1) ----------
+
+/** Типы параметров функции схемы. */
+const PARAM_TYPES: PinType[] = ["number", "string", "boolean", "item", "fluid", "position", "entity", "robot", "marker", "zone", "target", "entities", "robots", "value"]
+const PARAMS_TABLE = "params"
+
+/** Параметры «Функции» таблицей: имя, тип, ✕; под ней — «+ параметр». */
+function addParamsEditor(parent: LuaGuiElement, value: GraphValue | undefined): void {
+  const flow = parent.add({ type: "flow", direction: "vertical" })
+  const rows = flow.add({ type: "table", name: PARAMS_TABLE, column_count: 3 })
+  rows.style.horizontal_spacing = 6
+  rows.style.vertical_spacing = 4
+  const types: LocalisedString[] = PARAM_TYPES.map((t) => [`automaton-pin-type.${t}`])
+  for (const p of parseParams(value)) {
+    const name = rows.add({ type: "textfield", text: p.name, tags: { action: "workshop-param-name" } })
+    name.style.width = 140
+    rows.add({ type: "drop-down", items: types, selected_index: math.max(1, PARAM_TYPES.indexOf(p.type) + 1), tags: { action: "workshop-param-type" } })
+    const remove = rows.add({ type: "sprite-button", sprite: "utility/close", style: "tool_button_red", tooltip: ["automaton-workshop.remove-param"], tags: { action: "workshop-param-remove" } })
+    remove.style.size = 28
+  }
+  flow.add({ type: "button", caption: ["automaton-workshop.add-param"], tags: { action: "workshop-param-add" } })
+}
+
+/** Параметры из таблицы окна (без пустых имён; разделители из имени убираются — имя проверит сборка). */
+function paramRows(rows: LuaGuiElement, skip?: LuaGuiElement): GraphParam[] {
+  const children = rows.children
+  const list: GraphParam[] = []
+  for (let i = 0; i + 2 < children.length; i += 3) {
+    if (skip !== undefined && children[i + 2].index === skip.index) continue
+    const [name] = string.gsub(trim((children[i] as unknown as { text: string }).text), "[%s,:?]", "")
+    const type = PARAM_TYPES[(children[i + 1] as unknown as { selected_index: number }).selected_index - 1] ?? "value"
+    if (name !== "") list.push({ name, type })
+  }
+  return list
+}
+
+/** Свободное имя нового параметра: p1, p2… */
+function newParamName(list: GraphParam[]): string {
+  let n = 1
+  while (list.some((p) => p.name === `p${n}`)) n++
+  return `p${n}`
+}
+
+/** Узел «Вызвать»: список функций своей схемы и библиотек команды («отвезти — lib/Доставка»). */
+function addFunctionPicker(parent: LuaGuiElement, ws: Workshop, node: WorkshopNode): void {
+  const choices = callChoices(ws)
+  const library = callLibrary(node) ?? ""
+  const names = choices.map((c) => c.name)
+  const libraries = choices.map((c) => c.library ?? "")
+  const items: LocalisedString[] = choices.map((c) => (c.library === undefined ? c.name : `${c.name} — ${c.library}`))
+  let selected = choices.findIndex((c) => c.name === node.values.name && (c.library ?? "") === library) + 1
+  // Выбранной функции больше нет (узел «Функция» убрали, библиотеку переименовали вне игры) — показать её как есть.
+  if (selected === 0 && typeof node.values.name === "string" && node.values.name !== "") {
+    names.unshift(node.values.name)
+    libraries.unshift(library)
+    items.unshift(library === "" ? node.values.name : `${node.values.name} — ${library}`)
+    selected = 1
+  }
+  if (items.length === 0) {
+    const label = parent.add({ type: "label", caption: ["automaton-workshop.no-functions"] })
+    label.style.single_line = false
+    label.style.maximal_width = 300
+    return
+  }
+  const dropdown = parent.add({ type: "drop-down", items, selected_index: selected, tags: { action: "workshop-call-pick", names, libraries } })
+  dropdown.style.maximal_width = 360
+}
+
+function editedNode(player: LuaPlayer): { ws: Workshop; node: WorkshopNode } | undefined {
+  const ws = currentWorkshop(player)
+  const visitor = visitorOf(player)
+  const node = visitor?.editing === undefined ? undefined : ws?.nodes[visitor.editing]
+  return ws === undefined || node === undefined || !node.body.valid ? undefined : { ws, node }
+}
+
+/** Новые параметры функции: разъёмы её и вызовов — заново; окно — заново, если поменялись строки таблицы. */
+function setParams(player: LuaPlayer, list: GraphParam[], reopen: boolean): void {
+  setValue(player, "params", list.length === 0 ? "" : formatParams(list))
+  const edited = editedNode(player)
+  if (reopen && edited !== undefined) openNodeWindow(player, edited.ws, edited.node)
+}
+
 /** Узлы, чьи разъёмы зависят от этой настройки (переменная, функция, параметр) — обновить все. */
 const SHAPING = ["name", "type", "params", "returns"]
+
+/** Входы узла в окне: поменялись — окно открыть заново (иначе — нет: поле ввода не теряет фокус). */
+function inputsKey(ws: Workshop, node: WorkshopNode): string {
+  return slotsOf(ws, node)
+    .slots.filter((s) => s.side === "in" && !s.exec)
+    .map((s) => `${s.key}:${s.spec?.type}`)
+    .join(",")
+}
 
 /** Машина, выбранная игроком для отладки в мастерской. */
 function debugRecord(player: LuaPlayer): MachineRecord | undefined {
@@ -239,14 +334,14 @@ function debugRecord(player: LuaPlayer): MachineRecord | undefined {
 }
 
 function setValue(player: LuaPlayer, key: string, value: GraphValue | undefined): void {
-  const ws = currentWorkshop(player)
-  const visitor = visitorOf(player)
-  const node = visitor?.editing === undefined ? undefined : ws?.nodes[visitor.editing]
-  if (ws === undefined || node === undefined || !node.body.valid) return
+  const edited = editedNode(player)
+  if (edited === undefined) return
+  const { ws, node } = edited
+  const before = inputsKey(ws, node)
   node.values[key] = value
   if (SHAPING.includes(key) && (NODES[node.kind]?.settings ?? []).some((s) => s.id === key)) {
     for (const [, other] of pairs(ws.nodes)) if (other.body.valid) refreshNode(ws, other)
-    openNodeWindow(player, ws, node)
+    if (inputsKey(ws, node) !== before) openNodeWindow(player, ws, node)
   } else {
     drawNode(ws, node)
   }
@@ -327,7 +422,10 @@ export function restoreWorkshopWindows(): void {
 export { enterWorkshop, exitWorkshop }
 
 export function registerWorkshopGui(): void {
-  onWorkshopEnter((player, ws) => openAll(player, ws))
+  onWorkshopEnter((player, ws) => {
+    refreshLibraryCalls(ws)
+    openAll(player, ws)
+  })
   onWorkshopExit((player) => closeAll(player))
   onGuiClick("workshop-exit", (player) => exitWorkshop(player))
   onGuiClick("workshop-check", (player) => {
@@ -404,6 +502,27 @@ export function registerWorkshopGui(): void {
     const value = (element as unknown as { elem_value?: unknown }).elem_value
     setValue(player, tags.key, typeof value === "string" ? value : undefined)
   })
+  onGuiChange("workshop-param-name", (player, element) => setParams(player, paramRows(element.parent!), false))
+  onGuiSelection("workshop-param-type", (player, element) => setParams(player, paramRows(element.parent!), false))
+  onGuiClick("workshop-param-remove", (player, element) => setParams(player, paramRows(element.parent!, element), true))
+  onGuiClick("workshop-param-add", (player, element) => {
+    const list = paramRows(element.parent![PARAMS_TABLE]!)
+    list.push({ name: newParamName(list), type: "number" })
+    setParams(player, list, true)
+  })
+  onGuiSelection("workshop-call-pick", (player, element) => {
+    const edited = editedNode(player)
+    if (edited === undefined) return
+    const tags = element.tags as unknown as { names: string[]; libraries: string[] }
+    const index = (element as unknown as { selected_index: number }).selected_index
+    const name = tags.names[index - 1]
+    const library = tags.libraries[index - 1]
+    const choice = callChoices(edited.ws).find((c) => c.name === name && (c.library ?? "") === library)
+    if (choice === undefined) return
+    applyCall(edited.node.values, choice)
+    for (const [, other] of pairs(edited.ws.nodes)) if (other.body.valid) refreshNode(edited.ws, other)
+    openNodeWindow(player, edited.ws, edited.node)
+  })
   onGuiSelection("workshop-value", (player, element) => {
     const tags = element.tags as { key: string; options: string }
     const options = tags.options.split("|")
@@ -424,12 +543,16 @@ export function registerWorkshopGui(): void {
     const found = nodeOfEntity(selected)
     if (found !== undefined) openNodeWindow(player, found.ws, found.node)
   })
-  // Новая версия схемы не из этой мастерской (импорт строкой) — мастерская строится заново.
+  // Новая версия схемы не из этой мастерской (импорт строкой) — мастерская строится заново. Пересборка из-за новой
+  // версии библиотеки схему не меняет — черновик остаётся.
   onProgramPublished((program) => {
     if (publishing.fromWorkshop || program.graph === undefined) return
+    if (program.history[program.history.length - 1]?.rebuiltFor !== undefined) return
     const ws = workshopOf(program.id)
     if (ws !== undefined) buildGraph(ws, program.graph)
   })
+  // Библиотеку переименовали — вызовы её функций в мастерских под новым именем.
+  onProgramRenamed((program, oldName) => renameLibraryCalls(program.force, oldName, program.name))
   // Программу удалили — мастерскую тоже, игроков из неё — наружу.
   onProgramRemoved((program) => {
     for (const player of visitorsOf(program.id)) exitWorkshop(player)
@@ -484,6 +607,7 @@ function registerRemote(): void {
         problems: problems.length,
       }
     },
+    values: (name: string, node: number) => workshopNamed(name)?.nodes[node]?.values,
     pin: (name: string, node: number, key: string) => {
       const pin = workshopNamed(name)?.nodes[node]?.pins[key]
       return pin !== undefined && pin.valid ? pin.position : undefined
