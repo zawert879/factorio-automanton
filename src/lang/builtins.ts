@@ -51,6 +51,8 @@ const HOST_FUNCTIONS: Record<string, boolean> = {
  */
 export const BLOCKING_OBJECT_METHODS = [
   "insert", "extract", "repair", "rotate", "deconstruct", "setRecipe", "fill", "drain", "refuel",
+  // Постройка по призраку (21.3): ghost.build().
+  "build",
   // Системы своей машины (19.4): me.energy.charge(), me.tank.pump(…), me.weapon.attack(…) и т. д.
   "charge", "pump", "reload", "attack", "guard", "patrol",
 ]

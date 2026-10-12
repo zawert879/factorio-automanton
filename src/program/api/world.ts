@@ -67,6 +67,15 @@ interface ZoneFilter {
   kind?: string
 }
 
+/** Сущности своей команды, которые не здания: машины, персонажи, призраки и запросы предметов чертежа. */
+const NOT_BUILDINGS: Record<string, boolean> = {
+  unit: true,
+  character: true,
+  "entity-ghost": true,
+  "tile-ghost": true,
+  "item-request-proxy": true,
+}
+
 /** Здания в зоне на любом расстоянии (без поля зрения доступно только неизменное). */
 function findInZone(where: Val, what: ZoneFilter): Val {
   const robot = currentRobot()
@@ -84,7 +93,7 @@ function findInZone(where: Val, what: ZoneFilter): Val {
   const found = zone.surface.find_entities_filtered(filter as never)
   const entities: LuaEntity[] = []
   for (const entity of found) {
-    if (entity.type === "unit" || entity.type === "character" || MARKER_ENTITIES.includes(entity.name) || modelOf(entity.name) !== undefined) continue
+    if (NOT_BUILDINGS[entity.type] || MARKER_ENTITIES.includes(entity.name) || modelOf(entity.name) !== undefined) continue
     if (kind !== undefined && kind !== "Building" && !isOfClass(entity, kind)) continue
     entities.push(entity)
   }

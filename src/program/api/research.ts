@@ -87,6 +87,7 @@ const CLASS_METHOD_RESEARCH: Record<string, string> = {
   setRecipe: TECH.tuning,
   rotate: TECH.construction,
   deconstruct: TECH.construction,
+  build: TECH.construction,
 }
 for (const [cls] of HOST_CLASSES) {
   const table = hostMethods[cls]

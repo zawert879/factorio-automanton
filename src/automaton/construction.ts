@@ -1,7 +1,8 @@
 // Наладка и строительство (8.5, 8.6): выбрать рецепт сборщика, поставить здание из груза, разобрать здание
 // в груз, повернуть. Всё — в пределах досягаемости (как у персонажа), с короткой задержкой.
+// Постройка по призраку (21.3) — то же действие build с призраком-целью: он поднимается (revive) с проводами и тегами.
 import { LuaEntity, MapPosition } from "factorio:runtime"
-import { modelOf } from "../names"
+import { modelOf, ROBOT_PLACERS } from "../names"
 import { ActionState, distanceToEntity, face, registerActionHandler, StepOutcome } from "./actions"
 import { HANDLING_JOULES, spend } from "./energy"
 import { RobotRecord } from "./registry"
@@ -88,14 +89,46 @@ function buildCheck(record: RobotRecord, action: ActionState): StepOutcome | und
   return undefined
 }
 
+/** Чем строить призрак: первый предмет, который ставит его здание, того же качества. */
+function ghostStack(ghost: LuaEntity): { name: string; count: number; quality: string } | undefined {
+  const item = ghost.ghost_prototype.items_to_place_this?.[0]
+  return item === undefined ? undefined : { name: item.name, count: item.count, quality: ghost.quality.name }
+}
+
+/** Призрак (ghost.build, 21.3): есть, не машина (их строит игрок), предмет в грузе, досягаем. */
+function ghostCheck(record: RobotRecord, ghost: LuaEntity): StepOutcome | undefined {
+  if (!ghost.valid || ghost.type !== "entity-ghost" || ROBOT_PLACERS.includes(ghost.ghost_name)) return { finish: true, error: "invalid-target" }
+  const stack = ghostStack(ghost)
+  if (stack === undefined) return { finish: true, error: "invalid-target" }
+  if (record.cargo.get_item_count({ name: stack.name, quality: stack.quality }) < stack.count) return { finish: true, error: "not-enough-items" }
+  if (!inReach(record, ghost)) return { finish: true, error: "out-of-reach" }
+  return undefined
+}
+
+/** Поднять призрак: здание с проводами и тегами чертежа; место занято — target-full. */
+function buildGhost(record: RobotRecord, action: ActionState, ghost: LuaEntity): StepOutcome {
+  const problem = ghostCheck(record, ghost)
+  if (problem !== undefined) return problem
+  if (!spend(record, HANDLING_JOULES)) return { finish: true, error: "no-fuel" }
+  const stack = ghostStack(ghost)!
+  const [, built] = ghost.revive({ raise_revive: true })
+  if (built === undefined) return { finish: true, error: "target-full" }
+  record.cargo.remove(stack)
+  action.entity = built
+  action.done = 1
+  return { finish: true }
+}
+
 registerActionHandler("build", {
   start: (record, action) => {
-    const problem = buildCheck(record, action)
+    const ghost = action.params.target
+    const problem = ghost !== undefined ? ghostCheck(record, ghost) : buildCheck(record, action)
     if (problem !== undefined) return problem
-    face(record, action.params.position!, "idle")
+    face(record, ghost !== undefined ? ghost.position : action.params.position!, "idle")
     return { after: BUILD_TICKS }
   },
   step: (record, action) => {
+    if (action.params.target !== undefined) return buildGhost(record, action, action.params.target)
     const problem = buildCheck(record, action)
     if (problem !== undefined) return problem
     if (!spend(record, HANDLING_JOULES)) return { finish: true, error: "no-fuel" }

@@ -32,7 +32,9 @@ function startMove(target: Val, options: Val, name: string): LuaMultiReturn<[Val
   const timeout = type(options) === "table" && options.timeout !== undefined ? ticks(options.timeout, 0) : undefined
   return startWaiting(name, (frame) => {
     frame.__move = true
-    moveRobot(robot, resolved.entity !== undefined && resolved.entity.type !== "simple-entity-with-owner" ? { entity: resolved.entity } : { position: resolved.position }, { radius })
+    // К метке и призраку — по месту: призрак может исчезнуть по дороге (его построили).
+    const byPosition = resolved.entity === undefined || resolved.entity.type === "simple-entity-with-owner" || resolved.entity.type === "entity-ghost"
+    moveRobot(robot, byPosition ? { position: resolved.position } : { entity: resolved.entity! }, { radius })
     if (timeout !== undefined) {
       frame.__poll = "moveTimeout"
       sleepUntil(robot.id, game.tick + timeout, frame)
@@ -213,6 +215,12 @@ hostMethods.Building.repair = (o: Val, k: Val) => actionCall(k, "repair", k !== 
 hostMethods.Building.rotate = (o: Val, k: Val, reverse: Val) =>
   actionCall(k, "rotate", k !== undefined ? {} : { target: handleEntity(o), reverse: reverse === true })
 hostMethods.Building.deconstruct = (o: Val, k: Val) => actionCall(k, "deconstruct", k !== undefined ? {} : { target: handleEntity(o) })
+// Постройка по призраку (21.3): то же действие, что me.build, результат — здание.
+hostMethods.Ghost.build = (o: Val, k: Val) => {
+  if (k === undefined) return actionCall(k, "build", { target: handleEntity(o) })
+  const [built] = finishWaiting(k)
+  return $multi(built === undefined || !(built as LuaEntity).valid ? undefined : entityHandle(built as LuaEntity))
+}
 hostMethods.Assembler.setRecipe = (o: Val, k: Val, recipe: Val) => {
   if (k !== undefined) return finishWaiting(k)
   if (type(recipe) !== "string" || prototypes.recipe[recipe as string] === undefined) actionError("invalid-target", `unknown recipe ${tostring(recipe)}`)

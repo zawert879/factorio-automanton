@@ -1,7 +1,8 @@
-// Зрение (4.6): scan.robots / buildings / items / trees / rocks / resources / enemies / water — только в радиусе зрения
+// Зрение (4.6): scan.robots / buildings / ghosts / items / trees / rocks / resources / enemies / water — только в радиусе зрения
 // (Mk1 — 10 клеток), от ближнего к дальнему. Каждый взгляд стоит энергии, больше радиус — дороже.
 // scan.buildings (19.2) — здания, с фильтром по классу и имени: scan.buildings({ kind: Furnace }).
 // scan.trees, scan.rocks (21.2) — деревья и скалы: их рубят и разбивают me.mine.
+// scan.ghosts (21.3) — призраки зданий своей команды (по чертежу), кроме призраков машин: их программа не строит.
 import { LuaEntity, MapPosition } from "factorio:runtime"
 import { spend } from "../../automaton/energy"
 import { defineHostObject, hostMethods, Val } from "../../lang/runtime/core"
@@ -99,6 +100,16 @@ hostMethods.scan.items = (_o: Val, _k: Val, radius: Val) => {
   const found = seen(robot, "items", look(radius), { type: "item-entity" })
   const items = byDistance(found, (e) => e.position)
   return programArray(items.map((e) => ({ item: e.stack!.name, count: e.stack!.count, position: programPosition(e.position) })))
+}
+
+hostMethods.scan.ghosts = (_o: Val, _k: Val, filter: Val) => {
+  const robot = currentRobot()
+  const f = type(filter) === "table" ? filter : {}
+  const filters: Record<string, unknown> = { type: "entity-ghost", force: robot.entity.force_index }
+  const name = nameList(f.name)
+  if (name !== undefined) filters.ghost_name = name
+  const found = seen(robot, "ghosts", look(f.radius), filters).filter((e) => !ROBOT_PLACERS.includes(e.ghost_name))
+  return programArray(byDistance(found, (e) => e.position).map((e) => entityHandle(e)))
 }
 
 hostMethods.scan.trees = (_o: Val, _k: Val, radius: Val) => {

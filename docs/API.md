@@ -113,10 +113,10 @@ chest.extract("coal", 10)                               // D
 | [Своя машина](#своя-машина-me) | `me`: груз, энергия, здоровье, параметры программы, память, подпись; `Machine`, `Robot` | сразу |
 | [Движение](#движение) | `me.move`, `me.canReach`, `me.follow`, `me.goHome` | сразу |
 | [Предметы](#предметы) | `me.mine` (руда, деревья, скалы), `me.pickup`, `me.drop`; `extract` / `insert` у зданий, `insert` у машины | сразу |
-| [Здания](#здания) | классы зданий (`Furnace`, `Chest`, …), состояние (в поле зрения), `repair`, `setRecipe`, `me.build`, `deconstruct`, `rotate` | сразу / [Наладка] / [Строительство] |
+| [Здания](#здания) | классы зданий (`Furnace`, `Chest`, …), состояние (в поле зрения), `repair`, `setRecipe`, `me.build`, `deconstruct`, `rotate`; постройка по чертежу — `Ghost`, `ghost.build` | сразу / [Наладка] / [Строительство] |
 | [Жидкости](#жидкости) | `me.tank.pump`, `fill` / `drain` у зданий | [Жидкости] |
 | [Энергия](#энергия) | `me.energy` (`level`, `refuel`, `charge`), `robot.refuel` | сразу / Mk2 |
-| [Зрение](#зрение) | `scan.robots`, `scan.buildings`, `scan.items`, `scan.trees`, `scan.rocks`, `scan.resources`, `scan.enemies`, `scan.water`; `Tree`, `Rock` | сразу, радиус растёт исследованиями |
+| [Зрение](#зрение) | `scan.robots`, `scan.buildings`, `scan.ghosts`, `scan.items`, `scan.trees`, `scan.rocks`, `scan.resources`, `scan.enemies`, `scan.water`; `Tree`, `Rock` | сразу, радиус растёт исследованиями |
 | [Карта](#карта) | метки, зоны, `zone.find`, `map.tag` | сразу |
 | [Связь](#связь) | `radio` (`send`, `publish`, `subscribe`, `receive`, `request`, `inbox`), `robot` | [Радиосвязь] |
 | [Доска и задачи](#доска-и-задачи) | `board` (общая память), `tasks` (очереди заданий) | [Радиосвязь] |
@@ -134,7 +134,7 @@ type Fluid = string;     // "water", "crude-oil", ...
 type Position = { x: number; y: number };
 type Area = { from: Position; to: Position };
 type Direction = "north" | "east" | "south" | "west";
-type Target = Position | Building | Machine | Marker | Zone | Tree | Rock;
+type Target = Position | Building | Machine | Marker | Zone | Tree | Rock | Ghost;
 
 type Value =
   | null | boolean | number | string
@@ -421,6 +421,48 @@ if (furnace.status === "no-fuel") furnace.insert("coal", 5);
 - `me.build`: место занято — `target-full`, предмета нет в грузе — `not-enough-items`. Машины программой не ставятся.
 - `deconstruct`: только здания своей команды; содержимое здания тоже уходит в груз, не влезает — `cargo-full`.
   Деревья, камни и руда — это добыча (`me.mine`), а не разборка.
+
+### Постройка по чертежу
+
+Чертёж, который игрок положил на землю, — это призраки зданий. Машина видит их (`scan.ghosts()`) и строит
+из своего груза, как `me.build`, но здание встаёт таким, как в чертеже: с поворотом, рецептом, настройками и проводами.
+
+```ts
+/**
+ * Призрак — здание по чертежу, ещё не построенное. Призраки машин программам не видны: машины ставит игрок.
+ * @en A ghost — a building from a blueprint, not built yet. Ghosts of machines are not visible to programs: machines are placed by players.
+ */
+declare class Ghost {
+  private constructor();
+  readonly id: number;
+  readonly valid: boolean;             // false — построен или снят @en false — built or removed
+  readonly inSight: boolean;
+  readonly name: string;               // какое здание встанет: "stone-furnace" @en which building it becomes: "stone-furnace"
+  readonly item: Item;                 // чем строить: "stone-furnace" @en what to build it with: "stone-furnace"
+  readonly position: Position;
+  readonly direction: Direction;
+  /**
+   * [Строительство] Построить из груза, как me.build: здание встаёт таким, как в чертеже.
+   * @en [Construction] Build it from the cargo, like me.build: the building comes out as in the blueprint.
+   */
+  build(): Building;
+}
+```
+
+```ts
+// Построить всё, что видно по чертежу, из того, что есть в грузе
+for (const ghost of scan.ghosts()) {
+  if (me.cargo.count(ghost.item) === 0) continue;
+  me.move(ghost, { radius: 3 });
+  ghost.build();
+}
+```
+
+- `ghost.build()`: призрака уже нет — `invalid-target`; предмета нет в грузе — `not-enough-items`; место занято
+  (дерево, камень, машина, персонаж) — `target-full`. Всё — в радиусе `me.reach`, около полсекунды.
+- Строительные дроны игрока строят те же призраки — кто первый. Модули, которые просит чертёж, сами не встают:
+  запрос остаётся у здания.
+- Готовая программа — пример «Строитель»: берёт предметы на складе и строит призраки у метки.
 
 ### Классы зданий
 
@@ -939,6 +981,11 @@ declare const scan: {
    * @en Buildings nearby. With kind — only of that class and right away with its methods: scan.buildings({ kind: Furnace }) → Furnace[].
    */
   buildings<T extends Building = Building>(filter?: { kind?: BuildingKind<T>; name?: string | string[]; radius?: number }): T[];
+  /**
+   * Призраки зданий своей команды рядом — чертёж, положенный игроком. С name — только этих зданий.
+   * @en Ghosts of your team's buildings nearby — a blueprint placed by a player. With name — only of those buildings.
+   */
+  ghosts(filter?: { name?: string | string[]; radius?: number }): Ghost[];
   /**
    * Предметы, лежащие на земле.
    * @en Items lying on the ground.

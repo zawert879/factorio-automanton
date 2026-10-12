@@ -74,6 +74,8 @@ hostGetters.entity.name = (o: Val) => o.__name
 hostGetters.entity.valid = () => true
 hostGetters.entity.position = (o: Val) => ({ x: o.__x, y: o.__y })
 hostMethods.entity.count = () => 5
+// Деревья, скалы и призраки — обёртки сущностей своих классов (не здания): общие свойства — те же.
+for (const cls of ["Tree", "Rock", "Ghost"]) for (const key of ["id", "name", "valid", "position"]) hostGetters[cls][key] = hostGetters.entity[key]
 hostMethods.entity.output = () => inventory(arr({ name: "iron-plate", count: 4 }))
 
 // Инвентарь (груз машины, выход печи): предметы заданы при создании, count — по ним.
@@ -168,6 +170,8 @@ hostMethods.scan.robots = () => arr(robot(42, "boss", "Оркестратор"))
 hostMethods.scan.resources = () =>
   arr({ item: "iron-ore", center: { x: 40, y: 70 }, nearest: { x: 35, y: 60 }, amount: 5000 }, { item: "coal", center: { x: 10, y: 20 }, nearest: { x: 8, y: 18 }, amount: 3000 })
 hostMethods.scan.items = () => arr()
+hostMethods.scan.ghosts = () => arr(hostObject("entity", { __c: "Ghost", __id: 900, __name: "stone-furnace", __x: 6, __y: 6 }))
+hostGetters.Ghost.item = () => "stone-furnace"
 hostMethods.scan.trees = () => arr(hostObject("entity", { __c: "Tree", __name: "tree-01", __x: 3, __y: 4 }))
 hostMethods.scan.rocks = () => arr(hostObject("entity", { __c: "Rock", __name: "huge-rock", __x: 9, __y: 4 }))
 hostMethods.scan.water = () => arr()

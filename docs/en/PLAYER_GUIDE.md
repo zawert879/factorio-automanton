@@ -111,6 +111,20 @@ The selection must contain at least one building (a chest, a pole): the game won
 alone. If your team has no program with that name (a blueprint from another game), the machine is placed without
 a program — send the programs over as an export string.
 
+**Machines build blueprints.** A placed blueprint is a set of building ghosts. Construction robots build them around
+a player with a personal roboport, and machines build them anywhere else: `scan.ghosts()` lists the ghosts nearby,
+`ghost.build()` places the building from the machine's cargo exactly as in the blueprint (rotation, recipe, wires).
+It needs the **Automaton construction** research. A ready-made program is [examples/builder.ts](../../examples/builder.ts)
+("Строитель", the Builder): it takes the items from the depot at a marker and builds the ghosts at the "стройка" marker.
+
+```ts
+for (const ghost of scan.ghosts()) {
+  if (me.cargo.count(ghost.item) === 0) continue
+  me.move(ghost, { radius: 3 })
+  ghost.build()
+}
+```
+
 Setting up many machines at once:
 
 - **Copy settings** — Shift+right-click a machine (the same keys as for buildings) to copy its program
@@ -460,7 +474,7 @@ a scout, a patrol.
 | Display | small and large displays, `display()` |
 | Tuning | `setRecipe` — machines change assembler recipes themselves |
 | Automaton fluids (craft a boiler) | the tank (`me.tank.pump`), `fill` / `drain` on buildings |
-| Automaton construction | `me.build`, `deconstruct`, `rotate` |
+| Automaton construction | `me.build`, `ghost.build`, `deconstruct`, `rotate` |
 | Automatons and circuits | the signal marker, `signals` |
 | Automaton sensors 1–3 | vision of 16 / 24 / 32 tiles, `scan.enemies` |
 | Automaton Mk2, Mk3 | electric models, the charging station |

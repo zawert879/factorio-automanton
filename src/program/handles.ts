@@ -74,6 +74,7 @@ export function buildingClass(entity: LuaEntity): string {
   if (entity.force.name === "enemy") return "Enemy"
   if (isTree(entity)) return "Tree"
   if (isRock(entity)) return "Rock"
+  if (entity.type === "entity-ghost") return "Ghost"
   if (entity.name === CHARGING_STATION) return "ChargingStation"
   return CLASS_BY_TYPE[entity.type] ?? "Building"
 }
@@ -108,7 +109,8 @@ export function entityHandle(entity: LuaEntity): Val {
     __c: buildingClass(entity),
     __e: entity,
     __id: unit,
-    __name: entity.name,
+    // У призрака — имя здания, которое по нему встанет.
+    __name: entity.type === "entity-ghost" ? entity.ghost_name : entity.name,
     __type: entity.type,
     __x: position.x,
     __y: position.y,
@@ -118,6 +120,19 @@ export function entityHandle(entity: LuaEntity): Val {
     script.register_on_object_destroyed(entity)
   }
   return handle
+}
+
+/** Чем строить призрак здания name: первый предмет, который его ставит (у прямых рельсов — рельс). */
+export function ghostItem(name: string): { name: string; count: number } | undefined {
+  const item = prototypes.entity[name]?.items_to_place_this?.[0]
+  return item === undefined ? undefined : { name: item.name, count: item.count }
+}
+
+const DIRECTION_NAMES = ["north", "east", "south", "west"]
+
+/** Направление сущности словом API (Direction): из 16 направлений игры — ближайшее из четырёх. */
+export function directionName(direction: defines.direction): string {
+  return DIRECTION_NAMES[math.floor((direction + 2) / 4) % 4]
 }
 
 /** Здание из обёртки (проверка вида и существования). */
@@ -286,6 +301,16 @@ for (const cls of ["Tree", "Rock"]) {
   hostGetters[cls].products = (o: Val) => programArray(naturalProducts(o.__name))
   rawset(hostMethods[cls], "toString", (o: Val) => `${o.__name}(${o.__x}, ${o.__y})`)
 }
+
+// Призраки (21.3) — здания по чертежу, ещё не построенные: что встанет, каким предметом, где, куда повёрнуто.
+for (const key of ["id", "valid", "inSight", "name", "position"]) hostGetters.Ghost[key] = entityGetters[key]
+hostGetters.Ghost.item = (o: Val) => ghostItem(o.__name)?.name
+hostGetters.Ghost.direction = (o: Val) => {
+  const entity = o.__e as LuaEntity
+  if (!entity.valid) actionError("invalid-target")
+  return directionName(entity.direction)
+}
+rawset(hostMethods.Ghost, "toString", (o: Val) => `ghost:${o.__name}#${tostring(o.__id ?? "?")}`)
 
 // ---------- Машины ----------
 

@@ -12,6 +12,9 @@ function nauvis() {
 }
 
 function place(position: MapPosition): RobotRecord {
+  // Чанк мог ещё не сгенерироваться (генерация идёт в фоне): без него свободного места не найти.
+  nauvis().request_to_generate_chunks(position, 1)
+  nauvis().force_generate_chunk_requests()
   const free = nauvis().find_non_colliding_position(WORKER_MK1, position, 20, 0.5)!
   nauvis().create_entity({ name: WORKER_MK1_PLACER, position: free, force: "player", raise_built: true })
   return findRobot(nauvis().find_entities_filtered({ name: WORKER_MK1, position: free, radius: 0.5 })[0])!
