@@ -8,7 +8,7 @@ import { NODE_BODY_PREFIX } from "../names"
 import { addCode } from "../gui/codeView"
 import { onGuiChange, onGuiChecked, onGuiClick, onGuiElemChanged, onGuiSelection, titlebar } from "../gui/common"
 import { findProgram, onProgramPublished, onProgramRemoved, ProgramRecord } from "../program/store"
-import { buildGraph, deleteWorkshop, drawNode, isNodeBody, NODE_TAG, nodeOfEntity, readGraph, refreshNode, slotsOf, workshopOf } from "./entities"
+import { buildGraph, checkWiresLater, deleteWorkshop, drawNode, isNodeBody, isPin, NODE_TAG, nodeOfEntity, readGraph, refreshNode, slotsOf, workshopOf } from "./entities"
 import { newGraphProgram } from "./programs"
 import { buildWorkshop, publishing, publishWorkshop, showErrors } from "./publish"
 import { breakLine, machinesOf } from "./debug"
@@ -409,11 +409,17 @@ export function registerWorkshopGui(): void {
     const options = tags.options.split("|")
     setValue(player, tags.key, options[(element as unknown as { selected_index: number }).selected_index - 1])
   })
-  // Клик по узлу пустой рукой — окно настроек.
+  // Клик по узлу пустой рукой — окно настроек; клик проводом по разъёму — проверка цвета провода.
   onCustomInput("automaton-open", (e) => {
     const player = game.get_player(e.player_index)
     const selected = player?.selected
-    if (player === undefined || selected === undefined || !isNodeBody(selected.name)) return
+    if (player === undefined || selected === undefined) return
+    if (isPin(selected.name)) {
+      const hand = player.cursor_stack
+      if (hand?.valid_for_read && (hand.name === "red-wire" || hand.name === "green-wire")) checkWiresLater(player, selected)
+      return
+    }
+    if (!isNodeBody(selected.name)) return
     if (player.cursor_stack?.valid_for_read || player.cursor_ghost !== undefined) return
     const found = nodeOfEntity(selected)
     if (found !== undefined) openNodeWindow(player, found.ws, found.node)

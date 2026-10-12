@@ -1,7 +1,7 @@
 // Сцена для снимков экрана (npm run shot): машины во всех позах, затем game.take_screenshot.
 // Подключается из control.ts, только когда включён служебный мод automaton-visual.
 // Снимки — script-output/automaton-visual/*.png; файл done.txt — сигнал, что всё снято.
-import { MapPosition, PlayerIndex } from "factorio:runtime"
+import { MapPosition, PlayerIndex, TextFieldGuiElement } from "factorio:runtime"
 import { setActivity } from "../automaton/appearance"
 import { moveRobot } from "../automaton/movement"
 import { say, showProblem } from "../automaton/status"
@@ -10,7 +10,7 @@ import { Activity, BODY_DIRECTIONS, CHARGING_STATION, DISPLAYS, MODELS, TECH, WO
 import { renameDisplay } from "../world/displays"
 import { guiOf } from "../gui/common"
 import { openMachine } from "../gui/machine"
-import { checkFromWindow, closePrograms, editViewLine, openPrograms, publishFromWindow, showTypes } from "../gui/programs"
+import { askGraphName, checkFromWindow, closePrograms, createGraph, editViewLine, openPrograms, publishFromWindow, showTypes } from "../gui/programs"
 import { openExport, openImport, pasteImport } from "../gui/exchange"
 import { openDebugger } from "../gui/debugger"
 import { openFleet, showRobot } from "../gui/fleet"
@@ -316,9 +316,29 @@ for (let x = 10; x < 86; x++) c.pixel(x, 54, x % 2 === 0 ? "green" : "red")`,
     }
   }
   if (tick === 262) guiShot("debug")
+  // Новая схема: окно с именем; занятое имя — ошибка в том же окне.
+  if (tick === 300) {
+    const player = game.get_player(1 as PlayerIndex)
+    if (player !== undefined) {
+      player.gui.screen.clear()
+      openPrograms(player, findProgram("Шахтёр", "player")!.id, undefined)
+      askGraphName(player)
+    }
+  }
+  if (tick === 301) guiShot("new-graph")
+  // Через секунду после прежних публикаций: иначе — «не так часто».
+  if (tick === 302) {
+    const player = game.get_player(1 as PlayerIndex)
+    const field = player?.gui.screen["automaton-new-graph"]?.["graph-name"]
+    if (player !== undefined && field !== undefined) {
+      ;(field as TextFieldGuiElement).text = "Шахтёр"
+      createGraph(player)
+    }
+  }
+  if (tick === 303) guiShot("new-graph-taken")
   // Дерево технологий (этап 6): технологии автоматонов на месте «Логистики». Экран технологий в одиночной
   // игре ставит её на паузу — поэтому снимок последний, в том же тике (shot.mjs ждёт файлы ещё пару секунд).
-  if (tick === 264) {
+  if (tick === 305) {
     const player = game.get_player(1 as PlayerIndex)
     if (player !== undefined) {
       player.opened = undefined

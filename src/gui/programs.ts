@@ -50,12 +50,12 @@ import {
 } from "../program/store"
 import { onRefreshResult, onRefreshTimeout, requestRefresh, writeVsCodeFolder } from "../program/sync"
 import { PALETTE } from "./codeView"
-import { guiOf, onGuiChange, onGuiClick, onGuiSelection, titlebar } from "./common"
+import { guiOf, onGuiChange, onGuiClick, onGuiConfirm, onGuiSelection, titlebar } from "./common"
 import { diagnosticMessage, diagnosticText } from "./diagnostics"
 import { closeExchange, registerExchangeWindows } from "./exchange"
 import { DTS, DTS_EN } from "./dts.generated"
 import { folderItem, LIBRARY_COLOR, programTree, TreeEntry } from "./tree"
-import { newGraphProgram } from "../workshop/programs"
+import { newGraphProgram, suggestGraphName } from "../workshop/programs"
 import { publishing } from "../workshop/publish"
 import { enterWorkshop } from "../workshop/session"
 
@@ -64,6 +64,8 @@ const GRAPH_COLOR = "0.9,0.8,0.38"
 
 const FRAME = "automaton-programs"
 const CONFIRM_FRAME = "automaton-refresh-confirm"
+/** Окно «Новая схема»: имя и «Создать». */
+const NEW_GRAPH_FRAME = "automaton-new-graph"
 const TYPES_FRAME = "automaton-types"
 const MAX_ERRORS = 8
 /** Высота строки шрифта кода (automaton-code, 14) в единицах интерфейса — по снимку экрана. */
@@ -281,7 +283,50 @@ export function closePrograms(player: LuaPlayer): void {
   if (state.programs?.frame.valid) state.programs.frame.destroy()
   state.programs = undefined
   player.gui.screen[TYPES_FRAME]?.destroy()
+  player.gui.screen[NEW_GRAPH_FRAME]?.destroy()
   closeExchange(player)
+}
+
+/** Окно «Новая схема»: имя (предложено свободное «Схема N», выделено — можно сразу печатать), «Создать», «Отмена». */
+export function askGraphName(player: LuaPlayer): void {
+  player.gui.screen[NEW_GRAPH_FRAME]?.destroy()
+  const frame = player.gui.screen.add({ type: "frame", name: NEW_GRAPH_FRAME, direction: "vertical" })
+  frame.auto_center = true
+  titlebar(frame, ["automaton-workshop.new-graph-title"], "new-graph-cancel")
+  frame.add({ type: "label", caption: ["automaton-workshop.new-graph-name"] })
+  const field = frame.add({ type: "textfield", name: "graph-name", text: suggestGraphName(player), tags: { action: "new-graph-create" } })
+  field.style.width = 360
+  field.focus()
+  field.select_all()
+  const errors = frame.add({ type: "label", name: "graph-errors", caption: "" })
+  errors.style.font_color = { r: 1, g: 0.45, b: 0.35 }
+  errors.style.single_line = false
+  errors.style.maximal_width = 360
+  errors.visible = false
+  const row = frame.add({ type: "flow", direction: "horizontal" })
+  button(row, ["automaton-workshop.new-graph-cancel"], "new-graph-cancel")
+  const spacer = row.add({ type: "empty-widget" })
+  spacer.style.horizontally_stretchable = true
+  button(row, ["automaton-workshop.new-graph-create"], "new-graph-create", "green_button")
+}
+
+/** «Создать» в окне «Новая схема»: опубликовать пустую схему и войти в её мастерскую; ошибка — в том же окне. */
+export function createGraph(player: LuaPlayer): void {
+  const frame = player.gui.screen[NEW_GRAPH_FRAME]
+  if (frame === undefined) return
+  const denied = publishDenied(player)
+  const result = denied !== undefined ? undefined : newGraphProgram(player, trim((frame["graph-name"] as TextFieldGuiElement).text))
+  const problem = denied !== undefined ? { code: denied, params: [], line: 0, column: 0 } : result !== undefined && !result.ok ? result.diagnostics[0] : undefined
+  if (problem !== undefined || result === undefined || !result.ok) {
+    const errors = frame["graph-errors"] as LabelGuiElement
+    errors.caption = problem === undefined ? "" : diagnosticMessage(problem)
+    errors.visible = true
+    ;(frame["graph-name"] as TextFieldGuiElement).focus()
+    return
+  }
+  frame.destroy()
+  closePrograms(player)
+  enterWorkshop(player, result.program)
 }
 
 function windowOf(player: LuaPlayer): ProgramsWindow | undefined {
@@ -351,7 +396,8 @@ function load(window: ProgramsWindow, player: LuaPlayer, programId: number | und
   const isGraph = program?.graph !== undefined
   if (window.workshop?.valid) window.workshop.visible = isGraph
   window.code.read_only = isGraph
-  window.editButton.enabled = !isGraph
+  // У схемы «Править» открывает мастерскую.
+  window.editButton.tooltip = isGraph ? ["automaton-workshop.edit-graph-tooltip"] : ["automaton-gui.edit-mode-tooltip"]
   window.errorLines = {}
   window.errors.clear()
   window.notes.clear()
@@ -646,6 +692,13 @@ export function registerProgramsWindow(): void {
   onGuiClick("programs-edit", (player) => {
     const window = windowOf(player)
     if (window === undefined) return
+    // Схема правится в мастерской: её код собирается из узлов.
+    const program = window.programId === undefined ? undefined : storage.programs.byId[window.programId]
+    if (program?.graph !== undefined) {
+      closePrograms(player)
+      enterWorkshop(player, program)
+      return
+    }
     setMode(window, "edit")
     window.code.focus()
   })
@@ -696,14 +749,11 @@ export function registerProgramsWindow(): void {
       showErrors(window, [{ code: denied, params: [], line: 0, column: 0 }])
       return
     }
-    const result = newGraphProgram(player, trim(window.name.text))
-    if (!result.ok) {
-      showErrors(window, result.diagnostics)
-      return
-    }
-    closePrograms(player)
-    enterWorkshop(player, result.program)
+    askGraphName(player)
   })
+  onGuiClick("new-graph-create", (player) => createGraph(player))
+  onGuiConfirm("new-graph-create", (player) => createGraph(player))
+  onGuiClick("new-graph-cancel", (player) => player.gui.screen[NEW_GRAPH_FRAME]?.destroy())
   onGuiClick("programs-workshop", (player) => {
     const window = windowOf(player)
     const program = window?.programId === undefined ? undefined : storage.programs.byId[window.programId]

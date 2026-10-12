@@ -63,6 +63,15 @@ elseif step == 6 and wait > 10 then
   R.cursorAfterClear = player.cursor_stack.valid_for_read and player.cursor_stack.name or "empty"
   R.wires = graph().wires
   bodyAt = remote.call(W, "body", "sim/схема", waitNode)
+  remote.call(W, "wire", player.index, "green-wire")
+  step, wait = 60, 0
+-- 2б. Зелёный провод к разъёмам порядка: мод снимает его (порядок — только красным).
+elseif step == 60 and startOut and at(startOut) then sim.control_press{control = "build", notify = false}; step, wait = 61, 0
+elseif step == 61 and wait > 5 and waitIn and at(waitIn) then sim.control_press{control = "build", notify = false}; step, wait = 62, 0
+elseif step == 62 and wait > 10 then
+  player.cursor_stack.clear()
+  local g = graph()
+  R.afterGreen = { wires = #g.wires, problems = g.problems }
   step, wait = 7, 0
 -- 3. Клик по узлу пустой рукой — окно настроек.
 elseif step == 7 and bodyAt and at({bodyAt.x, bodyAt.y - 0.6}) then sim.control_press{control = "open-gui", notify = true}; step, wait = 8, 0
@@ -136,6 +145,7 @@ check(r.enter === true && r.controller === 2 && r.surface.startsWith("automaton-
 check(r.cursor === "blueprint" && r.afterPick === 2, "палитра: узел в руке чертежом, поставлен кликом")
 check(r.wireInHand === "red-wire", "кнопка палитры: красный провод в руке")
 check(arr(r.wires).includes(`1.next>${r.waitNode}.exec`), "красный провод кликами: «Старт» → «Ждать»")
+check(r.afterGreen?.wires === 1 && r.afterGreen?.problems === 0, "зелёный провод к разъёмам порядка снят")
 check(r.nodeWindow === true, "клик по узлу — окно настроек")
 check(r.afterPaste?.nodes === 2 && arr(r.afterPaste?.wires).length === 1 && r.afterPaste?.problems === 0, "вырезать и вставить: узел перенесён, провод цел")
 check(r.publish?.errors === 0 && r.publish?.version === 2, "публикация из мастерской: новая версия")

@@ -15,7 +15,10 @@ Date: 2026-10-12
     - Graphs keep their nodes; their code is rebuilt with the new API.
   Info:
     - Player guide, README, in-game help (F1) and VS Code types use the new API (Russian and English).
+  Changes:
+    - New graph asks for a name in its own window (a free "Graph N" is suggested); Edit on a graph program opens its workshop.
   Bugfixes:
+    - A green wire could be connected to the red flow pins (and a red one to data pins) and was read as a valid wire: such a wire is now removed right away, and a wrong-colour wire from a blueprint is an error on the node.
     - Gates did not open for machines, and the pathfinder treated a closed gate as a wall: a machine could not get into an area walled off with gates. Machines now path through gates, and gates open in front of them.
 ---------------------------------------------------------------------------------------------------
 Version: 0.7.0

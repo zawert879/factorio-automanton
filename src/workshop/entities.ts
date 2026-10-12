@@ -1,7 +1,7 @@
 // Мастерская схем (этап 15): поверхность программы, здания узлов и разъёмов, вид узла (rendering), чтение схемы
 // с поверхности (узлы и провода) и постройка поверхности из схемы. Узлы из палитры и вставка (Ctrl+V) приходят
 // призраками — они сразу оживают; разъёмы узла ищутся по месту, недостающие ставятся заново.
-import { Color, LocalisedString, LuaEntity, LuaSurface, MapGenSettingsWrite, MapPosition, Tags } from "factorio:runtime"
+import { Color, LocalisedString, LuaEntity, LuaPlayer, LuaSurface, MapGenSettingsWrite, MapPosition, Tags } from "factorio:runtime"
 import { blueprintOf } from "../automaton/blueprints"
 import { onEvent, onTick } from "../events"
 import { resolvePins } from "../graph/codegen"
@@ -51,6 +51,34 @@ export function isNodeBody(name: string): boolean {
 
 export function isPin(name: string): boolean {
   return name === PIN_EXEC || name === PIN_DATA
+}
+
+/** Цвет провода разъёма: порядок (▶) — красный, данные (●) — зелёный. */
+export function pinWire(pin: LuaEntity): defines.wire_connector_id {
+  return pin.name === PIN_EXEC ? defines.wire_connector_id.circuit_red : defines.wire_connector_id.circuit_green
+}
+
+/** Снять с разъёма провода не того цвета (к нему или к разъёму на другом конце); true — что-то снято. */
+export function dropWrongWires(pin: LuaEntity): boolean {
+  let dropped = false
+  for (const id of [defines.wire_connector_id.circuit_red, defines.wire_connector_id.circuit_green]) {
+    const connector = pin.get_wire_connector(id, false)
+    if (connector === undefined) continue
+    for (const connection of connector.connections) {
+      const other = connection.target.owner
+      if (id === pinWire(pin) && (!other.valid || !isPin(other.name) || id === pinWire(other))) continue
+      connector.disconnect_from(connection.target)
+      dropped = true
+    }
+  }
+  return dropped
+}
+
+/** Разъём, по которому кликнули проводом: проверить через тик, когда игра уже провела провод. */
+export function checkWiresLater(player: LuaPlayer, pin: LuaEntity): void {
+  const state = workshopState()
+  state.wireChecks ??= []
+  state.wireChecks.push({ pin, player: player.index })
 }
 
 export function isWorkshopEntity(name: string): boolean {
@@ -435,9 +463,15 @@ export function readGraph(ws: Workshop): { graph: Graph; problems: WireProblem[]
           if (ref === undefined || ref.programId !== ws.programId) continue
           const a = `${id}/${key}`
           const b = `${ref.node}/${ref.key}`
-          const pair = a < b ? `${a}|${b}` : `${b}|${a}`
+          // Пара разъёмов и цвет: провод виден с обоих концов; красный и зелёный между теми же разъёмами — разные.
+          const pair = `${a < b ? `${a}|${b}` : `${b}|${a}`}|${connectorId}`
           if (seen[pair]) continue
           seen[pair] = true
+          // Порядок — красным проводом, данные — зелёным (провод не того цвета мог прийти из чертежа).
+          if (connectorId !== pinWire(pin) || connectorId !== pinWire(other)) {
+            problems.push({ node: id, code: "graph-wire-color" })
+            continue
+          }
           const thisOut = string.sub(key, 1, 4) === "out:"
           const otherOut = string.sub(ref.key, 1, 4) === "out:"
           if (thisOut === otherOut) {
@@ -617,9 +651,21 @@ export function registerWorkshopEntities(): void {
   })
   onTick(() => {
     const state = storage.workshop
-    if (state === undefined || state.orphans.length === 0) return
-    for (const pin of state.orphans) if (pin.valid && state.pins[pin.unit_number!] === undefined) pin.destroy()
-    state.orphans = []
+    if (state === undefined) return
+    if (state.orphans.length > 0) {
+      for (const pin of state.orphans) if (pin.valid && state.pins[pin.unit_number!] === undefined) pin.destroy()
+      state.orphans = []
+    }
+    if (state.wireChecks !== undefined && state.wireChecks.length > 0) {
+      for (const check of state.wireChecks) {
+        if (!check.pin.valid || !dropWrongWires(check.pin)) continue
+        game.get_player(check.player)?.create_local_flying_text({
+          text: [check.pin.name === PIN_EXEC ? "automaton-workshop.wire-exec-only" : "automaton-workshop.wire-data-only"],
+          position: check.pin.position,
+        })
+      }
+      state.wireChecks = []
+    }
   })
   onEvent(defines.events.on_player_setup_blueprint, (e) => {
     const player = game.get_player(e.player_index)

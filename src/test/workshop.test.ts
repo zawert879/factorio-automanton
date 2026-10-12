@@ -7,7 +7,7 @@ import { findRobot } from "../automaton/registry"
 import { MODELS } from "../names"
 import { assignProgram, machineOf } from "../program/machines"
 import { deleteProgram, findProgram, publish } from "../program/store"
-import { buildGraph, ensureWorkshop, NODE_TAG, readGraph, removeNode, workshopOf } from "../workshop/entities"
+import { buildGraph, dropWrongWires, ensureWorkshop, NODE_TAG, readGraph, removeNode, workshopOf } from "../workshop/entities"
 import { publishWorkshop } from "../workshop/publish"
 import { breakLine, machineNode } from "../workshop/debug"
 import { loadedProgram } from "../program/store"
@@ -61,6 +61,26 @@ describe("мастерская", () => {
     expect(back.graph.wires.some((w) => w.to === 3 || w.from === 3)).toBe(false)
     buildGraph(ws, counting())
     expect(readGraph(ws).graph.wires.length).toBe(4)
+  })
+
+  test("провод не того цвета: ошибка схемы на узле, клик проводом его снимает", () => {
+    const program = findProgram("ws/count")!
+    const ws = workshopOf(program.id)!
+    buildGraph(ws, counting())
+    // Зелёный провод между разъёмами порядка «Старт ▶» и «Повторить ▶» (рядом с красным).
+    const out = ws.nodes[1]!.pins["out:next"]!
+    const input = ws.nodes[2]!.pins["in:exec"]!
+    out.get_wire_connector(defines.wire_connector_id.circuit_green, true)!.connect_to(input.get_wire_connector(defines.wire_connector_id.circuit_green, true)!, false)
+    expect(readGraph(ws).problems.map((p) => p.code)).toEqual(["graph-wire-color"])
+    expect(dropWrongWires(input)).toBe(true)
+    expect(readGraph(ws).problems.length).toBe(0)
+    expect(readGraph(ws).graph.wires.length).toBe(4)
+    // Красный провод к разъёму данных — тоже не тот цвет.
+    const value = ws.nodes[3]!.pins["in:value"]!
+    const index = ws.nodes[2]!.pins["out:index"]!
+    index.get_wire_connector(defines.wire_connector_id.circuit_red, true)!.connect_to(value.get_wire_connector(defines.wire_connector_id.circuit_red, true)!, false)
+    expect(dropWrongWires(value)).toBe(true)
+    expect(dropWrongWires(value)).toBe(false)
   })
 
   test("призрак узла с тегом (палитра, вставка) оживает узлом с разъёмами", () => {

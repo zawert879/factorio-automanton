@@ -1,18 +1,23 @@
-// Новая программа-схема (этап 15): пустая схема со «Стартом», опубликованная под именем из окна программ
+// Новая программа-схема (этап 15): пустая схема со «Стартом», опубликованная под именем из окна «Новая схема»
 // (пустое — «Схема N»). Занятое имя — ошибка, а не новая версия чужой программы.
 import { LuaPlayer } from "factorio:runtime"
 import { graphToSource } from "../graph/codegen"
 import { emptyGraph } from "../graph/model"
 import { findProgram, publish, PublishResult } from "../program/store"
 
+/** Свободное имя «Схема N» («Graph N» в английской игре) — предложение в окне «Новая схема». */
+export function suggestGraphName(player: LuaPlayer): string {
+  const base = player.locale === "ru" ? "Схема" : "Graph"
+  let n = 1
+  while (findProgram(`${base} ${n}`, player.force.name) !== undefined) n++
+  return `${base} ${n}`
+}
+
 export function newGraphProgram(player: LuaPlayer, wanted: string): PublishResult {
   const force = player.force.name
   let name = wanted
   if (name === "") {
-    const base = player.locale === "ru" ? "Схема" : "Graph"
-    let n = 1
-    while (findProgram(`${base} ${n}`, force) !== undefined) n++
-    name = `${base} ${n}`
+    name = suggestGraphName(player)
   } else if (findProgram(name, force) !== undefined) {
     return { ok: false, diagnostics: [{ code: "program-name-taken", params: [name], line: 0, column: 0 }] }
   }

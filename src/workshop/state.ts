@@ -1,6 +1,6 @@
 // Мастерская схем (этап 15): что лежит в storage. Узел — тело и разъёмы на поверхности программы; его вид
 // и значения — здесь; провода — только на поверхности (читаются при проверке и публикации).
-import { LocalisedString, LuaEntity, LuaRenderObject, LuaSurface, MapPosition } from "factorio:runtime"
+import { LocalisedString, LuaEntity, LuaRenderObject, LuaSurface, MapPosition, PlayerIndex } from "factorio:runtime"
 import { GraphValue } from "../graph/model"
 
 export interface WorkshopNode {
@@ -47,6 +47,8 @@ export interface WorkshopState {
   visitors: Record<number, WorkshopVisitor | undefined>
   /** Разъёмы, вставленные раньше своего тела: через тик без хозяина — убираются. */
   orphans: LuaEntity[]
+  /** Разъёмы, по которым кликнули проводом: через тик провода не того цвета снимаются (событий о проводах нет). */
+  wireChecks?: { pin: LuaEntity; player: PlayerIndex }[]
   /** Подсветка отладки (машины на узлах) по программам. */
   debugRenders?: Record<number, LuaRenderObject[] | undefined>
 }
