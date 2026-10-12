@@ -1,0 +1,12 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "target": "es2020",
+    "lib": ["es2020"],
+    "noEmit": true,
+    "moduleDetection": "force",
+    "module": "preserve",
+    "moduleResolution": "bundler"
+  },
+  "include": ["**/*.ts"]
+}

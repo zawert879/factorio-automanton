@@ -456,6 +456,45 @@ Mk2/Mk3 (этап 8) увеличат бак и скорость.
 параметры; команда (сообщения, запросы, доска, очереди задач, табло, сигналы), стройка, бой, зрение.
 Плюс переменные и свои функции-схемы.
 
+## API объектами (этап 19)
+
+Решения по [вариантам](https://claude.ai/artifact/JtQ3ApKSeho3PkY1rWrjHa): 1B, 2C, 3A, 4C, 5A, 6C. Черновик объявлений
+и примеры на нём — `docs/api-objects/` (проверка — `npx tsc -p docs/api-objects`), после согласования переезжают в
+[API.md](API.md). Пока этап не сделан, остальной документ и API.md описывают прежний API.
+
+**Глобальных функций 11 вместо 44:** вывод (`print`, `chat`, `alert`), ожидание и управление программой (`wait`,
+`waitUntil`, `exit`, `restart`), поиск по имени (`marker`, `zone`, `robot`, `display`). Остальное — в объектах
+`me`, `scan`, `map`, `radio`, `board`, `tasks`, `signals`, `time`, `world` и в методах объектов игры.
+
+**Действие — метод того, над чем действуют (1B).** `furnace.insert("coal", 2)`, `chest.extract("iron-plate")`,
+`furnace.repair()`, `assembler.setRecipe("gear")`, `boiler.fill()`, `helper.insert("coal", 5)` (было `give`),
+`helper.refuel()`. Делает всё равно эта машина: нужна `me.reach`, тратятся её энергия и время. Глаголы — со стороны
+здания (`insert` / `extract`, как в API Factorio): `chest.take()` читалось бы как «сундук берёт». У `me` — то, что
+без цели: `move`, `canReach`, `follow`, `goHome`, `mine`, `pickup`, `drop`, `build`, `say`.
+
+**Системы машины — группы, `null` у моделей без них (2C).** `me.energy` (`level`, `refuel`, `charge`) — у всех;
+`me.tank` (`pump`) — только у рабочих, `me.weapon` (`reload`, `attack`, `guard`, `patrol`) — только у боевых, у
+остальных `null`. `fill` / `drain` здания у машины без бака — `ActionError("no-tank")`.
+
+**Классы и `instanceof` (3A).** Объекты игры — классы: `Building` и подклассы, `Robot` (другая машина), `Enemy`,
+`Marker`, `Zone`; общее у `me` и `Robot` — абстрактный `Machine` (у `me` нет `insert` / `refuel` / `repair`
+другой машины). `new` — ошибка; `instanceof` работает для любого значения, в том числе пришедшего сообщением.
+
+**Класс на каждый вид зданий (4C).** `Chest`, `Furnace`, `Assembler` (сборщики, химзавод, нефтезавод, центрифуга),
+`RocketSilo`, `Lab`, `Boiler` (и теплообменник), `Generator`, `Reactor`, `StorageTank`, `Pipe` (и помпа), `Turret`,
+`FlameTurret`, `CargoWagon`, `FluidWagon`, `Locomotive`, `Vehicle`, `ChargingStation`; прочие — просто `Building`.
+У каждого — только применимые методы: `chest.setRecipe` — ошибка в редакторе. Поиск по классу сразу даёт его тип:
+`zone.find(Furnace)` → `Furnace[]`, `scan.buildings({ kind: Chest })`; фильтр `{ type: "furnace" }` уходит.
+`Entity` → `Building`, `scan.entities` → `scan.buildings`, `find(what, zone)` → `zone.find(what)`.
+
+**Связь — объект `radio` (5A):** `send`, `request`, `receive`, `tryReceive`, `publish`, `subscribe`, `unsubscribe`,
+`inbox` — как `board` и `tasks`.
+
+**Старые имена не поддерживаются (6C).** Выпуск ломает программы 0.7.0: после обновления они не собираются, машины
+стоят до правки. При обновлении мод пересобирает программы команды и показывает ошибки, как при публикации; в
+changelog и на странице мода — предупреждение и таблица «было → стало». Узлы мастерской те же, схемы собирают код
+с новыми именами.
+
 ## Риски
 
 | Риск | Что делаем |
