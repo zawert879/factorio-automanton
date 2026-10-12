@@ -424,21 +424,22 @@ if (furnace.status === "no-fuel") furnace.insert("coal", 5);
 
 ### Постройка по чертежу
 
-Чертёж, который игрок положил на землю, — это призраки зданий. Машина видит их (`scan.ghosts()`) и строит
-из своего груза, как `me.build`, но здание встаёт таким, как в чертеже: с поворотом, рецептом, настройками и проводами.
+Чертёж, который игрок положил на землю, — это призраки зданий и плитки (бетон, засыпка). Машина видит их
+(`scan.ghosts()`) и строит из своего груза, как `me.build`, но здание встаёт таким, как в чертеже: с поворотом,
+рецептом, настройками и проводами.
 
 ```ts
 /**
- * Призрак — здание по чертежу, ещё не построенное. Призраки машин программам не видны: машины ставит игрок.
- * @en A ghost — a building from a blueprint, not built yet. Ghosts of machines are not visible to programs: machines are placed by players.
+ * Призрак — здание или плитка по чертежу, ещё не построенные. Призраки машин программам не видны: машины ставит игрок.
+ * @en A ghost — a building or a tile from a blueprint, not built yet. Ghosts of machines are not visible to programs: machines are placed by players.
  */
 declare class Ghost {
   private constructor();
   readonly id: number;
   readonly valid: boolean;             // false — построен или снят @en false — built or removed
   readonly inSight: boolean;
-  readonly name: string;               // какое здание встанет: "stone-furnace" @en which building it becomes: "stone-furnace"
-  readonly item: Item;                 // чем строить: "stone-furnace" @en what to build it with: "stone-furnace"
+  readonly name: string;               // что встанет: "stone-furnace", плитка "concrete" @en what it becomes: "stone-furnace", the "concrete" tile
+  readonly item: Item;                 // чем строить: "stone-furnace", "concrete" @en what to build it with: "stone-furnace", "concrete"
   readonly position: Position;
   readonly direction: Direction;
   /**
@@ -447,10 +448,10 @@ declare class Ghost {
    */
   requests(): ItemStack[];
   /**
-   * [Строительство] Построить из груза, как me.build: здание встаёт таким, как в чертеже.
-   * @en [Construction] Build it from the cargo, like me.build: the building comes out as in the blueprint.
+   * [Строительство] Построить из груза, как me.build: здание встаёт таким, как в чертеже. Плитка — null.
+   * @en [Construction] Build it from the cargo, like me.build: the building comes out as in the blueprint. A tile gives null.
    */
-  build(): Building;
+  build(): Building | null;
 }
 ```
 
@@ -464,7 +465,8 @@ for (const ghost of scan.ghosts()) {
 ```
 
 - `ghost.build()`: призрака уже нет — `invalid-target`; предмета нет в грузе — `not-enough-items`; место занято
-  (дерево, камень, машина, персонаж) — `target-full`. Всё — в радиусе `me.reach`, около полсекунды.
+  (дерево, камень, машина, персонаж) — `target-full`. Всё — в радиусе `me.reach`, около полсекунды на здание
+  или клетку плитки.
 - Строительные дроны игрока строят те же призраки — кто первый. Модули, которые просит чертёж, сами не встают:
   запрос остаётся у здания (`building.requests()`), его выполняет `installModule` — см. «Модули».
 - Готовая программа — пример «Строитель»: берёт предметы на складе и строит призраки у метки.

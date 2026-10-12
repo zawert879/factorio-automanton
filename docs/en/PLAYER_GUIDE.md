@@ -111,8 +111,9 @@ The selection must contain at least one building (a chest, a pole): the game won
 alone. If your team has no program with that name (a blueprint from another game), the machine is placed without
 a program — send the programs over as an export string.
 
-**Machines build blueprints.** A placed blueprint is a set of building ghosts. Construction robots build them around
-a player with a personal roboport, and machines build them anywhere else: `scan.ghosts()` lists the ghosts nearby,
+**Machines build blueprints.** A placed blueprint is a set of building and tile ghosts (concrete, landfill).
+Construction robots build them around a player with a personal roboport, and machines build them anywhere else:
+`scan.ghosts()` lists the ghosts nearby,
 `ghost.build()` places the building from the machine's cargo exactly as in the blueprint (rotation, recipe, wires).
 It needs the **Automaton construction** research. A ready-made program is [examples/builder.ts](../../examples/builder.ts)
 ("Строитель", the Builder): it takes the items from the depot at a marker and builds the ghosts at the "стройка" marker.

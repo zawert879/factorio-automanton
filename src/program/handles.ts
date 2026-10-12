@@ -76,7 +76,7 @@ export function buildingClass(entity: LuaEntity): string {
   if (entity.force.name === "enemy") return "Enemy"
   if (isTree(entity)) return "Tree"
   if (isRock(entity)) return "Rock"
-  if (entity.type === "entity-ghost") return "Ghost"
+  if (entity.type === "entity-ghost" || entity.type === "tile-ghost") return "Ghost"
   if (entity.name === CHARGING_STATION) return "ChargingStation"
   return CLASS_BY_TYPE[entity.type] ?? "Building"
 }
@@ -112,7 +112,7 @@ export function entityHandle(entity: LuaEntity): Val {
     __e: entity,
     __id: unit,
     // У призрака — имя здания, которое по нему встанет.
-    __name: entity.type === "entity-ghost" ? entity.ghost_name : entity.name,
+    __name: entity.type === "entity-ghost" || entity.type === "tile-ghost" ? entity.ghost_name : entity.name,
     __type: entity.type,
     __x: position.x,
     __y: position.y,
@@ -124,9 +124,9 @@ export function entityHandle(entity: LuaEntity): Val {
   return handle
 }
 
-/** Чем строить призрак здания name: первый предмет, который его ставит (у прямых рельсов — рельс). */
-export function ghostItem(name: string): { name: string; count: number } | undefined {
-  const item = prototypes.entity[name]?.items_to_place_this?.[0]
+/** Чем строить призрак здания или плитки (tile) name: первый предмет, который его ставит (у прямых рельсов — рельс). */
+export function ghostItem(name: string, tile = false): { name: string; count: number } | undefined {
+  const item = (tile ? prototypes.tile[name] : prototypes.entity[name])?.items_to_place_this?.[0]
   return item === undefined ? undefined : { name: item.name, count: item.count }
 }
 
@@ -318,8 +318,9 @@ for (const cls of ["Tree", "Rock"]) {
 }
 
 // Призраки (21.3) — здания по чертежу, ещё не построенные: что встанет, каким предметом, где, куда повёрнуто.
+// Призрак плитки (21.6: бетон, засыпка) — тоже Ghost: name — плитка, item — чем её класть.
 for (const key of ["id", "valid", "inSight", "name", "position"]) hostGetters.Ghost[key] = entityGetters[key]
-hostGetters.Ghost.item = (o: Val) => ghostItem(o.__name)?.name
+hostGetters.Ghost.item = (o: Val) => ghostItem(o.__name, o.__type === "tile-ghost")?.name
 hostGetters.Ghost.direction = (o: Val) => {
   const entity = o.__e as LuaEntity
   if (!entity.valid) actionError("invalid-target")
@@ -329,7 +330,7 @@ hostGetters.Ghost.direction = (o: Val) => {
 hostMethods.Ghost.requests = (o: Val) => {
   const entity = o.__e as LuaEntity
   if (!entity.valid) actionError("invalid-target")
-  return programArray(requestedItems(entity.insert_plan))
+  return programArray(entity.type === "tile-ghost" ? [] : requestedItems(entity.insert_plan))
 }
 rawset(hostMethods.Ghost, "toString", (o: Val) => `ghost:${o.__name}#${tostring(o.__id ?? "?")}`)
 

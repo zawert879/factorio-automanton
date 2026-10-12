@@ -199,4 +199,32 @@ print(scan.marked().length, scan.buildings().length, scan.trees().length, scan.r
       robot.entity.destroy()
     })
   })
+
+  test("призраки плитки: scan.ghosts их видит (что класть — предмет плитки), ghost.build кладёт плитку из груза", (t) => {
+    const [x0, y0] = [1530, -1250]
+    const { surface, robot } = site(x0, y0)
+    robot.cargo.insert({ name: "concrete", count: 2 })
+    robot.cargo.insert({ name: "stone-brick", count: 1 })
+    for (const [name, x, y] of [["concrete", 5, 2], ["concrete", 6, 2], ["stone-path", 5, 4], ["stone-path", 6, 4]] as const) {
+      surface.create_entity({ name: "tile-ghost", inner_name: name, position: { x: x0 + x + 0.5, y: y0 + y + 0.5 }, force: "player" })
+    }
+    const m = run(
+      robot,
+      "test-tile-ghosts",
+      `const ghosts = scan.ghosts()
+print(ghosts.length, ghosts.filter((g) => g.name === "stone-path" && g.item === "stone-brick").length, ghosts[0] instanceof Ghost)
+let laid = 0
+for (const g of ghosts) {
+  if (me.cargo.count(g.item) === 0) continue
+  if (g.build() === null && !g.valid) laid++
+}
+print(laid, me.cargo.count("concrete"), me.cargo.count("stone-brick"), scan.ghosts().length)`,
+    )
+    waitUntil(t, "конца программы", finished(m), 900, () => {
+      expect(output(m)).toBe("4 2 true|3 0 0 1")
+      expect(surface.get_tile(x0 + 5, y0 + 2).name).toBe("concrete")
+      expect(surface.get_tile(x0 + 6, y0 + 2).name).toBe("concrete")
+      robot.entity.destroy()
+    })
+  })
 })

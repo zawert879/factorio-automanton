@@ -2,7 +2,8 @@
 // (Mk1 — 10 клеток), от ближнего к дальнему. Каждый взгляд стоит энергии, больше радиус — дороже.
 // scan.buildings (19.2) — здания, с фильтром по классу и имени: scan.buildings({ kind: Furnace }).
 // scan.trees, scan.rocks (21.2) — деревья и скалы: их рубят и разбивают me.mine.
-// scan.ghosts (21.3) — призраки зданий своей команды (по чертежу), кроме призраков машин: их программа не строит.
+// scan.ghosts (21.3) — призраки зданий и плитки (21.6) своей команды (по чертежу), кроме призраков машин: их
+// программа не строит.
 // scan.marked (21.5) — помеченное к сносу: здания своей команды (разбирает deconstruct), деревья и скалы (me.mine).
 import { LuaEntity, MapPosition } from "factorio:runtime"
 import { spend } from "../../automaton/energy"
@@ -106,7 +107,7 @@ hostMethods.scan.items = (_o: Val, _k: Val, radius: Val) => {
 hostMethods.scan.ghosts = (_o: Val, _k: Val, filter: Val) => {
   const robot = currentRobot()
   const f = type(filter) === "table" ? filter : {}
-  const filters: Record<string, unknown> = { type: "entity-ghost", force: robot.entity.force_index }
+  const filters: Record<string, unknown> = { type: ["entity-ghost", "tile-ghost"], force: robot.entity.force_index }
   const name = nameList(f.name)
   if (name !== undefined) filters.ghost_name = name
   const found = seen(robot, "ghosts", look(f.radius), filters).filter((e) => !ROBOT_PLACERS.includes(e.ghost_name))

@@ -95,9 +95,10 @@ function ghostStack(ghost: LuaEntity): { name: string; count: number; quality: s
   return item === undefined ? undefined : { name: item.name, count: item.count, quality: ghost.quality.name }
 }
 
-/** Призрак (ghost.build, 21.3): есть, не машина (их строит игрок), предмет в грузе, досягаем. */
+/** Призрак (ghost.build, 21.3; плитки — 21.6): есть, не машина (их строит игрок), предмет в грузе, досягаем. */
 function ghostCheck(record: RobotRecord, ghost: LuaEntity): StepOutcome | undefined {
-  if (!ghost.valid || ghost.type !== "entity-ghost" || ROBOT_PLACERS.includes(ghost.ghost_name)) return { finish: true, error: "invalid-target" }
+  if (!ghost.valid || (ghost.type !== "entity-ghost" && ghost.type !== "tile-ghost")) return { finish: true, error: "invalid-target" }
+  if (ROBOT_PLACERS.includes(ghost.ghost_name)) return { finish: true, error: "invalid-target" }
   const stack = ghostStack(ghost)
   if (stack === undefined) return { finish: true, error: "invalid-target" }
   if (record.cargo.get_item_count({ name: stack.name, quality: stack.quality }) < stack.count) return { finish: true, error: "not-enough-items" }
@@ -111,10 +112,18 @@ function buildGhost(record: RobotRecord, action: ActionState, ghost: LuaEntity):
   if (problem !== undefined) return problem
   if (!spend(record, HANDLING_JOULES)) return { finish: true, error: "no-fuel" }
   const stack = ghostStack(ghost)!
-  const [, built] = ghost.revive({ raise_revive: true })
-  if (built === undefined) return { finish: true, error: "target-full" }
+  if (ghost.type === "tile-ghost") {
+    // Плитка — не сущность: revive её не возвращает, успех — плитка на месте призрака.
+    const { surface, position } = ghost
+    const tile = ghost.ghost_name
+    ghost.revive({ raise_revive: true })
+    if (surface.get_tile(position.x, position.y).name !== tile) return { finish: true, error: "target-full" }
+  } else {
+    const [, built] = ghost.revive({ raise_revive: true })
+    if (built === undefined) return { finish: true, error: "target-full" }
+    action.entity = built
+  }
   record.cargo.remove(stack)
-  action.entity = built
   action.done = 1
   return { finish: true }
 }

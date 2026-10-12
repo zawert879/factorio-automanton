@@ -33,7 +33,8 @@ function startMove(target: Val, options: Val, name: string): LuaMultiReturn<[Val
   return startWaiting(name, (frame) => {
     frame.__move = true
     // К метке и призраку — по месту: призрак может исчезнуть по дороге (его построили).
-    const byPosition = resolved.entity === undefined || resolved.entity.type === "simple-entity-with-owner" || resolved.entity.type === "entity-ghost"
+    const type = resolved.entity?.type
+    const byPosition = type === undefined || type === "simple-entity-with-owner" || type === "entity-ghost" || type === "tile-ghost"
     moveRobot(robot, byPosition ? { position: resolved.position } : { entity: resolved.entity! }, { radius })
     if (timeout !== undefined) {
       frame.__poll = "moveTimeout"
@@ -225,8 +226,10 @@ hostMethods.Building.deconstruct = (o: Val, k: Val) => actionCall(k, "deconstruc
 // Постройка по призраку (21.3): то же действие, что me.build, результат — здание.
 hostMethods.Ghost.build = (o: Val, k: Val) => {
   if (k === undefined) return actionCall(k, "build", { target: handleEntity(o) })
+  // Плитка (21.6) — не здание: тогда итог действия — число, а не сущность.
   const [built] = finishWaiting(k)
-  return $multi(built === undefined || !(built as LuaEntity).valid ? undefined : entityHandle(built as LuaEntity))
+  const entity = type(built) === "userdata" ? (built as LuaEntity) : undefined
+  return $multi(entity === undefined || !entity.valid ? undefined : entityHandle(entity))
 }
 hostMethods.Assembler.setRecipe = (o: Val, k: Val, recipe: Val) => {
   if (k !== undefined) return finishWaiting(k)
