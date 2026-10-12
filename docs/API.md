@@ -116,7 +116,7 @@ chest.extract("coal", 10)                               // D
 | [Здания](#здания) | классы зданий (`Furnace`, `Chest`, …), состояние (в поле зрения), `repair`, `setRecipe`, `me.build`, `deconstruct`, `rotate`; постройка по чертежу — `Ghost`, `ghost.build` | сразу / [Наладка] / [Строительство] |
 | [Жидкости](#жидкости) | `me.tank.pump`, `fill` / `drain` у зданий | [Жидкости] |
 | [Энергия](#энергия) | `me.energy` (`level`, `refuel`, `charge`), `robot.refuel` | сразу / Mk2 |
-| [Зрение](#зрение) | `scan.robots`, `scan.buildings`, `scan.ghosts`, `scan.items`, `scan.trees`, `scan.rocks`, `scan.resources`, `scan.enemies`, `scan.water`; `Tree`, `Rock` | сразу, радиус растёт исследованиями |
+| [Зрение](#зрение) | `scan.robots`, `scan.buildings`, `scan.ghosts`, `scan.marked`, `scan.items`, `scan.trees`, `scan.rocks`, `scan.resources`, `scan.enemies`, `scan.water`; `Tree`, `Rock` | сразу, радиус растёт исследованиями |
 | [Карта](#карта) | метки, зоны, `zone.find`, `map.tag` | сразу |
 | [Связь](#связь) | `radio` (`send`, `publish`, `subscribe`, `receive`, `request`, `inbox`), `robot` | [Радиосвязь] |
 | [Доска и задачи](#доска-и-задачи) | `board` (общая память), `tasks` (очереди заданий) | [Радиосвязь] |
@@ -468,6 +468,17 @@ for (const ghost of scan.ghosts()) {
 - Строительные дроны игрока строят те же призраки — кто первый. Модули, которые просит чертёж, сами не встают:
   запрос остаётся у здания (`building.requests()`), его выполняет `installModule` — см. «Модули».
 - Готовая программа — пример «Строитель»: берёт предметы на складе и строит призраки у метки.
+
+Снос — тоже по пометкам: что игрок пометил планировщиком сноса, машина видит в `scan.marked()`.
+
+```ts
+// Разобрать всё, что помечено к сносу рядом: здания — в груз, деревья и скалы — добыча
+for (const target of scan.marked()) {
+  me.move(target, { radius: 2 });
+  if (target instanceof Tree || target instanceof Rock) me.mine(target);
+  else target.deconstruct();
+}
+```
 
 ### Классы зданий
 
@@ -1121,6 +1132,11 @@ declare const scan: {
    * @en Ghosts of your team's buildings nearby — a blueprint placed by a player. With name — only of those buildings.
    */
   ghosts(filter?: { name?: string | string[]; radius?: number }): Ghost[];
+  /**
+   * Помеченное к сносу рядом (планировщиком сноса): здания своей команды — разобрать deconstruct(), деревья и скалы — me.mine.
+   * @en Things marked for deconstruction nearby (with a deconstruction planner): your team's buildings — deconstruct() them, trees and rocks — me.mine.
+   */
+  marked(radius?: number): (Building | Tree | Rock)[];
   /**
    * Предметы, лежащие на земле.
    * @en Items lying on the ground.

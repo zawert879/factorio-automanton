@@ -1,8 +1,9 @@
-// Зрение (4.6): scan.robots / buildings / ghosts / items / trees / rocks / resources / enemies / water — только в радиусе зрения
+// Зрение (4.6): scan.robots / buildings / ghosts / marked / items / trees / rocks / resources / enemies / water — только в радиусе зрения
 // (Mk1 — 10 клеток), от ближнего к дальнему. Каждый взгляд стоит энергии, больше радиус — дороже.
 // scan.buildings (19.2) — здания, с фильтром по классу и имени: scan.buildings({ kind: Furnace }).
 // scan.trees, scan.rocks (21.2) — деревья и скалы: их рубят и разбивают me.mine.
 // scan.ghosts (21.3) — призраки зданий своей команды (по чертежу), кроме призраков машин: их программа не строит.
+// scan.marked (21.5) — помеченное к сносу: здания своей команды (разбирает deconstruct), деревья и скалы (me.mine).
 import { LuaEntity, MapPosition } from "factorio:runtime"
 import { spend } from "../../automaton/energy"
 import { defineHostObject, hostMethods, Val } from "../../lang/runtime/core"
@@ -14,7 +15,7 @@ import { buildingKind, nameList } from "./common"
 import { programArray, programPosition } from "../values"
 import { findCached } from "../cache"
 import { RobotRecord } from "../../automaton/registry"
-import { isRock } from "../../automaton/mining"
+import { isNatural, isRock } from "../../automaton/mining"
 
 /** Энергия взгляда радиусом 10 клеток. */
 const SCAN_JOULES = 2_000
@@ -109,6 +110,16 @@ hostMethods.scan.ghosts = (_o: Val, _k: Val, filter: Val) => {
   const name = nameList(f.name)
   if (name !== undefined) filters.ghost_name = name
   const found = seen(robot, "ghosts", look(f.radius), filters).filter((e) => !ROBOT_PLACERS.includes(e.ghost_name))
+  return programArray(byDistance(found, (e) => e.position).map((e) => entityHandle(e)))
+}
+
+hostMethods.scan.marked = (_o: Val, _k: Val, radius: Val) => {
+  const robot = currentRobot()
+  const force = robot.entity.force_index
+  const found = seen(robot, "marked", look(radius), { to_be_deconstructed: true }).filter((e) => {
+    if (isNatural(e)) return true
+    return e.force_index === force && !SKIPPED_TYPES[e.type] && !MARKER_ENTITIES.includes(e.name) && !ROBOT_PLACERS.includes(e.name)
+  })
   return programArray(byDistance(found, (e) => e.position).map((e) => entityHandle(e)))
 }
 

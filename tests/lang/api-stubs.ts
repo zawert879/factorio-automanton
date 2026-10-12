@@ -179,6 +179,7 @@ for (const cls of ["Furnace", "Assembler", "RocketSilo", "Lab", "Beacon"]) {
   hostMethods[cls].installModule = () => 2
   hostMethods[cls].removeModule = () => 0
 }
+hostMethods.scan.marked = () => arr(hostObject("entity", { __c: "Tree", __name: "tree-02", __x: 4, __y: 4 }), entity(nextId++, "wooden-chest", 6, 6))
 hostMethods.scan.trees = () => arr(hostObject("entity", { __c: "Tree", __name: "tree-01", __x: 3, __y: 4 }))
 hostMethods.scan.rocks = () => arr(hostObject("entity", { __c: "Rock", __name: "huge-rock", __x: 9, __y: 4 }))
 hostMethods.scan.water = () => arr()

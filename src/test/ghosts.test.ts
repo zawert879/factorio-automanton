@@ -173,4 +173,30 @@ try { g.build() } catch (e) { print(e instanceof ActionError ? e.code : String(e
       robot.entity.destroy()
     })
   })
+
+  test("scan.marked: помеченные к сносу здание, дерево и скала; deconstruct и me.mine их убирают, непомеченное — нет", (t) => {
+    const [x0, y0] = [1490, -1250]
+    const { surface, robot } = site(x0, y0)
+    surface.create_entity({ name: "wooden-chest", position: { x: x0 + 5.5, y: y0 + 2.5 }, force: "player" })!.order_deconstruction("player")
+    surface.create_entity({ name: "wooden-chest", position: { x: x0 + 5.5, y: y0 + 5.5 }, force: "player" })
+    surface.create_entity({ name: "tree-01", position: { x: x0 + 3.5, y: y0 + 6.5 } })!.order_deconstruction("player")
+    surface.create_entity({ name: "tree-01", position: { x: x0 + 9.5, y: y0 + 2.5 } })
+    surface.create_entity({ name: "big-rock", position: { x: x0 + 8, y: y0 + 8 } })!.order_deconstruction("player")
+    const m = run(
+      robot,
+      "test-marked",
+      `const list = scan.marked()
+print(list.length, list.filter((x) => x instanceof Tree).length, list.filter((x) => x instanceof Rock).length)
+for (const target of list) {
+  me.move(target, { radius: 2 })
+  if (target instanceof Tree || target instanceof Rock) me.mine(target)
+  else target.deconstruct()
+}
+print(scan.marked().length, scan.buildings().length, scan.trees().length, scan.rocks().length)`,
+    )
+    waitUntil(t, "конца программы", finished(m), 2400, () => {
+      expect(output(m)).toBe("3 1 1|0 1 1 0")
+      robot.entity.destroy()
+    })
+  })
 })

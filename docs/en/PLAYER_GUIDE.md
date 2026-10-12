@@ -130,6 +130,9 @@ into the slots, `removeModule()` takes them back, `modules()` lists what is inst
 `requests()` on the building shows what is missing, and a module installed by a machine goes into the requested slot,
 so the robots won't bring it again.
 
+**Deconstruction** works by marks too: whatever is marked with a deconstruction planner shows up in `scan.marked()`;
+buildings are taken apart with `deconstruct()`, trees and rocks with `me.mine(…)`.
+
 Setting up many machines at once:
 
 - **Copy settings** — Shift+right-click a machine (the same keys as for buildings) to copy its program
