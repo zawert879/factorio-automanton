@@ -85,23 +85,35 @@ describe("ворота и стены", () => {
     const x0 = -180
     const y0 = 1300
     const surface = site(x0, y0)
-    // Стена поперёк — от низа площадки (вдоль низа — ещё стена) до y0+4: проход только сверху.
+    // Стена поперёк (клетки y0+4…y0+28) и вдоль низа площадки (y0+29, x0…x0+39): объехать можно сверху или под нижней
+    // стеной вокруг её конца — поисковик пути выбирает то так, то так.
     const built: LuaEntity[] = []
     for (let y = y0 + 4; y < y0 + 29; y++) built.push(surface.create_entity({ name: "stone-wall", position: { x: x0 + 20.5, y: y + 0.5 }, force: "player" })!)
     for (let x = x0; x < x0 + 40; x++) built.push(surface.create_entity({ name: "stone-wall", position: { x: x + 0.5, y: y0 + 29.5 }, force: "player" })!)
     const robot = place(surface, { x: x0 + 10.5, y: y0 + 15.5 })
     moveRobot(robot, { position: { x: x0 + 30.5, y: y0 + 15.5 } })
-    let topmost = 99
+    // Где машина пересекла линию стены (x0+20.5) — замер каждый тик: сквозь стену (y0+4…y0+29) нельзя.
+    const wallX = x0 + 20.5
+    const crossed: number[] = []
+    let lastX = robot.entity.position.x
+    let done = false
+    const sample = (): void => {
+      if (done || !robot.entity.valid) return
+      const { x, y } = robot.entity.position
+      if ((lastX - wallX) * (x - wallX) <= 0 && x !== lastX) crossed.push(math.floor(y - y0))
+      lastX = x
+      t.after(1, sample)
+    }
+    sample()
     waitUntil(
       t,
       "конца поездки",
-      () => {
-        topmost = math.min(topmost, robot.entity.position.y - y0)
-        return !isMoving(robot)
-      },
+      () => !isMoving(robot),
       1500,
       () => {
-        expect(`${lastMoveResult(robot)} ${topmost < 5}`).toBe("arrived true")
+        done = true
+        const through = crossed.filter((row) => row >= 4 && row < 30)
+        expect(`${lastMoveResult(robot)} ${crossed.length > 0} ${through.join(",")}`).toBe("arrived true ")
         for (const e of built) e.destroy()
         robot.entity.destroy()
       },
