@@ -6,7 +6,7 @@ import { cancelMove } from "../automaton/movement"
 import { onRobotRegistered, onRobotRemoved, RobotRecord } from "../automaton/registry"
 import { Val } from "../lang/runtime/core"
 import { Machine, newMachine } from "../lang/runtime"
-import { onProgramPublished, onProgramRemoved, ProgramRecord } from "./store"
+import { onProgramOutdated, onProgramPublished, onProgramRemoved, ProgramRecord } from "./store"
 
 export interface MachineRecord {
   robotId: number
@@ -104,6 +104,17 @@ export function restartMachine(record: MachineRecord): void {
     appendConsole(record, `— ${program.name}: программа в карантине`)
     return
   }
+  if (program.outdated !== undefined) {
+    // Обновление мода (19.6): текст на прежнем API не собирается — машина стоит с ошибкой, пока программу не исправят.
+    const first = program.outdated[0]
+    const where = first === undefined ? "" : ` (${first.module ?? program.name}:${first.line} ${first.code})`
+    record.machine = {
+      status: "error",
+      error: { name: "Error", message: `program does not build after the mod update${where}: fix it and publish again`, value: undefined },
+    }
+    appendConsole(record, `— ${program.name}: не собирается после обновления мода — исправьте и опубликуйте снова`)
+    return
+  }
   if (program.library) {
     // Библиотека (только объявления): запускать нечего — она для других программ.
     record.machine = { status: "done" }
@@ -134,6 +145,12 @@ export function stopMachine(record: MachineRecord): void {
 export function registerMachines(): void {
   // Новая версия программы — машины с ней начинают заново.
   onProgramPublished((program) => {
+    for (const [, record] of pairs(storage.machines)) {
+      if (record.programId === program.id && !record.parked) restartMachine(record)
+    }
+  })
+  // Программа не собралась после обновления мода — машины с ней встают с ошибкой.
+  onProgramOutdated((program) => {
     for (const [, record] of pairs(storage.machines)) {
       if (record.programId === program.id && !record.parked) restartMachine(record)
     }

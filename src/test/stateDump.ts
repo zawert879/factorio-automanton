@@ -25,12 +25,12 @@ while (true) {
   if (c.n % 10 === 0) print(total, [...seen.keys()].join(","))
 }`
 
-const MINER_PROGRAM = `while (true) { mine("iron-ore", 3); wait(0.5) }`
+const MINER_PROGRAM = `while (true) { me.mine("iron-ore", 3); wait(0.5) }`
 
 /** Жидкости (этап 7): набрать воду, залить в резервуар; второй — нефть с месторождения. */
-const WATER_PROGRAM = `const tank = scan.entities({ name: "storage-tank" })[0]
-while (true) { pump("water", 300); fill(tank); wait(0.2) }`
-const OIL_PROGRAM = `while (true) { pump("crude-oil", 30); print(Math.round(me.tank!.amount)) }`
+const WATER_PROGRAM = `const tank = scan.buildings({ kind: StorageTank })[0]
+while (true) { me.tank!.pump("water", 300); tank.fill(); wait(0.2) }`
+const OIL_PROGRAM = `while (true) { me.tank!.pump("crude-oil", 30); print(Math.round(me.tank!.amount)) }`
 
 /** Толпа машин (13.1): своя роль по id — ездят по кругу или копают; связь, доска, случайные числа. */
 const CROWD_PROGRAM = `const id = me.id
@@ -38,19 +38,19 @@ const points = [{ x: 200, y: 100 }, { x: 230, y: 100 }, { x: 230, y: 130 }, { x:
 let i = id % 4
 // Подписка на соседа (рассылки всем нет).
 const neighbour = robot(id - 1)
-if (neighbour !== null) subscribe(neighbour, "толпа")
+if (neighbour !== null) radio.subscribe(neighbour, "толпа")
 while (true) {
   if (id % 4 === 0) {
-    move({ x: 203, y: 147 })
-    mine("iron-ore", 2)
+    me.move({ x: 203, y: 147 })
+    me.mine("iron-ore", 2)
   } else {
     const p = points[i % 4]
-    move({ x: p.x + (id % 7), y: p.y + (id % 5) })
+    me.move({ x: p.x + (id % 7), y: p.y + (id % 5) })
   }
   i++
   board.increment("шаги")
-  if (i % 3 === 0) publish("толпа", { from: id, i })
-  const m = tryReceive<{ from: number; i: number }>("толпа")
+  if (i % 3 === 0) radio.publish("толпа", { from: id, i })
+  const m = radio.tryReceive<{ from: number; i: number }>("толпа")
   let sum = 0
   for (let k = 0; k < 50; k++) sum += Math.floor(Math.random() * 10)
   if (m !== null) print(m.data.from, sum)
@@ -58,19 +58,19 @@ while (true) {
 }`
 
 /** Связь (этап 9): запросы с ответом, доска, задачи — до и после сохранения. */
-const PING_PROGRAM = `subscribe("понг-машина", "пинг")
+const PING_PROGRAM = `radio.subscribe("понг-машина", "пинг")
 while (true) {
-  const m = receive<number>("пинг", 2)
+  const m = radio.receive<number>("пинг", 2)
   if (m !== null) m.reply(m.data + 1)
   const task = tasks.next<number>("работа", { timeout: 0.5, lease: 2 })
   if (task !== null) { board.increment("сделано", task.data); task.done() }
 }`
 const PONG_PROGRAM = `let n = 0
 while (true) {
-  n = request<number>("пинг-машина", "пинг", n, 5)
+  n = radio.request<number>("пинг-машина", "пинг", n, 5)
   tasks.push("работа", n, { priority: n % 3 })
   board.set("последний", { n, at: time.tick })
-  publish("пинг", n)
+  radio.publish("пинг", n)
   wait(0.3)
 }`
 
@@ -154,7 +154,7 @@ const steps: Record<number, () => void> = {
   // Бой (этап 10): боевая машина патрулирует два поста — команды движку переживают сохранение.
   97: () => {
     game.forces.player.technologies[TECH.combat1].researched = true
-    const patrol = publishProgram("патруль", `while (true) patrol([{ x: 150, y: 60 }, { x: 160, y: 70 }], () => false)`)
+    const patrol = publishProgram("патруль", `while (true) me.weapon!.patrol([{ x: 150, y: 60 }, { x: 160, y: 70 }], () => false)`)
     if (!patrol.ok) error("программа патруля не компилируется")
     const position = nauvis().find_non_colliding_position(MODELS[3].entity, { x: 150, y: 60 }, 20, 0.5)!
     nauvis().create_entity({ name: MODELS[3].placer, position, force: "player", raise_built: true })

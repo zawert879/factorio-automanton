@@ -136,21 +136,23 @@ describe("прогрессия", () => {
     robot.entity.destroy()
   })
 
-  test("без исследования — not-researched: pump, scan.enemies; me.tank === null", (t) => {
+  test("без исследования — not-researched: fill у здания, scan.enemies; me.tank === null", (t) => {
     arena(-400, 150)
     const robot = place({ x: -390.5, y: 160.5 })
+    const tank = nauvis().create_entity({ name: "storage-tank", position: { x: -386.5, y: 160.5 }, force: "player" })!
     player().technologies[TECH.fluids].researched = false
     run(
       t,
       robot,
       "test-gate",
       `print(me.tank === null)
-try { pump("water") } catch (e) { print(e instanceof ActionError ? e.code : "?") }
+try { scan.buildings({ kind: StorageTank })[0].fill() } catch (e) { print(e instanceof ActionError ? e.code : "?") }
 try { scan.enemies() } catch (e) { print(e instanceof ActionError ? e.code : "?") }`,
       120,
       (output) => {
         player().technologies[TECH.fluids].researched = true
         expect(output).toBe("true|not-researched|not-researched")
+        tank.destroy()
         robot.entity.destroy()
       },
     )
@@ -164,10 +166,10 @@ try { scan.enemies() } catch (e) { print(e instanceof ActionError ? e.code : "?"
       t,
       robot,
       "test-recipe",
-      `const m = scan.entities({ name: "assembling-machine-1" })[0]
-setRecipe(m, "iron-gear-wheel")
+      `const m = scan.buildings({ kind: Assembler })[0]
+m.setRecipe("iron-gear-wheel")
 print(m.recipe)
-try { setRecipe(m, "crude-oil-barrel-nonexistent") } catch (e) { print(e instanceof ActionError ? e.code : "?") }`,
+try { m.setRecipe("crude-oil-barrel-nonexistent") } catch (e) { print(e instanceof ActionError ? e.code : "?") }`,
       300,
       (output) => {
         expect(output).toBe("iron-gear-wheel|invalid-target")
@@ -188,13 +190,13 @@ try { setRecipe(m, "crude-oil-barrel-nonexistent") } catch (e) { print(e instanc
       t,
       robot,
       "test-build",
-      `const chest = build("wooden-chest", { x: -390.5, y: 220.5 })
+      `const chest = me.build("wooden-chest", { x: -390.5, y: 220.5 })
 print(chest.name, me.cargo.count("wooden-chest"))
-const boiler = build("boiler", { x: -390, y: 224.5 }, "north")
-rotate(boiler)
-deconstruct(chest)
+const boiler = me.build("boiler", { x: -390, y: 224.5 }, "north")
+boiler.rotate()
+chest.deconstruct()
 print(chest.valid, me.cargo.count("wooden-chest"))
-try { build("wooden-chest", { x: -381.5, y: 220.5 }) } catch (e) { print(e instanceof ActionError ? e.code : "?") }`,
+try { me.build("wooden-chest", { x: -381.5, y: 220.5 }) } catch (e) { print(e instanceof ActionError ? e.code : "?") }`,
       600,
       (output) => {
         expect(output).toBe("wooden-chest 0|false 1|out-of-reach")

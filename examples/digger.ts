@@ -14,19 +14,19 @@ me.label = `копаю ${ore}`;
 const home = nearestField(ore);
 while (true) {
   refuelFrom(coalDepot);
-  move(home);
+  me.move(home);
   try {
-    mine(ore, 40);
+    me.mine(ore, 40);
   } catch (e) {
     if (!(e instanceof ActionError) || (e.code !== "no-resource" && e.code !== "cargo-full")) throw e;
   }
   refuelFrom(coalDepot);
   const chest = chestAt(depot);
   try {
-    put(chest, ore);
+    chest.insert(ore);
   } catch (e) {
     if (!(e instanceof ActionError) || e.code !== "target-full") throw e;
-    say("Сундук полон — жду", 10);
+    me.say("Сундук полон — жду", 10);
     wait(10);
   }
 }

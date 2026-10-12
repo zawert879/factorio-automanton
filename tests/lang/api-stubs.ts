@@ -30,10 +30,29 @@ function hostObject(kind: string, fields: Val): Val {
   return fields
 }
 
-/** Здание с классом по имени (19.2): печь — Furnace, сундук — Chest, остальное — Building. */
+let nextId = 100
+
+/** Класс здания по части имени (19.2): печь — Furnace, сундук — Chest, …, остальное — Building. */
+const CLASS_BY_NAME: [string, string][] = [
+  ["furnace", "Furnace"],
+  ["chest", "Chest"],
+  ["storage-tank", "StorageTank"],
+  ["boiler", "Boiler"],
+  ["assembling", "Assembler"],
+  ["lab", "Lab"],
+]
+
 function entity(id: number, name: string, x: number, y: number): Val {
-  const cls = string.find(name, "furnace")[0] !== undefined ? "Furnace" : string.find(name, "chest")[0] !== undefined ? "Chest" : "Building"
+  let cls = "Building"
+  for (const [part, c] of CLASS_BY_NAME) if (string.find(name, part, 1, true)[0] !== undefined) cls = c
   return hostObject("entity", { __c: cls, __id: id, __name: name, __x: x, __y: y })
+}
+
+/** Пример здания класса kind (для scan.buildings и zone.find); без класса — печь. */
+function sampleOf(kind: Val, x: number, y: number): Val {
+  const cls = type(kind) === "table" ? (kind.__builtin as string) : "Furnace"
+  for (const [part, c] of CLASS_BY_NAME) if (c === cls) return entity(nextId++, part === "chest" ? "steel-chest" : part === "furnace" ? "stone-furnace" : part, x, y)
+  return entity(nextId++, "stone-furnace", x, y)
 }
 
 function robot(id: number, name: string, programName: string): Val {
@@ -44,7 +63,6 @@ function message(topic: string, data: Val, from: Val): Val {
   return hostObject("message", { __topic: topic, __data: data, __from: from })
 }
 
-let nextId = 100
 
 // Здания — таблицы класса Building (как в игре, src/program/handles.ts): подклассы их наследуют.
 hostKindClass.entity = "Building"
@@ -88,8 +106,7 @@ hostMethods.message.reply = (o: Val, _k: Val, data: Val) => log.push(`reply to $
 defineHostObject("zone")
 hostGetters.zone.name = (o: Val) => o.__name
 hostKindClass.zone = "Zone"
-hostMethods.zone.find = (_o: Val, _k: Val, what: Val) =>
-  arr(type(what) === "table" && what.__builtin === "Chest" ? entity(nextId++, "steel-chest", 3, 3) : entity(nextId++, "stone-furnace", 5, 5))
+hostMethods.zone.find = (_o: Val, _k: Val, what: Val) => arr(sampleOf(what, 3, 3))
 
 defineHostObject("screen")
 hostGetters.screen.width = () => 128
@@ -143,7 +160,10 @@ for (const name of ["reload", "attack", "guard", "patrol"]) hostMethods.weapon[n
 // scan, map
 defineHostObject("scan")
 hostMethods.scan.enemies = () => arr()
-hostMethods.scan.entities = () => arr(entity(1, "stone-furnace", 5, 5), entity(2, "stone-furnace", 7, 5))
+hostMethods.scan.buildings = (_o: Val, _k: Val, filter: Val) => {
+  const kind = type(filter) === "table" ? filter.kind : undefined
+  return arr(sampleOf(kind, 5, 5), sampleOf(kind, 7, 5))
+}
 hostMethods.scan.robots = () => arr(robot(42, "boss", "Оркестратор"))
 hostMethods.scan.resources = () =>
   arr({ item: "iron-ore", center: { x: 40, y: 70 }, nearest: { x: 35, y: 60 }, amount: 5000 }, { item: "coal", center: { x: 10, y: 20 }, nearest: { x: 8, y: 18 }, amount: 3000 })

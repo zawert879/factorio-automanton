@@ -23,7 +23,7 @@ describe("кэши", () => {
     const first = surface.create_entity({ name: "wooden-chest", position: { x: left + 7.5, y: top + 7.5 }, force: "player", raise_built: true })!
     surface.create_entity({ name: MODELS[0].placer, position: { x: left + 2.5, y: top + 2.5 }, force: "player", raise_built: true })
     const robot = findRobot(surface.find_entities_filtered({ name: MODELS[0].entity, position: { x: left + 2.5, y: top + 2.5 }, radius: 0.5 })[0])!
-    const result = publishProgram("test-cache", `for (let i = 0; i < 9; i++) { print(find("wooden-chest", zone("кэш")).length); wait(0.1) }`)
+    const result = publishProgram("test-cache", `for (let i = 0; i < 9; i++) { print(zone("кэш").find("wooden-chest").length); wait(0.1) }`)
     if (!result.ok) error(describeDiagnostics(result.diagnostics).join("; "))
     const m = assignProgram(robot, result.program)
     let second: ReturnType<typeof surface.create_entity>

@@ -23,11 +23,11 @@ ${RADIO ? `const neighbour = robot(id - 1)
 if (neighbour !== null) subscribe(neighbour, "толпа")` : ""}
 while (true) {
   if (id % 4 === 0) {
-    move({ x: base.x, y: base.y + 3 })
-    mine("iron-ore", 3)
+    me.move({ x: base.x, y: base.y + 3 })
+    me.mine("iron-ore", 3)
   } else {
     const p = points[i % 4]
-    move({ x: base.x + p.x - 12, y: base.y + p.y - 12 })
+    me.move({ x: base.x + p.x - 12, y: base.y + p.y - 12 })
   }
   i++
   board.increment("шаги")

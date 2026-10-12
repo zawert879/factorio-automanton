@@ -1,8 +1,8 @@
-// Движение и предметы (4.2) поверх систем этапа 2: move, canReach, follow, goHome, mine, take, put,
-// pickup, drop, give, repair, refuel; жидкости (7.1): pump, fill, drain; зарядка (8.2): charge;
-// наладка и строительство (8.5, 8.6): setRecipe, build, deconstruct, rotate. Блокирующие: программа
-// ждёт конца действия или поездки. Методы зданий и машин (19.3): furnace.insert(…), chest.extract(…),
-// assembler.setRecipe(…), boiler.fill(…), helper.refuel(…) — те же действия, цель — сам объект.
+// Действия поверх систем этапа 2 (блокирующие: программа ждёт конца действия или поездки).
+// Своей машины — реализации в реестре host (move, canReach, follow, goHome, mine, pickup, drop, build, refuel,
+// charge, pump): их вызывают методы me, me.energy, me.tank (src/program/api/me.ts), у программы этих имён нет.
+// Методы зданий и машин (19.3): furnace.insert(…), chest.extract(…), assembler.setRecipe(…), boiler.fill(…),
+// helper.refuel(…) — цель действия — сам объект.
 import { LuaEntity, MapPosition } from "factorio:runtime"
 import { isFlyer } from "../../automaton/models"
 import { cancelMove, isMoving, moveRobot } from "../../automaton/movement"
@@ -137,35 +137,17 @@ registerPoll("follow", (record, frame, tick) => {
 // ---------- Предметы ----------
 
 blocking("mine", (k, what, amount) => actionCall(k, "mine", k !== undefined ? {} : { item: item(what), count: count(amount) }))
-blocking("take", (k, from, what, amount) =>
-  actionCall(k, "take", k !== undefined ? {} : { target: handleEntity(from), item: item(what), count: count(amount) }),
-)
-blocking("put", (k, into, what, amount) =>
-  actionCall(k, "put", k !== undefined ? {} : { target: handleEntity(into), item: item(what), count: count(amount) }),
-)
 blocking("pickup", (k, what, amount) => actionCall(k, "pickup", k !== undefined ? {} : { item: optionalItem(what), count: count(amount) }))
 blocking("drop", (k, what, amount) => actionCall(k, "drop", k !== undefined ? {} : { item: item(what), count: count(amount) }))
-blocking("give", (k, to, what, amount) =>
-  actionCall(k, "give", k !== undefined ? {} : { target: handleRobot(to).entity, item: item(what), count: count(amount) }),
-)
-blocking("repair", (k, target) =>
-  actionCall(k, "repair", k !== undefined ? {} : { target: type(target) === "table" && target.__h === "robot" ? handleRobot(target).entity : handleEntity(target) }),
-)
 blocking("refuel", (k, what, to) =>
   actionCall(k, "refuel", k !== undefined ? {} : { item: optionalItem(what), target: to === undefined ? undefined : handleRobot(to).entity }),
 )
 
-// ---------- Зарядка, наладка, строительство ----------
+// ---------- Зарядка, строительство ----------
 
 blocking("charge", (k, station) =>
   actionCall(k, "charge", k !== undefined ? {} : { target: station === undefined ? undefined : handleEntity(station) }),
 )
-
-blocking("setRecipe", (k, machine, recipe) => {
-  if (k !== undefined) return finishWaiting(k)
-  if (type(recipe) !== "string" || prototypes.recipe[recipe as string] === undefined) actionError("invalid-target", `unknown recipe ${tostring(recipe)}`)
-  return actionCall(k, "set-recipe", { target: handleEntity(machine), item: recipe as string })
-})
 
 const DIRECTIONS: Record<string, defines.direction> = {
   north: defines.direction.north,
@@ -186,18 +168,9 @@ blocking("build", (k, what, at, direction) => {
   return actionCall(k, "build", { item: item(what), position, direction: dir })
 })
 
-blocking("deconstruct", (k, target) => actionCall(k, "deconstruct", k !== undefined ? {} : { target: handleEntity(target) }))
-blocking("rotate", (k, target, reverse) =>
-  actionCall(k, "rotate", k !== undefined ? {} : { target: handleEntity(target), reverse: reverse === true }),
-)
-
 // ---------- Жидкости ----------
 
 blocking("pump", (k, what, amount) => actionCall(k, "pump", k !== undefined ? {} : { item: fluid(what), count: fluidAmount(amount) }))
-blocking("fill", (k, into, amount) => actionCall(k, "fill", k !== undefined ? {} : { target: handleEntity(into), count: fluidAmount(amount) }))
-blocking("drain", (k, from, what, amount) =>
-  actionCall(k, "drain", k !== undefined ? {} : { target: handleEntity(from), item: fluid(what), count: fluidAmount(amount) }),
-)
 
 // ---------- Методы зданий и машин (19.3) ----------
 // Действие делает эта машина (досягаемость me.reach, её энергия и время), цель — объект метода. Классы и что у них

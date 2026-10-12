@@ -21,13 +21,13 @@ abstract class Job {
 
 // Функция высшего порядка: возвращает замыкание-фильтр
 const lowOn = (item: Item, below: number) =>
-  (e: Entity) => e.count(item) < below;
+  (f: Furnace) => f.count(item) < below;
 
 class Smelting extends Job {
   constructor(
     readonly ore: Item,
     readonly mineAt: Zone,
-    readonly furnaces: Entity[],
+    readonly furnaces: Furnace[],
   ) {
     super("smelting");
   }
@@ -37,32 +37,32 @@ class Smelting extends Job {
   }
 
   run(): void {
-    move(this.mineAt);
-    mine(this.ore, 50);
+    me.move(this.mineAt);
+    me.mine(this.ore, 50);
 
     this.furnaces
       .filter(lowOn(this.ore, 10))
       .sort((a, b) => me.distance(a) - me.distance(b))
       .forEach(f => {
-        move(f);
-        put(f, this.ore, 20);
+        me.move(f);
+        f.insert(this.ore, 20);
       });
   }
 }
 
 class Refuel extends Job {
-  constructor(readonly depot: Entity, readonly min: number) {
+  constructor(readonly depot: Chest, readonly min: number) {
     super("refuel");
   }
 
   ready(): boolean {
-    return me.fuel < this.min;
+    return me.energy.level < this.min;
   }
 
   run(): void {
-    move(this.depot);
-    take(this.depot, "coal", 10);
-    refuel();
+    me.move(this.depot);
+    this.depot.extract("coal", 10);
+    me.energy.refuel();
   }
 }
 
@@ -71,11 +71,11 @@ type State =
   | { kind: "idle"; cycles: number }; // сколько циклов подряд без работы
 
 const jobs: Job[] = [
-  new Refuel(find("steel-chest", zone("coal-depot"))[0], 0.2),
+  new Refuel(zone("coal-depot").find(Chest, "steel-chest")[0], 0.2),
   new Smelting(
     "iron-ore",
     zone("north-iron"),
-    find("stone-furnace", zone("smelter")),
+    zone("smelter").find(Furnace, "stone-furnace"),
   ),
 ];
 
@@ -94,7 +94,7 @@ while (true) {
       break;
     case "idle":
       idle = state.cycles;
-      if (idle > 10) say(`Нечего делать уже ${idle} циклов`);
+      if (idle > 10) me.say(`Нечего делать уже ${idle} циклов`);
       else wait(5);
       break;
   }

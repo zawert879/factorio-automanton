@@ -6,8 +6,8 @@ import { run } from "./harness"
 
 const SOURCE = `function f(): boolean {
   let poured = 0
-  for (const b of [1, 2]) {
-    try { poured += fill(b as any) } catch (e) { print("err") } finally { poured += 1 }
+  for (const b of [zone("a").find(StorageTank)[0], zone("b").find(StorageTank)[0]]) {
+    try { poured += b.fill() } catch (e) { print("err") } finally { poured += 1 }
   }
   print(typeof poured, poured)
   return poured > 0

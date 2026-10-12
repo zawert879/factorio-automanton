@@ -47,6 +47,8 @@ hostKindClass.me = "Machine"
 hostGetters.me.name = () => "test-bot"
 hostGetters.me.id = () => 7
 hostMethods.me.say = (_o: Val, _k: Val, text: Val) => printArgs(text)
+// Действия своей машины — те же функции API, как в игре (src/program/api/me.ts).
+for (const name of ["move", "mine", "put"]) hostMethods.me[name] = (_o: Val, k: Val, ...args: Val[]) => host[name](k, ...args)
 defineHostObject("console")
 hostMethods.console.log = (_o: Val, _k: Val, ...args: Val[]) => printArgs(...args)
 

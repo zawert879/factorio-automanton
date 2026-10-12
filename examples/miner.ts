@@ -16,24 +16,24 @@ me.label = `копаю ${item}`;
 
 let field = nearestField(item);
 while (true) {
-  move(field);
+  me.move(field);
   try {
-    mine(item);
+    me.mine(item);
   } catch (e) {
     // Клетка выработана — ищем соседнюю.
     if (!(e instanceof ActionError) || e.code !== "no-resource") throw e;
     field = nearestField(item);
     continue;
   }
-  if (me.fuel < 0.5 && me.cargo.count("coal") > 0) refuel("coal");
+  if (me.energy.level < 0.5 && me.cargo.count("coal") > 0) me.energy.refuel("coal");
 
   const chest = chestAt(depotName);
   while (me.cargo.count(item) > 0) {
     try {
-      put(chest, item);
+      chest.insert(item);
     } catch (e) {
       if (!(e instanceof ActionError) || e.code !== "target-full") throw e;
-      say("Сундук полон — жду", 10);
+      me.say("Сундук полон — жду", 10);
       wait(10);
     }
   }

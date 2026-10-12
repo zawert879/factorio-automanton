@@ -99,7 +99,7 @@ print(asm.recipe)
 const helper = scan.robots()[0]
 print(helper.insert("coal", 3))
 helper.refuel("coal")
-print(helper.fuel > 0, me.cargo.count("coal"))
+print(helper.energy.level > 0, me.cargo.count("coal"))
 const tank = area.find(StorageTank)[0]
 print(tank.fill(50), tank.drain("water", 20), Math.round(tank.fluid("water")))`,
     )
@@ -134,7 +134,7 @@ print(tank.fill(50), tank.drain("water", 20), Math.round(tank.fluid("water")))`,
 me.move({ x: x0 + 5, y: me.position.y })
 print(Math.abs(me.position.x - (x0 + 5)) < 1.5)
 me.energy.refuel("coal")
-print(me.energy.level > 0, me.cargo.count("coal"), me.fuel === me.energy.level)
+print(me.energy.level > 0, me.cargo.count("coal"))
 print(me.tank !== null ? me.tank.capacity : -1, me.tank?.fluid ?? "пусто", me.weapon === null)
 me.say("готово")`,
     )
@@ -147,7 +147,7 @@ weapon.reload()
 print(weapon.ammo!.name, weapon.ammo!.count)`,
     )
     waitUntil(t, "конца программ", () => finished(worker)() && finished(combat)(), 600, () => {
-      expect(worker.console.filter((line) => !line.startsWith("—")).join("|")).toBe("true|true 0 true|1000 пусто true|say: готово")
+      expect(worker.console.filter((line) => !line.startsWith("—")).join("|")).toBe("true|true 0|1000 пусто true|say: готово")
       expect(combat.console.filter((line) => !line.startsWith("—")).join("|")).toBe("gun 15 true true|firearm-magazine 2")
       techs[TECH.fluids].researched = before[0]
       techs[TECH.combat1].researched = before[1]

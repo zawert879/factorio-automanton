@@ -3,7 +3,7 @@
 // - Ошибки на возможностях TypeScript, которых нет в языке машин (async/await, var, enum, регулярные
 //   выражения, == …) — те же, что даст игра при публикации (docs/LANGUAGE.md, «Не поддерживается»).
 // - Подсказки о времени (docs/API.md, «Время программы»): наведите на for / while — цена витка и сколько
-//   тиков займёт цикл с известным числом витков; на publish, sort, map, JSON.parse — цена вызова.
+//   тиков займёт цикл с известным числом витков; на radio.publish, sort, map, JSON.parse — цена вызова.
 "use strict"
 
 /** Квант рабочих моделей (src/names.ts, quantum). */
@@ -13,11 +13,18 @@ const QUANTA = [
   ["Mk3", 200],
 ]
 
-/** Функции, которые ждут (действия, ожидание) — src/lang/builtins.ts, HOST_FUNCTIONS со значением true. */
-const WAITING = new Set([
-  "move", "canReach", "follow", "goHome", "mine", "take", "put", "pickup", "drop", "give", "repair", "setRecipe",
-  "build", "deconstruct", "rotate", "pump", "fill", "drain", "refuel", "charge", "attack", "guard", "patrol", "reload",
-  "receive", "request", "wait", "waitUntil",
+/** Глобальные функции, которые ждут, — src/lang/builtins.ts, HOST_FUNCTIONS со значением true. */
+const WAITING = new Set(["wait", "waitUntil"])
+
+/**
+ * Методы, которые ждут (действия машины), — по имени, при любом объекте, как у компилятора (src/lang/builtins.ts:
+ * BLOCKING_OBJECT_METHODS и методы me, radio в BLOCKING_HOST_METHODS); tasks.next — отдельно.
+ */
+const WAITING_METHODS = new Set([
+  "move", "canReach", "follow", "goHome", "mine", "pickup", "drop", "build",
+  "insert", "extract", "repair", "rotate", "deconstruct", "setRecipe", "fill", "drain", "refuel",
+  "charge", "pump", "reload", "attack", "guard", "patrol",
+  "receive", "request",
 ])
 
 const TEXT = {
@@ -62,7 +69,7 @@ const TEXT = {
     ticks: (model, t) => `${model} — ${t} ${plural(t, "тик", "тика", "тиков")}`,
     seconds: (s) => `≈ ${s} с на Mk1`,
     costs: {
-      publish: "publish: 1 инструкция кванта за каждого подписчика, письма уходят сразу; перерасход кванта машина отрабатывает, пропуская тики.",
+      publish: "radio.publish: 1 инструкция кванта за каждого подписчика, письма уходят сразу; перерасход кванта машина отрабатывает, пропуская тики.",
       sort: "sort: 1 инструкция на 8 элементов, сразу.",
       each: "1 инструкция за элемент: сразу, если в лямбде нет ожиданий (перерасход — пропуск тиков), иначе с паузами, как цикл.",
       parse: "JSON.parse: 1 инструкция на 256 символов текста.",
@@ -110,7 +117,7 @@ const TEXT = {
     ticks: (model, t) => `${model} — ${t} tick${t === 1 ? "" : "s"}`,
     seconds: (s) => `≈ ${s} s on Mk1`,
     costs: {
-      publish: "publish: 1 instruction per subscriber, messages leave at once; the robot pays the overspent quantum by skipping ticks.",
+      publish: "radio.publish: 1 instruction per subscriber, messages leave at once; the robot pays the overspent quantum by skipping ticks.",
       sort: "sort: 1 instruction per 8 elements, at once.",
       each: "1 instruction per element: at once if the callback does not wait (overspend — skipped ticks), otherwise with pauses, like a loop.",
       parse: "JSON.parse: 1 instruction per 256 characters of text.",
@@ -275,7 +282,7 @@ function iterations(ts, loop) {
   return Math.max(0, Math.ceil(span / Math.abs(step)))
 }
 
-/** Первая ожидающая функция в теле цикла (move, wait…), если есть. */
+/** Первая ожидающая функция или метод в теле цикла (me.move, wait…), если есть. */
 function waitingCall(ts, loop) {
   let found
   const visit = (node) => {
@@ -284,6 +291,7 @@ function waitingCall(ts, loop) {
       const callee = node.expression
       if (ts.isIdentifier(callee) && WAITING.has(callee.text)) found = callee.text
       else if (ts.isPropertyAccessExpression(callee) && ts.isIdentifier(callee.expression) && callee.expression.text === "tasks" && callee.name.text === "next") found = "tasks.next"
+      else if (ts.isPropertyAccessExpression(callee) && WAITING_METHODS.has(callee.name.text)) found = callee.getText()
     }
     // Вложенные функции не исполняются в витке сами по себе.
     if (!ts.isFunctionLike(node)) ts.forEachChild(node, visit)
@@ -312,10 +320,10 @@ function loopHint(ts, loop, lang) {
 /** Цена вызова тяжёлой функции библиотеки (если это она). */
 function callCost(ts, node, lang) {
   const t = (TEXT[lang] ?? TEXT.ru).costs
-  if (ts.isIdentifier(node) && node.text === "publish") return t.publish
   if (ts.isIdentifier(node) && ts.isPropertyAccessExpression(node.parent) && node.parent.name === node) {
     const name = node.text
     const owner = node.parent.expression
+    if (ts.isIdentifier(owner) && owner.text === "radio" && name === "publish") return t.publish
     if (ts.isIdentifier(owner) && owner.text === "JSON") return name === "parse" ? t.parse : name === "stringify" ? t.stringify : undefined
     if (name === "sort") return t.sort
     if (EACH.has(name)) return `${name}: ${t.each}`
@@ -424,4 +432,4 @@ function init(modules) {
 
 module.exports = init
 /** Для тестов (tools/test/tsplugin.mjs). */
-module.exports.internals = { unsupported, iterations, loopHint, callCost, WAITING, QUANTA }
+module.exports.internals = { unsupported, iterations, loopHint, callCost, WAITING, WAITING_METHODS, QUANTA }

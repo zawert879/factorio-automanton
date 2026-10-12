@@ -235,8 +235,8 @@ script.on_nth_tick(1, (event) => {
       "Счетовод",
       `const keeper = scan.robots().find((r) => r.program === "Хранитель")!
 while (true) {
-  const coal = request<number>(keeper, "сколько", "coal", 10)
-  say(\`угля на складе: \${coal}\`, 3)
+  const coal = radio.request<number>(keeper, "сколько", "coal", 10)
+  me.say(\`угля на складе: \${coal}\`, 3)
   wait(4)
 }`,
     )

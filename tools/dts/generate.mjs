@@ -11,11 +11,12 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
+import { isDeclarationBlock } from "./blocks.mjs"
 
 const root = join(fileURLToPath(import.meta.url), "..", "..", "..")
 const api = readFileSync(join(root, "docs", "API.md"), "utf8")
 const blocks = [...api.matchAll(/```ts\n([\s\S]*?)```/g)].map((m) => m[1])
-const declarations = blocks.filter((b) => /\bdeclare\b/.test(b) || b.startsWith("type Item"))
+const declarations = blocks.filter((b) => isDeclarationBlock(b))
 const examples = blocks.filter((b) => !declarations.includes(b))
 // Примеры из руководства игрока (и его английской версии, 18.9) — тоже программы, они должны проходить tsc.
 for (const doc of ["docs/PLAYER_GUIDE.md", "README.md", "docs/en/PLAYER_GUIDE.md", "README.en.md"].map((f) => join(root, f))) {
@@ -178,7 +179,7 @@ const help = []
     section = { title: [title, SECTION_EN[title] ?? title], entries: [], example: undefined }
     for (const m of part.matchAll(/```ts\n([\s\S]*?)```/g)) {
       const body = m[1]
-      const isDeclaration = /\bdeclare\b/.test(body) || body.startsWith("type Item")
+      const isDeclaration = isDeclarationBlock(body)
       if (!isDeclaration) {
         section.example ??= body.replace(/\n$/, "")
         continue

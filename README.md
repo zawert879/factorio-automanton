@@ -15,10 +15,10 @@
 // Программа «Шахтёр»: копает и возит в сундук у метки
 const field = scan.resources().find((p) => p.item === "coal")!.nearest
 while (true) {
-  move(field)
-  mine("coal")
-  move(marker("склад"), { radius: 2 })
-  put(scan.entities({ type: "container" })[0], "coal")
+  me.move(field)
+  me.mine("coal")
+  me.move(marker("склад"), { radius: 2 })
+  scan.buildings({ kind: Chest })[0].insert("coal")
 }
 ```
 

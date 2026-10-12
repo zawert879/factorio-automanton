@@ -43,12 +43,12 @@ F1 или «?» на панели быстрого доступа (поиск п
    const item: Item = ore ?? "coal"
    const field = scan.resources().find((p) => p.item === item)!.nearest
    while (true) {
-     move(field)
-     mine(item)
+     me.move(field)
+     me.mine(item)
      // Угольщик подкладывает уголь и себе в топливо.
-     if (item === "coal" && me.fuel < 0.5) refuel("coal")
-     move(marker("склад"), { radius: 2 })
-     put(scan.entities({ type: "container" })[0], item)
+     if (item === "coal" && me.energy.level < 0.5) me.energy.refuel("coal")
+     me.move(marker("склад"), { radius: 2 })
+     scan.buildings({ kind: Chest })[0].insert(item)
    }
    ```
 
@@ -61,7 +61,7 @@ F1 или «?» на панели быстрого доступа (поиск п
 4. **Плавильня.** Скрафтите несколько каменных печей и поставьте их рядом. Ярлыком «Программатор»
    на панели быстрого доступа выделите их рамкой и назовите зону `плавильня`. Поставьте второй
    сундук и метку `плиты`. Третьей машине напишите печника: взять руду и уголь со склада, разложить
-   по печам зоны (`find("stone-furnace", zone("плавильня"))`), забрать плиты и отвезти к метке `плиты`.
+   по печам зоны (`zone("плавильня").find(Furnace)`), забрать плиты и отвезти к метке `плиты`.
 5. **Новые машины** крафтятся из железа и шестерён — рецепт открыт сразу.
 
 Готовые примеры посложнее — в папке [examples](../examples): печник, водовоз, перевозчик по маршрутам,
@@ -72,7 +72,7 @@ F1 или «?» на панели быстрого доступа (поиск п
 
 Дальше — электричество. Прибрежного насоса нет: **воду к котлам возят машины**. Скрафтите котёл —
 откроется исследование «Жидкости для автоматонов». Поставьте у котлов резервуар (в котёл влезает
-всего 200 воды), метку `котельная` и напишите водовоза: `pump` у озера, `drain` в резервуар (пример —
+всего 200 воды), метку `котельная` и напишите водовоза: `me.tank.pump` у озера, `fill` в резервуар (пример —
 [examples/water.ts](../examples/water.ts)). Один водовоз — примерно на один котёл.
 
 ![Водовоз набирает воду у озера и везёт к котлу](media/water.gif)
@@ -93,7 +93,7 @@ F1 или «?» на панели быстрого доступа (поиск п
 - **Консоль** — последние 100 строк `print` и сообщения об ошибках; текущая строка программы.
 - **Груз, топливо, бак** — что машина везёт и сколько у неё энергии. Стоя рядом, можно перекладывать руками:
   клик с предметом в руке кладёт его в груз или топливный слот, пустой рукой — забирает.
-- **Имя и дом** — имя видно над машиной (Alt), «дом» — точка для `goHome()`.
+- **Имя и дом** — имя видно над машиной (Alt), «дом» — точка для `me.goHome()`.
 
 Подобранная машина помнит имя, номер, энергию и бак, а её программа и параметры ждут, пока
 машину поставят снова. Погибшая машина высыпает груз на землю.
@@ -161,10 +161,10 @@ import { attempt, chestAt, nearestField } from "./lib/Помощники";
 // Копать железную руду рядом и складывать в сундук у метки «руда».
 const field = nearestField("iron-ore");
 while (true) {
-  move(field);
-  attempt(() => mine("iron-ore", 20));
+  me.move(field);
+  attempt(() => me.mine("iron-ore", 20));
   const chest = chestAt("руда");
-  attempt(() => put(chest, "iron-ore"), "сундук");
+  attempt(() => chest.insert("iron-ore"), "сундук");
 }
 ```
 
@@ -174,7 +174,7 @@ while (true) {
 // Программа «lib/Склад»
 export const DEPOTS = { coal: "уголь", iron: "железо" };
 
-export function stock(chest: Entity, item: Item): number {
+export function stock(chest: Chest, item: Item): number {
   return chest.count(item);
 }
 ```
@@ -245,26 +245,26 @@ const ore: Item = "iron-ore"
 let trips = 0
 
 // Функции, стрелочные функции, замыкания
-const lowOn = (item: Item, below: number) => (e: Entity) => e.count(item) < below
+const lowOn = (item: Item, below: number) => (f: Furnace) => f.count(item) < below
 
 // Объекты, массивы, деструктуризация, ?. и ??
 const { depot = "склад" } = me.args<{ depot?: string }>()
-const hungry = scan.entities({ type: "furnace" }).filter(lowOn("coal", 5))
+const hungry = scan.buildings({ kind: Furnace }).filter(lowOn("coal", 5))
 const first = hungry[0]?.position ?? me.position
 
 // Классы и интерфейсы
 interface Job { ready(): boolean; run(): void }
 class Feed implements Job {
-  constructor(readonly furnace: Entity) {}
+  constructor(readonly furnace: Furnace) {}
   ready(): boolean { return this.furnace.count("coal") < 5 }
-  run(): void { move(this.furnace); put(this.furnace, "coal", 5) }
+  run(): void { me.move(this.furnace); this.furnace.insert("coal", 5) }
 }
 
 // Ошибки действий — ActionError с кодом
 try {
-  mine(ore, 50)
+  me.mine(ore, 50)
 } catch (e) {
-  if (e instanceof ActionError && e.code === "no-resource") say("руда кончилась")
+  if (e instanceof ActionError && e.code === "no-resource") me.say("руда кончилась")
   else throw e
 }
 
@@ -280,7 +280,7 @@ for (const stack of me.cargo.items()) counts.set(stack.name, stack.count)
 
 ## Как машина думает
 
-- **Действия ждут.** `move`, `mine`, `put`, `take`, `pump`, `wait`… возвращают управление, когда
+- **Действия ждут.** `me.move`, `me.mine`, `insert`, `extract`, `me.tank.pump`, `wait`… возвращают управление, когда
   дело сделано. Пока машина едет, её программа стоит и не тратит ресурсы.
 - **Квант.** Каждый тик машина исполняет до 50 инструкций (Mk2 — 100, Mk3 — 200, больше —
   исследованием «Процессор»). Длинный цикл без действий просто растянется на несколько тиков —
@@ -289,8 +289,9 @@ for (const stack of me.cargo.items()) counts.set(stack.name, stack.count)
   персонаж), видит в радиусе `me.vision` (10 клеток, больше — «Сенсоры» и модели постарше).
   Далёкое здание видно только как «есть такое» — его состояние надо узнать, подъехав, или спросить
   у машины, которая рядом.
-- **Энергия.** Mk1 жжёт топливо из топливного слота (`refuel` перекладывает его из груза, `refuel("coal", robot)` —
-  в слот соседней машины, игрок кладёт его в окне машины), Mk2+ заряжают аккумулятор на зарядной станции (`charge`).
+- **Энергия.** Mk1 жжёт топливо из топливного слота (`me.energy.refuel` перекладывает его из груза, `robot.refuel("coal")` —
+  в слот соседней машины, игрок кладёт его в окне машины), Mk2+ заряжают аккумулятор на зарядной станции
+  (`me.energy.charge`).
 - **Память.** Переменные живут, пока работает программа; `me.memory` переживает перезапуск
   и подбор машины.
 
@@ -300,9 +301,9 @@ for (const stack of me.cargo.items()) counts.set(stack.name, stack.count)
 
 1. **Виток цикла стоит 1 инструкцию** кванта, вызов «долгой» функции (с циклом или действием) — тоже 1.
    Обычные выражения и короткие функции — бесплатно. Кончился квант — пауза до следующего тика.
-2. **Ожидание квант не тратит.** Пока машина едет, копает или ждёт (`wait`, `receive`), её программа
+2. **Ожидание квант не тратит.** Пока машина едет, копает или ждёт (`wait`, `radio.receive`), её программа
    стоит и ничего не стоит.
-3. **Тяжёлый вызов — сразу, а потом отдых.** `publish` тысяче подписчиков, `sort` большого массива,
+3. **Тяжёлый вызов — сразу, а потом отдых.** `radio.publish` тысяче подписчиков, `sort` большого массива,
    `map` по большому массиву выполняются целиком в этом тике, а перерасход машина отрабатывает
    следующими тиками (пропускает их). Цены — в [API.md, «Время программы»](API.md#время-программы).
 
@@ -313,7 +314,7 @@ for (const stack of me.cargo.items()) counts.set(stack.name, stack.count)
 
 Отсюда практические советы:
 
-- **Проверяйте результат действия, а не предполагайте.** `take` возвращает, сколько реально взято;
+- **Проверяйте результат действия, а не предполагайте.** `extract` возвращает, сколько реально взято;
   если брать нечего — `ActionError("not-enough-items")`. В библиотеке «Помощники» для этого есть `attempt`.
 - **Не оптимизируйте под квант.** Длинный цикл просто дольше идёт; программа от этого не ломается.
 - **Ждите через `wait` и действия**, а не пустым циклом: ожидание бесплатно, пустой цикл тратит квант.
@@ -325,7 +326,7 @@ for (const stack of me.cargo.items()) counts.set(stack.name, stack.count)
 | Код | Что случилось |
 |---|---|
 | `no-path` / `stuck` | Пути нет / машину зажали |
-| `out-of-reach` | Здание дальше 10 клеток — сначала `move` |
+| `out-of-reach` | Здание дальше 10 клеток — сначала `me.move` |
 | `out-of-sight` | Состояние здания не видно — подъехать |
 | `invalid-target` | Цели нет или она не подходит |
 | `no-fuel` | Кончилась энергия |
@@ -333,15 +334,15 @@ for (const stack of me.cargo.items()) counts.set(stack.name, stack.count)
 | `not-enough-items` | В грузе нет нужного |
 | `no-resource` | Рядом нечего добывать |
 | `not-researched` | Функция откроется исследованием |
-| `timeout` | Истёк таймаут (`request`, `move` с `timeout`) |
+| `timeout` | Истёк таймаут (`radio.request`, `me.move` с `timeout`) |
 
 ## Мир: метки, зоны, зрение
 
 - **Метка** — флажок с именем, через который можно пройти. `marker("склад")` — его позиция.
   Переименовать — `/am-name`, наведя курсор.
 - **Зона** — прямоугольник, выделенный «Программатором» (рамка левой кнопкой). `zone("плавильня")`, а
-  `find("stone-furnace", zone("плавильня"))` — печи в ней на любом расстоянии.
-- **Зрение** — `scan.entities(...)`, `scan.resources()`, `scan.robots()`, `scan.items()`,
+  `zone("плавильня").find(Furnace)` — печи в ней на любом расстоянии.
+- **Зрение** — `scan.buildings(...)`, `scan.resources()`, `scan.robots()`, `scan.items()`,
   `scan.water()` и (с «Сенсорами 2») `scan.enemies()`: только в радиусе зрения, от ближнего к дальнему.
 - **Карта** — `map.tag(позиция, текст, значок)` ставит отметку на карте для всех игроков.
 
@@ -352,38 +353,38 @@ for (const stack of me.cargo.items()) counts.set(stack.name, stack.count)
 ```ts
 const field = scan.resources().find((p) => p.item === "coal")!.nearest
 while (true) {
-  move(field)
-  mine("coal")
-  if (me.fuel < 0.5) refuel("coal")
-  move(marker("склад"), { radius: 2 })
-  put(scan.entities({ type: "container" })[0], "coal")
+  me.move(field)
+  me.mine("coal")
+  if (me.energy.level < 0.5) me.energy.refuel("coal")
+  me.move(marker("склад"), { radius: 2 })
+  scan.buildings({ kind: Chest })[0].insert("coal")
 }
 ```
 
 **Кормить все печи в зоне**
 
 ```ts
-for (const furnace of find({ type: "furnace" }, zone("плавильня"))) {
-  move(furnace)
-  if (furnace.count("coal") < 5) put(furnace, "coal", 5)
-  put(furnace, "iron-ore", 10)
+for (const furnace of zone("плавильня").find(Furnace)) {
+  me.move(furnace)
+  if (furnace.count("coal") < 5) furnace.insert("coal", 5)
+  furnace.insert("iron-ore", 10)
 }
 ```
 
 **Спросить у машины, которая видит склад** (нужна «Радиосвязь»)
 
 ```ts
-const coal = request<number>("кладовщик", "сколько", "coal", 10)
+const coal = radio.request<number>("кладовщик", "сколько", "coal", 10)
 print(`на складе ${coal} угля`)
 ```
 
 **Разделить работу без ссор** — захват на доске
 
 ```ts
-for (const furnace of find({ type: "furnace" }, zone("плавильня"))) {
+for (const furnace of zone("плавильня").find(Furnace)) {
   if (!board.claim(`печь-${furnace.id}`, 30)) continue  // эту печь уже кормит другая машина
-  move(furnace)
-  put(furnace, "iron-ore", 20)
+  me.move(furnace)
+  furnace.insert("iron-ore", 20)
   board.release(`печь-${furnace.id}`)
 }
 ```
@@ -396,7 +397,7 @@ tasks.push("доставка", { item: "iron-plate", to: "сборка" }, { pri
 
 // Рабочий: задание не закончено за 60 с — вернётся в очередь
 const task = tasks.next<{ item: Item; to: string }>("доставка")!
-move(marker(task.data.to))
+me.move(marker(task.data.to))
 task.done()
 ```
 
@@ -409,7 +410,7 @@ const screen = display("штаб")
 screen.frame(() => {
   screen.clear("black")
   screen.text(4, 4, `Угля: ${board.get<number>("уголь") ?? 0}`, { color: "yellow", size: 12 })
-  screen.bar(4, 24, screen.width - 8, 6, me.fuel, "green")
+  screen.bar(4, 24, screen.width - 8, 6, me.energy.level, "green")
 })
 ```
 
@@ -423,12 +424,12 @@ screen.frame(() => {
 | Радиосвязь автоматонов (место «Логистики») | сообщения, `robot()`, доска, очереди задач |
 | Табло | малое и большое табло, `display()` |
 | Наладка | `setRecipe` — машины сами меняют рецепт сборщика |
-| Жидкости для автоматонов (скрафтить котёл) | бак, `pump`, `fill`, `drain` |
-| Строительство автоматонами | `build`, `deconstruct`, `rotate` |
+| Жидкости для автоматонов (скрафтить котёл) | бак (`me.tank.pump`), `fill` / `drain` у зданий |
+| Строительство автоматонами | `me.build`, `deconstruct`, `rotate` |
 | Автоматоны и цепи | сигнальная метка, `signals` |
 | Сенсоры 1–3 | зрение 16 / 24 / 32 клетки, `scan.enemies` |
 | Автоматон Mk2, Mk3 | электрические модели, зарядная станция |
-| Боевые автоматоны 1–2 | пулемёт и ракетомёт, `attack`, `guard`, `patrol`, `reload` |
+| Боевые автоматоны 1–2 | пулемёт и ракетомёт, `me.weapon`: `attack`, `guard`, `patrol`, `reload` |
 | Летающие автоматоны 1–2 | перевозчики, которые летят по прямой над всем |
 | Скорость, груз, добыча, процессор, память, баки 1–3 | улучшения всех машин |
 
@@ -531,9 +532,9 @@ screen.frame(() => {
 
 | Видите | Причина |
 |---|---|
-| `out-of-reach` у `put`/`take` | забыли `move` к зданию |
+| `out-of-reach` у `insert`/`extract` | забыли `me.move` к зданию |
 | `out-of-sight` при чтении `furnace.count(…)` | здание далеко — подъехать или спросить по радио |
-| `no-path` | цель за водой или стеной; `canReach(...)` проверит заранее |
-| машина стоит со значком топлива | `refuel` из груза (Mk1) или `charge()` у станции (Mk2+) |
+| `no-path` | цель за водой или стеной; `me.canReach(...)` проверит заранее |
+| машина стоит со значком топлива | `me.energy.refuel()` из груза (Mk1) или `me.energy.charge()` у станции (Mk2+) |
 | `not-researched` | нужное исследование ещё не изучено |
 | программа «в карантине» | исправьте бесконечную рекурсию или рост памяти и опубликуйте снова |

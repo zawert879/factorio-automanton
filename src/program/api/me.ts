@@ -26,7 +26,6 @@ getters.program = () => robotProgramName(currentRobot())
 getters.health = () => robotHealth(currentRobot())
 getters.label = () => currentMachine().label ?? ""
 getters.cargo = () => cargoHandle(currentRobot())
-getters.fuel = () => fuelLevel(currentRobot())
 getters.energy = () => energyObject
 getters.tank = () => (tankCapacity(currentRobot()) <= 0 ? undefined : tankObject)
 // me.weapon — в combat.ts.

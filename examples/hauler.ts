@@ -10,7 +10,7 @@
 // batch — сколько брать за раз.
 // Топливо машина берёт в сундуке у метки «уголь» (параметр "coal").
 
-import { attempt, buildingAt, refuelFrom } from "./lib/Помощники";
+import { attempt, nearMarker, refuelFrom } from "./lib/Помощники";
 
 type Place = { marker?: string; zone?: string };
 type Route = { item: Item; from: Place; to: Place; keep?: number; batch?: number };
@@ -18,7 +18,9 @@ type Route = { item: Item; from: Place; to: Place; keep?: number; batch?: number
 const args = me.args<{ routes?: Route[]; coal?: string }>();
 const routes = args.routes ?? [];
 const coalDepot = args.coal ?? "уголь";
-const BUILDING_TYPES = ["container", "logistic-container", "furnace", "assembling-machine", "lab", "boiler"];
+/** Откуда брать (у этих зданий есть extract) и куда класть (insert). */
+const SOURCES: BuildingKind<Chest | Furnace | Assembler | Lab>[] = [Chest, Furnace, Assembler, Lab];
+const TARGETS: BuildingKind<Chest | Furnace | Assembler | Lab | Boiler>[] = [Chest, Furnace, Assembler, Lab, Boiler];
 me.label = "перевозчик";
 
 if (routes.length === 0) {
@@ -26,16 +28,28 @@ if (routes.length === 0) {
   exit();
 }
 
-/** Здания места: сундук у метки или все подходящие здания в зоне. */
-function buildingsOf(place: Place): Entity[] {
+/** Здания места этих классов: ближайшее к метке или все в зоне. */
+function buildingsOf<T extends Building>(place: Place, kinds: BuildingKind<T>[]): T[] {
   if (place.marker !== undefined) {
-    const building = buildingAt(place.marker, BUILDING_TYPES);
-    return building === null ? [] : [building];
+    const at = marker(place.marker);
+    me.move(at, { radius: 2 });
+    let best: T | null = null;
+    let bestDistance = Infinity;
+    for (const kind of kinds) {
+      const building = nearMarker(at, kind);
+      if (building === null) continue;
+      const d = (building.position.x - at.position.x) ** 2 + (building.position.y - at.position.y) ** 2;
+      if (d < bestDistance) {
+        best = building;
+        bestDistance = d;
+      }
+    }
+    return best === null ? [] : [best];
   }
   if (place.zone !== undefined) {
     const area = zone(place.zone);
-    const all: Entity[] = [];
-    for (const type of BUILDING_TYPES) for (const b of find({ type }, area)) all.push(b);
+    const all: T[] = [];
+    for (const kind of kinds) for (const b of area.find(kind)) all.push(b);
     return all;
   }
   return [];
@@ -45,24 +59,23 @@ function run(route: Route): void {
   const keep = route.keep ?? 20;
   const batch = route.batch ?? 50;
   // Зону назначения видно издалека: пустая — везти некуда.
-  if (route.to.zone !== undefined && buildingsOf(route.to).length === 0) return;
+  if (route.to.zone !== undefined && buildingsOf(route.to, TARGETS).length === 0) return;
   // Забрать.
   if (me.cargo.count(route.item) < batch) {
-    for (const source of buildingsOf(route.from)) {
-      move(source);
-      attempt(() => take(source, route.item, batch - me.cargo.count(route.item)));
+    for (const source of buildingsOf(route.from, SOURCES)) {
+      me.move(source);
+      attempt(() => source.extract(route.item, batch - me.cargo.count(route.item)));
       if (me.cargo.count(route.item) >= batch) break;
     }
   }
   if (me.cargo.count(route.item) === 0) return;
   // Развезти: в каждое здание — до keep штук (в сундук — всё).
-  for (const target of buildingsOf(route.to)) {
+  for (const target of buildingsOf(route.to, TARGETS)) {
     if (me.cargo.count(route.item) === 0) break;
-    move(target);
+    me.move(target);
     // В сундук — всё, что везём, если у маршрута не задан keep (иначе и сундук — до keep штук).
-    const isChest = target.type === "container" || target.type === "logistic-container";
-    const need = isChest && route.keep === undefined ? me.cargo.count(route.item) : keep - target.count(route.item);
-    if (need > 0) attempt(() => put(target, route.item, Math.min(need, me.cargo.count(route.item))));
+    const need = target instanceof Chest && route.keep === undefined ? me.cargo.count(route.item) : keep - target.count(route.item);
+    if (need > 0) attempt(() => target.insert(route.item, Math.min(need, me.cargo.count(route.item))));
   }
 }
 

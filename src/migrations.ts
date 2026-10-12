@@ -7,9 +7,10 @@
 
 import { LuaEntity } from "factorio:runtime"
 import { buildingClass } from "./program/handles"
+import { rebuildAfterUpdate } from "./program/store"
 
 /** Текущая версия схемы storage. */
-export const SCHEMA_VERSION = 3
+export const SCHEMA_VERSION = 4
 
 const MIGRATIONS: Record<number, (this: void) => void> = {
   // 2 (этапы 7–11): у машины — модель, бак и оружейный слот; у полётов — места в круге пересчёта.
@@ -28,6 +29,13 @@ const MIGRATIONS: Record<number, (this: void) => void> = {
       if (handle === undefined || handle.__c !== undefined) continue
       const entity = handle.__e as LuaEntity
       if (entity.valid) handle.__c = buildingClass(entity)
+    }
+  },
+  // 4 (19.6): API объектами — программы собираются заново; тексты на прежнем API не собираются, их машины стоят.
+  4: () => {
+    const broken = rebuildAfterUpdate()
+    for (const [force, names] of pairs(broken)) {
+      game.forces[force]?.print(["automaton.api-update-broken", names.length, names.join(", ")])
     }
   },
 }

@@ -99,6 +99,8 @@ describe("мастерская", () => {
     const position = { x: -760.5, y: 700.5 }
     surface.request_to_generate_chunks(position, 1)
     surface.force_generate_chunk_requests()
+    // Своя чистая площадка: деревья и камни сдвинули бы машину с места.
+    for (const e of surface.find_entities_filtered({ area: [[-764, 697], [-756, 705]] })) if (e.type !== "character") e.destroy()
     const tiles = []
     for (let x = -763; x < -757; x++) for (let y = 698; y < 704; y++) tiles.push({ name: "grass-1", position: { x, y } })
     surface.set_tiles(tiles, true, true, true)

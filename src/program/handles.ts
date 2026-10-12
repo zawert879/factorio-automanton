@@ -20,7 +20,9 @@ import { defineHostObject, hostGetters, hostKindClass, hostMethods, hostSetters,
 import { isHostSubclass } from "../lang/hostClasses"
 import { CHARGING_STATION } from "../names"
 import { actionError, currentRobot } from "./context"
-import { programArray, programPosition, readPosition } from "./values"
+import { programArray, programPosition, readPosition, robotHandle } from "./values"
+
+export { robotHandle }
 
 /** Характеристики модели Mk1 (docs/API.md, «Модели машин»). */
 /** Досягаемость — как у персонажа, у всех моделей одна. Остальное — у модели (src/automaton/models.ts). */
@@ -112,14 +114,6 @@ export function entityHandle(entity: LuaEntity): Val {
     storage.handles.entities[unit] = handle
     script.register_on_object_destroyed(entity)
   }
-  return handle
-}
-
-export function robotHandle(id: number): Val {
-  const existing = storage.handles.robots[id]
-  if (existing !== undefined) return existing
-  const handle = { __t: "host", __h: "robot", __id: id }
-  storage.handles.robots[id] = handle
   return handle
 }
 
@@ -235,35 +229,47 @@ entityGetters.health = (o: Val) => {
   requireSight(entity)
   return entity.max_health > 0 ? entity.health! / entity.max_health : 1
 }
-entityGetters.recipe = (o: Val) => {
+// Члены классов (docs/API.md, «Классы зданий»): у класса без члена его нет и во время выполнения.
+const ITEM_CLASSES = ["Chest", "Furnace", "Assembler", "RocketSilo", "Lab", "Boiler", "Reactor", "Turret", "CargoWagon", "Locomotive", "Vehicle"]
+const FLUID_CLASSES = ["Assembler", "Boiler", "Generator", "StorageTank", "Pipe", "FlameTurret", "FluidWagon"]
+const CRAFTING_CLASSES = ["Furnace", "Assembler", "RocketSilo"]
+
+function members(registry: Record<string, Record<string, Val>>, classes: string[], name: string, fn: Val): void {
+  for (const cls of classes) registry[cls][name] = fn
+}
+
+members(hostGetters, CRAFTING_CLASSES, "recipe", (o: Val) => {
   requireSight(o.__e)
   return entityRecipe(o.__e)
-}
-entityGetters.progress = (o: Val) => {
+})
+members(hostGetters, CRAFTING_CLASSES, "progress", (o: Val) => {
   requireSight(o.__e)
   return entityProgress(o.__e)
-}
-const entityMethods = hostMethods.Building
-entityMethods.count = (o: Val, _k: Val, item: Val) => {
+})
+members(hostMethods, ITEM_CLASSES, "count", (o: Val, _k: Val, item: Val) => {
   requireSight(o.__e)
   const name = itemName(item)
   return name === undefined ? (o.__e as LuaEntity).get_item_count() : entityItemCount(o.__e, name)
-}
-for (const which of ["input", "output", "fuel"] as const) {
-  entityMethods[which] = (o: Val) => {
+})
+function inventoryMethod(which: "input" | "output" | "fuel"): Val {
+  return (o: Val) => {
     const entity = o.__e as LuaEntity
     requireSight(entity)
     const inventory = which === "input" ? entityInput(entity) : which === "output" ? entityOutput(entity) : entityFuel(entity)
     return inventory === undefined ? undefined : inventoryHandle({ __e: entity, __which: which })
   }
 }
+members(hostMethods, ["Furnace", "Assembler", "RocketSilo", "Lab"], "input", inventoryMethod("input"))
+members(hostMethods, CRAFTING_CLASSES, "output", inventoryMethod("output"))
+members(hostMethods, ["Furnace", "Boiler", "Reactor", "Locomotive", "Vehicle"], "fuel", inventoryMethod("fuel"))
 // Содержимое сундука, вагона, багажника и патроны турели — это «вход» здания (src/automaton/inspect.ts).
-for (const cls of ["Chest", "CargoWagon", "Vehicle"]) hostMethods[cls].inventory = entityMethods.input
-hostMethods.Turret.ammo = entityMethods.input
-entityMethods.fluid = (o: Val, _k: Val, name: Val) => {
+members(hostMethods, ["Chest", "CargoWagon", "Vehicle"], "inventory", inventoryMethod("input"))
+hostMethods.Turret.ammo = inventoryMethod("input")
+members(hostMethods, FLUID_CLASSES, "fluid", (o: Val, _k: Val, name: Val) => {
   requireSight(o.__e)
   return entityFluid(o.__e, name === undefined ? undefined : tostring(name))
-}
+})
+const entityMethods = hostMethods.Building
 rawset(entityMethods, "toString", (o: Val) => `${o.__name}#${tostring(o.__id ?? "?")}`)
 
 // Враги — обёртки зданий с классом Enemy: только то, что объявлено у Enemy.
@@ -319,7 +325,6 @@ robotGetters.position = (o: Val) => programPosition(robotPosition(sightedRobot(o
 robotGetters.state = (o: Val) => robotState(sightedRobot(o))
 robotGetters.program = (o: Val) => robotProgramName(sightedRobot(o))
 robotGetters.health = (o: Val) => robotHealth(sightedRobot(o))
-robotGetters.fuel = (o: Val) => fuelLevel(sightedRobot(o))
 robotGetters.energy = (o: Val) => ({ level: fuelLevel(sightedRobot(o)) })
 hostMethods.robot.distance = (o: Val, _k: Val, to: Val) => distanceBetween(sightedRobot(o).entity.position, to)
 rawset(hostMethods.robot, "toString", (o: Val) => `${storage.robots.byId[o.__id]?.name ?? "robot"}#${o.__id}`)

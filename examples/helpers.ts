@@ -5,36 +5,33 @@
 // Здесь только объявления (export function, export const) — это библиотека: на машине её не запустить,
 // её импортируют другие программы. Измените её — программы, которые её импортируют, пересоберутся.
 
-/** Типы сундуков. */
-export const CHESTS = ["container", "logistic-container"];
-
 /**
- * Здание у метки: ближайшее к самой метке (машина останавливается в паре клеток от неё — с любой стороны).
+ * Здание класса kind у метки: ближайшее к самой метке (машина останавливается в паре клеток от неё — с любой стороны).
  * Ищется вокруг машины — вызывать, стоя у метки.
  */
-export function nearMarker(at: Marker, types: string[] = CHESTS): Entity | null {
-  let best: Entity | null = null;
+export function nearMarker<T extends Building>(at: Marker, kind: BuildingKind<T>): T | null {
+  let best: T | null = null;
   let bestDistance = Infinity;
-  for (const e of scan.entities({ type: types, radius: 6 })) {
-    const d = (e.position.x - at.position.x) ** 2 + (e.position.y - at.position.y) ** 2;
+  for (const b of scan.buildings({ kind, radius: 6 })) {
+    const d = (b.position.x - at.position.x) ** 2 + (b.position.y - at.position.y) ** 2;
     if (d < bestDistance) {
-      best = e;
+      best = b;
       bestDistance = d;
     }
   }
   return best;
 }
 
-/** Доехать до метки и найти здание рядом с ней (по умолчанию — сундук); нет — null. */
-export function buildingAt(name: string, types: string[] = CHESTS): Entity | null {
+/** Доехать до метки и найти рядом с ней здание класса kind; нет — null. */
+export function buildingAt<T extends Building>(name: string, kind: BuildingKind<T>): T | null {
   const at = marker(name);
-  move(at, { radius: 2 });
-  return nearMarker(at, types);
+  me.move(at, { radius: 2 });
+  return nearMarker(at, kind);
 }
 
 /** Доехать до метки и найти сундук рядом с ней; нет — сообщить команде и остановить программу. */
-export function chestAt(name: string): Entity {
-  const chest = buildingAt(name);
+export function chestAt(name: string): Chest {
+  const chest = buildingAt(name, Chest);
   if (chest === null) {
     alert(`${me.name}: у метки «${name}» нет сундука`);
     exit();
@@ -69,14 +66,14 @@ export function attempt(action: () => number, what?: string): number {
 }
 
 /**
- * Заправиться, если топлива меньше min: углём из груза, а если его нет — со склада угля у метки depot.
+ * Заправиться, если энергии меньше min: углём из груза, а если его нет — со склада угля у метки depot.
  * refuel перекладывает в топливо весь уголь груза: если уголь нужен ещё для чего-то, заправляйтесь до того, как его брать.
  */
 export function refuelFrom(depot: string, min = 0.3): void {
-  if (me.fuel >= min) return;
+  if (me.energy.level >= min) return;
   if (me.cargo.count("coal") === 0) {
-    const chest = buildingAt(depot);
-    if (chest !== null) attempt(() => take(chest, "coal", 10));
+    const chest = buildingAt(depot, Chest);
+    if (chest !== null) attempt(() => chest.extract("coal", 10));
   }
-  if (me.cargo.count("coal") > 0) refuel("coal");
+  if (me.cargo.count("coal") > 0) me.energy.refuel("coal");
 }

@@ -13,6 +13,7 @@ import { LuaPlayer } from "factorio:runtime"
 import { compile, CompileResult, MAX_SOURCE_BYTES, ProgramVariable } from "../lang/codegen"
 import { Diagnostic } from "../lang/lexer"
 import { Graph } from "../graph/model"
+import { englishGraphSource, graphToSource } from "../graph/codegen"
 import { relativeModulePath, resolveModulePath, rewriteImportPaths } from "../lang/modules"
 import { loadProgram, Program } from "../lang/runtime"
 
@@ -61,6 +62,11 @@ export interface ProgramRecord {
   /** Библиотека (только объявления и export): машине не назначается. */
   library: boolean
   stale?: StaleBuild
+  /**
+   * Сборки нет: после обновления мода текст не собирается (19.6, API объектами) — машины с программой стоят с ошибкой.
+   * Снимается новой публикацией.
+   */
+  outdated?: Diagnostic[]
   /** Отладка (18.8): строки, где можно остановиться, и переменные верхнего уровня в кадре; у сборок до 18.8 нет. */
   breakable?: number[]
   variables?: ProgramVariable[]
@@ -159,6 +165,12 @@ export function onProgramRenamed(listener: (this: void, program: ProgramRecord, 
 }
 
 /** Программу удалили или отправили в карантин (машины с ней останавливаются). */
+/** Программа не собралась после обновления мода (rebuildAfterUpdate): машины с ней останавливаются. */
+const outdatedListeners: ((this: void, program: ProgramRecord) => void)[] = []
+export function onProgramOutdated(listener: (this: void, program: ProgramRecord) => void): void {
+  outdatedListeners.push(listener)
+}
+
 export function onProgramRemoved(listener: (this: void, program: ProgramRecord) => void): void {
   removedListeners.push(listener)
 }
@@ -210,6 +222,7 @@ function applyBuild(program: ProgramRecord, compiled: CompileResult, source: str
   program.author = author
   program.quarantined = undefined
   program.stale = undefined
+  program.outdated = undefined
   program.limitErrors = []
   program.history.push({ version: program.version, source, tick: game.tick, author, rebuiltFor, graph: program.graph })
   while (program.history.length > HISTORY_VERSIONS) program.history.shift()
@@ -225,6 +238,40 @@ export function rebuildProgram(program: ProgramRecord, author: string | undefine
   if (!compiled.ok) return compiled.diagnostics
   applyBuild(program, compiled, program.source, author)
   return []
+}
+
+/**
+ * Обновление мода сменило API программ (19.6, DESIGN.md «API объектами»): все программы собираются заново из текста
+ * (схемы — заново из схемы). Собралась — новая версия, машины перезапускаются; нет — сборки больше нет, машины
+ * стоят с ошибкой, пока программу не исправят. Результат — несобравшиеся программы по командам.
+ */
+export function rebuildAfterUpdate(): Record<string, string[]> {
+  const broken: Record<string, string[]> = {}
+  const ids: number[] = []
+  for (const [id] of pairs(storage.programs.byId)) ids.push(id)
+  table.sort(ids)
+  for (const id of ids) {
+    const program = storage.programs.byId[id]!
+    let source = program.source
+    if (program.graph !== undefined) {
+      const generated = graphToSource(program.graph, program.name, englishGraphSource(program.source))
+      if (generated.ok) {
+        source = generated.source
+        program.graphLines = generated.lineNodes
+      }
+    }
+    const compiled = compileFor(program.name, source, program.force)
+    if (compiled.ok) {
+      applyBuild(program, compiled, source, "Automaton")
+      continue
+    }
+    program.outdated = compiled.diagnostics
+    program.lua = ""
+    const list = (broken[program.force] ??= [])
+    list.push(program.name)
+    for (const listener of outdatedListeners) listener(program)
+  }
+  return broken
 }
 
 /**
@@ -273,7 +320,7 @@ export function publish(request: PublishRequest): PublishResult {
   if (program !== undefined && sameName !== undefined && sameName !== program) return failure("program-name-taken", [name])
   if (program === undefined && programsOf(force).length >= MAX_PROGRAMS_PER_FORCE) return failure("too-many-programs", [MAX_PROGRAMS_PER_FORCE])
   // Тот же текст — не новая версия (машины не перезапускаются): так повторная публикация из VS Code безвредна.
-  if (program !== undefined && program.name === name && program.source === request.source && !program.quarantined) {
+  if (program !== undefined && program.name === name && program.source === request.source && !program.quarantined && program.outdated === undefined) {
     // Схема с тем же кодом (узлы передвинули) — сохранить расстановку без новой версии.
     if (request.graph !== undefined) {
       program.graph = request.graph

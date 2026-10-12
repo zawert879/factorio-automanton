@@ -64,7 +64,7 @@ describe("программы машин", () => {
   test("move: программа продолжается после приезда", (t) => {
     const { robot } = site(-680, 100)
     const x = robot.entity.position.x + 8
-    const m = run(robot, "test-move", `move({ x: ${x}, y: me.position.y })\nprint("arrived", Math.abs(me.position.x - ${x}) < 1.5)`)
+    const m = run(robot, "test-move", `me.move({ x: ${x}, y: me.position.y })\nprint("arrived", Math.abs(me.position.x - ${x}) < 1.5)`)
     waitUntil(t, "конца программы", finished(m), 600, () => {
       expect(output(m)).toBe("arrived true")
       robot.entity.destroy()
@@ -73,7 +73,7 @@ describe("программы машин", () => {
 
   test("ошибки: ActionError ловится, необработанная — строка и статус error", (t) => {
     const { robot } = site(-720, 100)
-    const m = run(robot, "test-errors", `try { mine("iron-ore", 1) } catch (e) { print(e instanceof ActionError, e.code) }\nconst o: any = undefined\nprint(o.x)`)
+    const m = run(robot, "test-errors", `try { me.mine("iron-ore", 1) } catch (e) { print(e instanceof ActionError, e.code) }\nconst o: any = undefined\nprint(o.x)`)
     waitUntil(t, "конца программы", finished(m), 200, () => {
       expect(m.machine.status).toBe("error")
       expect(output(m)).toBe("true no-resource|Ошибка (строка 3): TypeError: Cannot read properties of undefined (reading 'x')")
@@ -81,14 +81,14 @@ describe("программы машин", () => {
     })
   })
 
-  test("зоны, find и видимость: далёкое здание — только неизменное", (t) => {
+  test("зоны, zone.find и видимость: далёкое здание — только неизменное", (t) => {
     const { surface, robot } = site(-760, 100)
     const furnace = surface.create_entity({ name: "stone-furnace", position: { x: -735, y: 125 }, force: "player" })!
     createZone("далеко", surface, { left_top: { x: -740, y: 120 }, right_bottom: { x: -730, y: 130 } })
     const m = run(
       robot,
       "test-sight",
-      `const f = find("stone-furnace", zone("далеко"))[0]\nprint(f.name, f.inSight, f.valid)\ntry { print(f.status) } catch (e) { print(e.code) }`,
+      `const f = zone("далеко").find("stone-furnace")[0]\nprint(f.name, f.inSight, f.valid)\ntry { print(f.status) } catch (e) { print(e.code) }`,
     )
     waitUntil(t, "конца программы", finished(m), 200, () => {
       expect(output(m)).toBe("stone-furnace false true|out-of-sight")
@@ -97,7 +97,7 @@ describe("программы машин", () => {
     })
   })
 
-  test("метки по имени и scan.entities в поле зрения", (t) => {
+  test("метки по имени и scan.buildings в поле зрения", (t) => {
     const { surface, robot } = site(-800, 100)
     const flag = surface.create_entity({ name: MARKER, position: { x: -790, y: 103 }, force: "player", raise_built: true })!
     renameMarker(markerOf(flag)!, "склад")
@@ -106,7 +106,7 @@ describe("программы машин", () => {
     const m = run(
       robot,
       "test-marker",
-      `const p = marker("склад").position\nprint(p.x, p.y)\nconst c = scan.entities({ name: "iron-chest" })[0]\nprint(c.name, c.count("iron-plate"), c.status)`,
+      `const p = marker("склад").position\nprint(p.x, p.y)\nconst c = scan.buildings({ kind: Chest, name: "iron-chest" })[0]\nprint(c.name, c.count("iron-plate"), c.status)`,
     )
     waitUntil(t, "конца программы", finished(m), 200, () => {
       expect(output(m)).toBe("-789.5 103.5|iron-chest 7 idle")
@@ -148,18 +148,18 @@ describe("программы машин: поиск пути и зрение", (
     const water = []
     for (let x = -985; x < -975; x++) for (let y = 110; y < 120; y++) water.push({ name: "deepwater", position: { x, y } })
     surface.set_tiles(water, true, true, true)
-    const m = run(robot, "test-reach", `print(canReach({ x: -990, y: 104 }), canReach({ x: -980, y: 115 }))`)
+    const m = run(robot, "test-reach", `print(me.canReach({ x: -990, y: 104 }), me.canReach({ x: -980, y: 115 }))`)
     waitUntil(t, "конца программы", finished(m), 600, () => {
       expect(output(m)).toBe("true false")
       robot.entity.destroy()
     })
   })
 
-  test("scan.entities видит только в радиусе зрения", (t) => {
+  test("scan.buildings видит только в радиусе зрения", (t) => {
     const { surface, robot } = site(-1040, 100)
     const near = surface.create_entity({ name: "wooden-chest", position: { x: -1033, y: 104 }, force: "player" })!
     const far = surface.create_entity({ name: "wooden-chest", position: { x: -1020, y: 104 }, force: "player" })!
-    const m = run(robot, "test-vision", `const found = scan.entities({ name: "wooden-chest" })
+    const m = run(robot, "test-vision", `const found = scan.buildings({ name: "wooden-chest" })
 print(found.length, found[0].position.x)`)
     waitUntil(t, "конца программы", finished(m), 100, () => {
       expect(output(m)).toBe("1 -1032.5")
@@ -183,7 +183,7 @@ describe("сквозной сценарий 4.10", () => {
 const dirs = [[1, 0], [0, 1], [-1, 0], [0, -1]]
 let pos = me.position
 let step = 6
-for (let turn = 0; turn < 3 && me.fuel > 0.3; turn++) {
+for (let turn = 0; turn < 3 && me.energy.level > 0.3; turn++) {
   for (const patch of scan.resources()) {
     const key = \`\${patch.item}:\${Math.floor(patch.center.x / 32)}:\${Math.floor(patch.center.y / 32)}\`
     if (seen.has(key)) continue
@@ -193,7 +193,7 @@ for (let turn = 0; turn < 3 && me.fuel > 0.3; turn++) {
   }
   const [dx, dy] = dirs[turn % 4]
   pos = { x: pos.x + dx * step, y: pos.y + dy * step }
-  try { move(pos) } catch {}
+  try { me.move(pos) } catch {}
   if (turn % 2 === 1) step += 6
 }`,
     )
@@ -218,19 +218,19 @@ for (let turn = 0; turn < 3 && me.fuel > 0.3; turn++) {
       robot,
       "Шахтёр",
       `const { ore } = me.args<{ ore: string }>()
-const furnace = scan.entities({ name: "stone-furnace" })[0]
-put(furnace, "coal", 2)
+const furnace = scan.buildings({ kind: Furnace })[0]
+furnace.insert("coal", 2)
 while (furnace.count("iron-plate") < 2) {
   if (me.cargo.count(ore) === 0) {
     const patch = scan.resources().find(p => p.item === ore)!
-    move(patch.nearest, { radius: 1.5 })
-    mine(ore, 2)
-    move(furnace)
+    me.move(patch.nearest, { radius: 1.5 })
+    me.mine(ore, 2)
+    me.move(furnace)
   }
-  put(furnace, ore)
+  furnace.insert(ore)
   wait(1)
 }
-take(furnace, "iron-plate")
+furnace.extract("iron-plate")
 print("пластин:", me.cargo.count("iron-plate"))`,
     )
     waitUntil(t, "пластин", finished(m), 3000, () => {

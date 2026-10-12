@@ -19,7 +19,12 @@ describe("справка", () => {
         if (entry.doc[0] !== "") expect(`${entry.name}: ${entry.doc[1] !== "" && !CYRILLIC.test(entry.doc[1])}`).toBe(`${entry.name}: true`)
       }
     }
-    for (const name of ["mine", "move", "scan", "publish", "display", "ActionError"]) expect(names.includes(name)).toBe(true)
+    for (const name of ["Me", "scan", "radio", "display", "Furnace", "ActionError"]) expect(names.includes(name)).toBe(true)
+    // Методы (19.6: me.move, radio.publish, furnace.insert) находятся поиском — по ключам записи.
+    const keys = HELP.flatMap((section) => section.entries.map((entry) => entry.keys))
+    for (const method of ["move", "mine", "publish", "insert", "extract", "pump", "attack"]) {
+      expect(`${method}: ${keys.some((k) => k.split(" ").includes(method.toLowerCase()))}`).toBe(`${method}: true`)
+    }
   })
 
   test("примеры разделов и первая программа компилируются", () => {

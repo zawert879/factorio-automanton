@@ -71,9 +71,9 @@ describe("заправка другой машины", () => {
     const published = publish({
       name: "refuel/other",
       source: `const r = scan.robots()[0]
-print(r.fuel)
-refuel("coal", r)
-print(r.fuel > 0)
+print(r.energy.level)
+r.refuel("coal")
+print(r.energy.level > 0)
 `,
     })
     if (!published.ok) error("программа не опубликована")

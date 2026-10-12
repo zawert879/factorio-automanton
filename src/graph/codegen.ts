@@ -5,6 +5,7 @@
 // кода помнит свой узел: ошибки компилятора и отладка показывают узел, а не строку.
 import { assignable, ELEMENT_TYPES, Graph, GraphDiagnostic, GraphNode, GraphValue, PinType, TS_TYPES } from "./model"
 import { HELPERS, NODES, NodeSpec, PinSpec, quote, settingType } from "./nodes"
+import { HOST_CLASSES } from "../lang/hostClasses"
 
 export interface GraphSource {
   ok: boolean
@@ -41,13 +42,12 @@ const KEYWORDS = new Set([
   "switch", "this", "throw", "true", "try", "typeof", "undefined", "var", "void", "while", "me", "args",
 ])
 
-/** Имена API и встроенной библиотеки: переменная или параметр с таким именем закрыли бы функцию. */
+/** Имена API и встроенной библиотеки: переменная или параметр с таким именем закрыли бы функцию или класс. */
 const GLOBALS = new Set([
-  "print", "say", "chat", "alert", "move", "canReach", "follow", "goHome", "mine", "take", "put", "pickup", "drop", "give",
-  "repair", "setRecipe", "build", "deconstruct", "rotate", "pump", "fill", "drain", "refuel", "charge", "marker", "zone",
-  "find", "send", "publish", "subscribe", "unsubscribe", "receive", "tryReceive", "request", "robot", "display", "attack",
-  "guard", "patrol", "reload", "wait", "waitUntil", "exit", "restart", "scan", "board", "tasks", "signals", "world", "Math",
-  "JSON", "String", "Number", "Array", "Map", "Set", "Object", "Error", "ActionError", "console", "Infinity", "NaN",
+  "print", "chat", "alert", "marker", "zone", "robot", "display", "wait", "waitUntil", "exit", "restart",
+  "scan", "map", "radio", "board", "tasks", "signals", "time", "world", "Math", "JSON", "String", "Number", "Array",
+  "Map", "Set", "Object", "Error", "ActionError", "console", "Infinity", "NaN",
+  ...HOST_CLASSES.map(([name]) => name),
   "nearestPatch", "nearestWater", "nearestEntity", "chestAt", "markersOf", "writeSignal",
 ])
 

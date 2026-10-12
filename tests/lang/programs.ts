@@ -186,20 +186,20 @@ group("библиотека", [
 
 group("действия и паузы", [
   ["бесконечный цикл с выходом", `let n = 0; while (true) { n++; if (n >= 1000) break } print(n)`, "1000"],
-  ["блокирующие вызовы", `print("start"); wait(1); print("after wait"); move({ x: 1, y: 2 }); print(mine("coal", 5))`, "start|after wait|5"],
+  ["блокирующие вызовы", `print("start"); wait(1); print("after wait"); me.move({ x: 1, y: 2 }); print(me.mine("coal", 5))`, "start|after wait|5"],
   [
     "действия в forEach, map и методе класса",
-    `class Miner { constructor(readonly ore: string) {} work(n: number) { return mine(this.ore, n) } }
+    `class Miner { constructor(readonly ore: string) {} work(n: number) { return me.mine(this.ore, n) } }
     const m = new Miner("iron-ore")
     const results: number[] = []
     ;[1, 2, 3].forEach(n => { results.push(m.work(n)) })
-    print(results, [4, 5].map(n => m.work(n)), [6, 7].filter(n => mine("x", n) > 6), [1, 2].reduce((s, n) => s + mine("x", n), 0))`,
+    print(results, [4, 5].map(n => m.work(n)), [6, 7].filter(n => me.mine("x", n) > 6), [1, 2].reduce((s, n) => s + me.mine("x", n), 0))`,
     "1,2,3 4,5 7 3",
   ],
-  ["ActionError", `try { move("nowhere") } catch (e) { print(e instanceof ActionError, e.code) }`, "true no-path"],
+  ["ActionError", `try { me.move("nowhere") } catch (e) { print(e instanceof ActionError, e.code) }`, "true no-path"],
   ["действие в синхронном колбэке", `[2, 1].sort((a, b) => { wait(1); return a - b })`, "error: TypeError: Actions cannot be used in this callback @1 []"],
   ["цикл в синхронном колбэке", `print([3, 1, 2].sort((a, b) => { let x = 0; for (let i = 0; i < 50; i++) x++; return a - b }))`, "1,2,3"],
-  ["действие в конструкторе", `class Bot { fuel: number; constructor() { this.fuel = mine("coal", 3) } } const b = new Bot(); print(b.fuel)`, "3"],
+  ["действие в конструкторе", `class Bot { fuel: number; constructor() { this.fuel = me.mine("coal", 3) } } const b = new Bot(); print(b.fuel)`, "3"],
   [
     "finally после паузы",
     `function job() { try { wait(0.1); return "done" } finally { print("cleanup"); wait(0.05) } }
@@ -208,7 +208,7 @@ group("действия и паузы", [
   ],
   [
     "пауза внутри catch",
-    `try { move("nowhere") } catch (e) { wait(0.1); print("recovered", e.code) } finally { print("end") }`,
+    `try { me.move("nowhere") } catch (e) { wait(0.1); print("recovered", e.code) } finally { print("end") }`,
     "recovered no-path|end",
   ],
   [

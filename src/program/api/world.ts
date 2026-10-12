@@ -1,4 +1,4 @@
-// Карта (4.9): marker, zone, find, map.tag; zone.find (19.2) — здания класса в зоне. Время и мир (4.7): wait,
+// Карта (4.9): marker, zone, zone.find (19.2: здания класса или с именем), map.tag. Время и мир (4.7): wait,
 // waitUntil, exit, restart, time, world.
 import { BoundingBox, LuaEntity } from "factorio:runtime"
 import { controlFlow, defineHostObject, host, hostBlocking, hostGetters, hostKindClass, hostMethods, program, Val } from "../../lang/runtime/core"
@@ -94,12 +94,6 @@ function findInZone(where: Val, what: ZoneFilter): Val {
   zone.found ??= {}
   zone.found[key] = result
   return programArray([...result])
-}
-
-host.find = (what: Val, where: Val) => {
-  if (type(what) === "string") return findInZone(where, { name: what as string })
-  if (type(what) === "table" && type(what.type) === "string") return findInZone(where, { type: what.type as string })
-  actionError("invalid-target", 'find needs a name or { type: "…" }')
 }
 
 /** zone.find(Furnace, имя?) — здания класса; zone.find(имя?) — по имени или все. */

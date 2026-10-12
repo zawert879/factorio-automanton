@@ -18,7 +18,7 @@ const BAD: [string, string, string][] = [
   ["строка вместо числа", `wait("5")`, "type-not-assignable@1"],
   ["число вместо строки", `marker(5)`, "type-not-assignable@1"],
   ["литерал не из объединения", `display("x").text(0, 0, "a", { align: "middle" })`, "type-not-assignable@1"],
-  ["мало аргументов", `put(scan.entities()[0])`, "type-argument-count@1"],
+  ["мало аргументов", `zone("склад").find(Chest)[0].insert()`, "type-argument-count@1"],
   ["много аргументов", `wait(1, 2, 3)`, "type-argument-count@1"],
   ["аннотация переменной", `const x: number = "a"`, "type-not-assignable@1"],
   ["присваивание выведенному типу", `let x = 1\nx = "a"`, "type-not-assignable@2"],
@@ -30,7 +30,6 @@ const BAD: [string, string, string][] = [
   ["лямбда: параметр из контекста", `const xs = ["a", "b"]\nxs.map((s) => s.foo)`, "type-no-property@2"],
   ["результат map — новый тип", `const lens = ["a", "bb"].map((s) => s.length)\nlens[0].toUpperCase()`, "type-no-property@2"],
   ["Map: тип значения", `const m = new Map<string, number>()\nm.set("a", "b")`, "type-not-assignable@2"],
-  ["receive<T>: data", `const m = receive<{ n: number }>("t")!\nprint(m.data.x)`, "type-no-property@2"],
   ["me.args<T>", `const { ore } = me.args<{ ore: string }>()\nwait(ore)`, "type-not-assignable@2"],
   ["свойство объектного литерала", `const p = { x: 1, y: 2 }\nprint(p.z)`, "type-no-property@2"],
   ["поле класса присваивание", `class A { n = 0 }\nconst a = new A()\na.n = "x"`, "type-not-assignable@3"],
@@ -76,7 +75,7 @@ me.goHome()`,
 const chests = scan.buildings({ kind: Chest, radius: 5 })
 print(chests[0].inventory().count("coal"))
 print(zone("склад").find().length + zone("склад").find("wooden-chest").length + zone("склад").find(Chest, ["iron-chest"]).length)
-const t = receive("цель")?.data
+const t = radio.receive("цель")?.data
 if (t instanceof Furnace || t instanceof Chest) print(t.count("coal"))
 if (t instanceof Machine) print(t.id, t.position.x)
 function nearest<T extends Building>(kind: BuildingKind<T>): T | null { return scan.buildings({ kind })[0] ?? null }
@@ -92,13 +91,13 @@ function area(s: Shape): number {
   if (s.kind === "circle") return Math.PI * s.r * s.r
   return s.side * s.side
 }
-try { move({ x: 1, y: 2 }) } catch (e) { if (e instanceof ActionError) print(e.code, e.message) }
+try { me.move({ x: 1, y: 2 }) } catch (e) { if (e instanceof ActionError) print(e.code, e.message) }
 print(area({ kind: "circle", r: 1 }))`,
   ],
   [
     "ранний выход и null",
-    `function nearest(): Entity {
-  const all = scan.entities({ type: "container" })
+    `function nearest(): Chest {
+  const all = scan.buildings({ kind: Chest })
   const first = all.find((e) => e.name === "wooden-chest")
   if (first === undefined) {
     alert("нет")
@@ -133,16 +132,16 @@ print(n, s, total + 1, longest.length, pairs.join(","), flat.length)`,
 class Mine extends Job {
   private done = 0
   constructor(readonly ore: string) { super("mine") }
-  run(): void { this.done += mine(this.ore, 5) }
+  run(): void { this.done += me.mine(this.ore, 5) }
 }
 const jobs: Job[] = [new Mine("coal")]
 for (const job of jobs) { job.run(); print(job.title, Job.count) }`,
   ],
   [
     "API: сообщения, доска, задачи, табло",
-    `type Order = { furnace: Entity; ore: Item }
-const m = receive<Order>("задание", 5)
-if (m !== null) { move(m.data.furnace); put(m.data.furnace, m.data.ore); m.reply("ok") }
+    `type Order = { furnace: Furnace; ore: Item }
+const m = radio.receive<Order>("задание", 5)
+if (m !== null) { me.move(m.data.furnace); m.data.furnace.insert(m.data.ore); m.reply("ok") }
 board.increment("n")
 const task = tasks.next<number>("q", { timeout: 1 })
 if (task !== null) { print(task.data + 1); task.done() }
@@ -164,11 +163,11 @@ me.label = label`,
   ],
   [
     "функции высшего порядка и колбэки",
-    `const lowOn = (item: Item, below: number) => (e: Entity) => e.count(item) < below
-const hungry = scan.entities({ type: "furnace" }).filter(lowOn("coal", 5)).sort((x, y) => me.distance(x) - me.distance(y))
+    `const lowOn = (item: Item, below: number) => (e: Furnace) => e.count(item) < below
+const hungry = scan.buildings({ kind: Furnace }).filter(lowOn("coal", 5)).sort((x, y) => me.distance(x) - me.distance(y))
 waitUntil(() => me.cargo.isFull(), { every: 1, timeout: 10 })
 hungry.forEach((f, i) => print(i, f.name))
-const byName = new Map<string, Entity[]>()
+const byName = new Map<string, Furnace[]>()
 for (const e of hungry) { const list = byName.get(e.name) ?? []; list.push(e); byName.set(e.name, list) }`,
   ],
   [

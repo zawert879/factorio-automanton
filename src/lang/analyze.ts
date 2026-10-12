@@ -13,6 +13,44 @@
 import * as A from "./ast"
 import { BLOCKING_HOST_METHODS, BLOCKING_OBJECT_METHODS, Builtin, BUILTINS, HIGHER_ORDER_METHODS } from "./builtins"
 import { isHostClass } from "./hostClasses"
+
+/** Прежние глобальные функции API (до 19.6, DESIGN.md «API объектами») → как это пишется теперь: подсказка в ошибке. */
+const OLD_API: Record<string, string | undefined> = {
+  move: "me.move(…)",
+  canReach: "me.canReach(…)",
+  follow: "me.follow(…)",
+  goHome: "me.goHome()",
+  mine: "me.mine(…)",
+  pickup: "me.pickup(…)",
+  drop: "me.drop(…)",
+  build: "me.build(…)",
+  say: "me.say(…)",
+  take: "chest.extract(item, count)",
+  put: "chest.insert(item, count)",
+  give: "robot.insert(item, count)",
+  repair: "building.repair()",
+  setRecipe: "assembler.setRecipe(recipe)",
+  deconstruct: "building.deconstruct()",
+  rotate: "building.rotate()",
+  pump: "me.tank.pump(…)",
+  fill: "tank.fill(amount)",
+  drain: "tank.drain(fluid, amount)",
+  refuel: "me.energy.refuel(…) / robot.refuel(…)",
+  charge: "me.energy.charge(…)",
+  attack: "me.weapon.attack(…)",
+  guard: "me.weapon.guard(…)",
+  patrol: "me.weapon.patrol(…)",
+  reload: "me.weapon.reload(…)",
+  find: "zone(…).find(Furnace)",
+  send: "radio.send(…)",
+  publish: "radio.publish(…)",
+  subscribe: "radio.subscribe(…)",
+  unsubscribe: "radio.unsubscribe(…)",
+  receive: "radio.receive(…)",
+  tryReceive: "radio.tryReceive(…)",
+  request: "radio.request(…)",
+  inbox: "radio.inbox",
+}
 import { Diagnostic } from "./lexer"
 import { ModuleUnit } from "./modules"
 
@@ -482,8 +520,10 @@ export function analyze(program: A.Program, units?: ModuleUnit[]): Analysis {
       resolutions.set(node, resolution)
       return resolution
     }
-    // Рассылки всем больше нет (растёт как N²): подсказать замену.
-    report(name === "broadcast" ? "broadcast-removed" : "unknown-name", [name], at)
+    // Рассылки всем больше нет (растёт как N²): подсказать замену. Прежние функции API (до 19.6) — новая запись.
+    if (name === "broadcast") report("broadcast-removed", [name], at)
+    else if (OLD_API[name] !== undefined) report("api-moved", [name, OLD_API[name]], at)
+    else report("unknown-name", [name], at)
     return undefined
   }
 

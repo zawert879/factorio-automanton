@@ -3,7 +3,7 @@
 // накопать руды на месторождении и отвезти в печь, которую назвал оркестратор.
 // Параметры: {"field": "<зона с рудой>", "amount": 50} — зону выделите «Программатором» на месторождении.
 
-type Order = { furnace: Entity; ore: Item };
+type Order = { furnace: Furnace; ore: Item };
 
 function findBoss(): number {
   const near = scan.robots().find(r => r.program === "Оркестратор");
@@ -15,22 +15,22 @@ function findBoss(): number {
 
 const { field, amount } = me.args<{ field: string; amount?: number }>();
 const boss = findBoss();
-request(boss, "регистрация", me.name, 30);
+radio.request(boss, "регистрация", me.name, 30);
 me.label = "рабочий";
 
 while (true) {
-  const msg = receive<Order>("задание");
+  const msg = radio.receive<Order>("задание");
   if (msg === null) continue;
 
   const { furnace, ore } = msg.data;
   try {
-    move(zone(field));
-    mine(ore, amount ?? 50);
-    move(furnace);
-    put(furnace, ore);
+    me.move(zone(field));
+    me.mine(ore, amount ?? 50);
+    me.move(furnace);
+    furnace.insert(ore);
   } catch (e) {
-    say(`Не вышло: ${e instanceof ActionError ? e.code : "?"}`);
+    me.say(`Не вышло: ${e instanceof ActionError ? e.code : "?"}`);
   } finally {
-    send(boss, "готово", { furnaceId: furnace.id });
+    radio.send(boss, "готово", { furnaceId: furnace.id });
   }
 }

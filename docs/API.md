@@ -6,24 +6,28 @@
 
 ## Общие правила
 
+- **Объекты и их методы.** Действие пишется у того, над чем действуют: `furnace.insert("coal", 5)`,
+  `chest.extract("iron-plate")`, `assembler.setRecipe("iron-gear-wheel")`, `helper.refuel()`. Своё — у `me`:
+  `me.move(…)`, `me.mine(…)`, `me.say(…)`, системы машины — `me.energy`, `me.tank`, `me.weapon`. Связь — `radio`.
+  Делает действие всегда эта машина: ей нужна досягаемость, тратятся её энергия и время.
 - **Мгновенные функции и действия.** Чтение состояния, зрение, сообщения, рисование выполняются сразу.
-  Действия (`move`, `mine`, `take`, `put`, `attack`, …) занимают игровое время: программа ждёт,
-  пока действие закончится. Одновременно у машины идёт одно действие.
+  Действия (`me.move`, `me.mine`, `chest.extract`, `furnace.insert`, `me.weapon.attack`, …) занимают игровое
+  время: программа ждёт, пока действие закончится. Одновременно у машины идёт одно действие.
 - **Бесконечные циклы — норма.** `while (true)` — обычный главный цикл программы. У машины есть квант
   инструкций на тик (зависит от модели); исчерпала — программа ставится на паузу и со следующего тика
-  продолжается с того же места. Это не ошибка и никого не блокирует. `wait`, `receive` и действия
+  продолжается с того же места. Это не ошибка и никого не блокирует. `wait`, `radio.receive` и действия
   квант не тратят, поэтому ждать через них выгоднее, чем крутиться вхолостую. Что сколько стоит и когда
   выполняется строка — раздел [«Время программы»](#время-программы).
 - **Руки — как у персонажа.** Брать, класть, чинить, строить можно только в радиусе досягаемости
   `me.reach` (как у персонажа — 10 клеток); добывать — стоя у месторождения (`me.mineReach`, 2.7 клетки);
-  подбирать с земли — вплотную. Дальше — `ActionError("out-of-reach")`: подъехать нужно самому через `move`.
+  подбирать с земли — вплотную. Дальше — `ActionError("out-of-reach")`: подъехать нужно самому через `me.move`.
 - **Глаза — только рядом.** Машина видит в радиусе зрения `me.vision`. Неизменное — id, имя, тип,
   позиция здания — читается всегда. Текущее состояние зданий (содержимое, статус, рецепт) и других
   машин (позиция, состояние, здоровье) — только в поле зрения, иначе `ActionError("out-of-sight")`.
   Проверить заранее — `inSight`. О дальнем узнают из сообщений тех, кто видит (например, оркестратора).
 - **Связь — без ограничения дальности.** Сообщения, общая доска, очереди задач и табло работают
   на любом расстоянии.
-- **Частичный результат — не ошибка.** `take`, `put`, `mine` возвращают, сколько реально перенесено.
+- **Частичный результат — не ошибка.** `extract`, `insert`, `me.mine` возвращают, сколько реально перенесено.
   Исключение бросается, только если действие невозможно.
 - **Энергия.** Тратится на путь, действия, бой, зрение (зависит от радиуса), немного — на сообщения
   и рисование. Чтение своего состояния бесплатно.
@@ -46,11 +50,12 @@
 в ближайшей точке остановки (виток цикла, вход в функцию) и со следующего тика продолжает с того же места.
 Это не ошибка.
 
-**2. Ожидание.** Действия (`move`, `mine`, `take`, `put`, …), `wait`, `waitUntil`, `receive`, `request` —
+**2. Ожидание.** Действия (`me.move`, `me.mine`, `chest.extract`, `furnace.insert`, …), `wait`, `waitUntil`,
+`radio.receive`, `radio.request` —
 точки, где программа ждёт: квант на это не тратится, машина не исполняется, пока ожидание не кончится.
 
 **3. Долг.** Тяжёлый вызов библиотеки выполняется целиком, даже если стоит больше оставшегося кванта
-(например, `publish` тысяче подписчиков: все письма уходят в этом тике). Перерасход становится долгом:
+(например, `radio.publish` тысяче подписчиков: все письма уходят в этом тике). Перерасход становится долгом:
 следующие тики машина пропускает, по кванту за тик, пока не отработает. В среднем машина всё равно
 делает не больше кванта работы за тик.
 
@@ -67,8 +72,8 @@
 | `shift` | 1 на 64 элемента массива |
 | `Array.from(…, f)` | 1 за элемент |
 | `JSON.stringify` / `JSON.parse` | 1 за объект и массив / 1 на 256 символов текста |
-| `publish` | 1 за каждого подписчика, которому ушло письмо |
-| Действия, `wait`, `receive`, `request` | 0 (машина ждёт) |
+| `radio.publish` | 1 за каждого подписчика, которому ушло письмо |
+| Действия, `wait`, `radio.receive`, `radio.request` | 0 (машина ждёт) |
 
 **На всех машин** в тике есть общий бюджет (настройка карты, по умолчанию 20 000 инструкций). Он
 раздаётся готовым к работе машинам по кругу. Если машин много и все считают, часть получит ход тиком
@@ -76,16 +81,16 @@
 
 **Что из этого следует.** Между двумя соседними строками могут пройти тики, если между ними цикл или
 тяжёлый вызов, — а мир за это время меняется: другие машины забирают предметы, здания работают.
-Поэтому результат действия проверяют, а не предполагают: `take` возвращает, сколько реально взято, а если
+Поэтому результат действия проверяют, а не предполагают: `extract` возвращает, сколько реально взято, а если
 брать нечего — `ActionError("not-enough-items")`. Сообщения доходят на следующем тике после отправки.
 
 Пример на Mk1 (квант 50):
 
 ```
-const coal = chest.count("coal")            // A
-publish("склад", coal)                       // B: 120 подписчиков
-for (const id of helpers) send(id, "иди", coal)   // C: 100 помощников
-take(chest, "coal", 10)                      // D
+const coal = chest.count("coal")                        // A
+radio.publish("склад", coal)                            // B: 120 подписчиков
+for (const id of helpers) radio.send(id, "иди", coal)   // C: 100 помощников
+chest.extract("coal", 10)                               // D
 ```
 
 | Тик | Программа | Получатели |
@@ -103,19 +108,19 @@ take(chest, "coal", 10)                      // D
 
 | Раздел | Что внутри | Доступ |
 |---|---|---|
-| [Вывод](#вывод) | `print`, `console.log`, `say`, `chat`, `alert` | сразу |
-| [Своя машина](#своя-машина-me) | `me`: груз, топливо, здоровье, параметры программы, память, подпись | сразу |
-| [Движение](#движение) | `move`, `canReach`, `follow`, `goHome` | сразу |
-| [Предметы](#предметы) | `mine`, `take`, `put`, `pickup`, `drop`, `give` | сразу |
-| [Здания](#здания) | классы зданий (`Furnace`, `Chest`, …), состояние (в поле зрения), `repair` / `setRecipe` / `build`, `deconstruct`, `rotate` | сразу / [Наладка] / [Строительство] |
-| [Жидкости](#жидкости) | `pump`, `fill`, `drain` | [Жидкости] |
-| [Энергия](#энергия) | `refuel`, `charge` | сразу / Mk2 |
-| [Зрение](#зрение) | `scan.robots`, `scan.buildings`, `scan.entities`, `scan.items`, `scan.resources`, `scan.enemies`, `scan.water` | сразу, радиус растёт исследованиями |
-| [Карта](#карта) | метки, зоны, `zone.find`, `find`, `map.tag` | сразу |
+| [Вывод](#вывод) | `print`, `console.log`, `me.say`, `chat`, `alert` | сразу |
+| [Своя машина](#своя-машина-me) | `me`: груз, энергия, здоровье, параметры программы, память, подпись; `Machine`, `Robot` | сразу |
+| [Движение](#движение) | `me.move`, `me.canReach`, `me.follow`, `me.goHome` | сразу |
+| [Предметы](#предметы) | `me.mine`, `me.pickup`, `me.drop`; `extract` / `insert` у зданий, `insert` у машины | сразу |
+| [Здания](#здания) | классы зданий (`Furnace`, `Chest`, …), состояние (в поле зрения), `repair`, `setRecipe`, `me.build`, `deconstruct`, `rotate` | сразу / [Наладка] / [Строительство] |
+| [Жидкости](#жидкости) | `me.tank.pump`, `fill` / `drain` у зданий | [Жидкости] |
+| [Энергия](#энергия) | `me.energy` (`level`, `refuel`, `charge`), `robot.refuel` | сразу / Mk2 |
+| [Зрение](#зрение) | `scan.robots`, `scan.buildings`, `scan.items`, `scan.resources`, `scan.enemies`, `scan.water` | сразу, радиус растёт исследованиями |
+| [Карта](#карта) | метки, зоны, `zone.find`, `map.tag` | сразу |
 | [Связь](#связь) | `radio` (`send`, `publish`, `subscribe`, `receive`, `request`, `inbox`), `robot` | [Радиосвязь] |
 | [Доска и задачи](#доска-и-задачи) | `board` (общая память), `tasks` (очереди заданий) | [Радиосвязь] |
 | [Табло](#табло) | `display`: пиксельный холст — линии, фигуры, текст, иконки, таблицы | [Табло] |
-| [Бой](#бой) | `attack`, `guard`, `patrol`, `reload`, `me.weapon` | [Боевые автоматоны] |
+| [Бой](#бой) | `me.weapon` (`attack`, `guard`, `patrol`, `reload`) | [Боевые автоматоны] |
 | [Сигналы](#сигналы) | чтение и запись сигналов цепей | [Цепи] |
 | [Время и мир](#время-и-мир) | `wait`, `waitUntil`, `time`, `world` (рецепты, исследования, статистика) | сразу |
 | [Ошибки](#ошибки) | `ActionError`, коды | сразу |
@@ -128,11 +133,11 @@ type Fluid = string;     // "water", "crude-oil", ...
 type Position = { x: number; y: number };
 type Area = { from: Position; to: Position };
 type Direction = "north" | "east" | "south" | "west";
-type Target = Position | Building | Entity | Machine | Marker | Zone;
+type Target = Position | Building | Machine | Marker | Zone;
 
 type Value =
   | null | boolean | number | string
-  | Building | Entity | Machine | Position
+  | Building | Machine | Position
   | Value[]
   | { [key: string]: Value };
 
@@ -150,7 +155,7 @@ interface ItemStack { name: Item; count: number }
 | Экземпляр класса | `Route { from: "склад", keep: 20 }` (свой `toString` — его текст) |
 | `Map`, `Set` | `Map(2) { "a" => 1, "b" => 2 }`, `Set(2) { 1, 2 }` |
 | Ошибка | `ActionError: no path (no-path)` |
-| Здание, машина | `Furnace(stone-furnace #12 @ 10.5, 5.5)` — класс здания и имя, `Robot(АМ-7 #7)` (`me` — тоже) |
+| Здание, машина | `Furnace(stone-furnace #12 @ 10.5, 5.5)` — класс здания и имя, `Robot(АМ-7 #7)` (`me` — тоже; отправленный сообщением `me` приходит как `Robot`) |
 | Метка, зона, табло | `Marker(склад)`, `Zone(плавильня)`, `Display(штаб)` |
 | Груз, сообщение, задача | `Inventory { coal: 7 }`, `Message(Robot(АМ-3 #3), "тема": данные)`, `Task(работа #4: данные)` |
 | Энергия, бак, оружие | `Energy(0.5)`, `Tank(water 100/1000)`, `Weapon(gun, firearm-magazine × 2)` |
@@ -166,12 +171,6 @@ interface ItemStack { name: Item; count: number }
  */
 declare function print(...values: unknown[]): void;
 declare const console: { log(...values: unknown[]): void };   // то же, что print @en same as print
-
-/**
- * Облачко с текстом над машиной на `seconds` секунд (по умолчанию 3). Видят все игроки.
- * @en A speech bubble with text above the machine for `seconds` seconds (3 by default). All players see it.
- */
-declare function say(text: string, seconds?: number): void;
 
 interface Me {
   /**
@@ -197,8 +196,8 @@ declare function alert(text: string): void;
 ```ts
 // Что везёт машина — в консоль, игрокам — облачко над ней
 print("груз:", me.cargo.items());
-say(`Везу ${me.cargo.count()} предметов`, 5);
-if (me.fuel < 0.1) alert(`${me.name}: кончается топливо`);
+me.say(`Везу ${me.cargo.count()} предметов`, 5);
+if (me.energy.level < 0.1) alert(`${me.name}: кончается топливо`);
 ```
 
 ## Своя машина (`me`)
@@ -232,8 +231,7 @@ declare abstract class Machine {
   readonly state: RobotState;
   readonly program: string | null;     // имя программы из библиотеки @en name of the program from the library
   readonly health: number;             // 0..1
-  readonly fuel: number;               // 0..1 — топливо или заряд @en 0..1 — fuel or charge
-  readonly energy: { readonly level: number };   // 0..1 — топливо или заряд @en 0..1 — fuel or charge
+  readonly energy: { readonly level: number };   // 0..1 — топливо или заряд. Было fuel @en 0..1 — fuel or charge. Was fuel
   distance(to: Target): number;
 }
 
@@ -266,9 +264,8 @@ type RobotState =
 
 interface Me extends Machine {
   name: string;                        // можно переименовать себя из программы @en a program can rename its own machine
-  label: string;                       // постоянная подпись над машиной (в отличие от say) @en a permanent label above the machine (unlike say)
+  label: string;                       // постоянная подпись над машиной (в отличие от me.say) @en a permanent label above the machine (unlike me.say)
   readonly cargo: Inventory;
-  readonly fuel: number;               // 0..1 — топливо или заряд @en 0..1 — fuel or charge
   readonly energy: Energy;             // уровень, заправка, зарядка @en level, refueling, charging
   readonly tank: Tank | null;          // бак — только у рабочих моделей @en the tank — only on worker models
   readonly weapon: Weapon | null;      // оружие — только у боевых моделей @en the weapon — only on combat models
@@ -310,31 +307,6 @@ me.label = `копаю ${ore}`;
 ## Движение
 
 ```ts
-/**
- * Доехать до цели. К машине — только если она в поле зрения (иначе спроси у неё позицию сообщением).
- * ActionError("no-path"), если пути нет.
- * @en Drive to the target. To a machine — only if it is within sight (otherwise ask it for its position with a message). ActionError("no-path") if there is no path.
- */
-declare function move(to: Target, opts?: { radius?: number; timeout?: number }): void;
-
-/**
- * Есть ли путь до цели (спрашивает поиск пути, занимает несколько тиков).
- * @en Whether there is a path to the target (asks the pathfinder, takes a few ticks).
- */
-declare function canReach(to: Target): boolean;
-
-/**
- * Ехать следом за целью, пока `until` не вернёт true. false — цель потеряна из виду.
- * @en Follow the target until `until` returns true. false — the target was lost from sight.
- */
-declare function follow(target: Robot | Entity, until: () => boolean): boolean;
-
-/**
- * Вернуться в me.home.
- * @en Return to me.home.
- */
-declare function goHome(): void;
-
 interface Me {
   /**
    * Доехать до цели. К машине — только если она в поле зрения (иначе спроси у неё позицию сообщением).
@@ -351,7 +323,7 @@ interface Me {
    * Ехать следом за целью, пока `until` не вернёт true. false — цель потеряна из виду. Было follow.
    * @en Follow the target until `until` returns true. false — the target was lost from sight. Was follow.
    */
-  follow(target: Robot | Building, until: () => boolean): boolean;
+  follow(target: Machine | Building, until: () => boolean): boolean;
   /**
    * Вернуться в me.home. Было goHome.
    * @en Return to me.home. Was goHome.
@@ -363,49 +335,13 @@ interface Me {
 ```ts
 // Доехать до метки «склад», а если пути нет — вернуться домой
 const depot = marker("склад");
-if (canReach(depot)) move(depot, { radius: 2 });
-else goHome();
+if (me.canReach(depot)) me.move(depot, { radius: 2 });
+else me.goHome();
 ```
 
 ## Предметы
 
 ```ts
-/**
- * Добыть ресурс, стоя у месторождения. Без count — пока не заполнится груз. Возвращает, сколько добыто.
- * @en Mine a resource while standing at the patch. Without count — until the cargo is full. Returns how much was mined.
- */
-declare function mine(item: Item, count?: number): number;
-
-/**
- * Взять из здания в радиусе me.reach: выход печи и сборщика, сундук, вагон.
- * @en Take from a building within me.reach: furnace and assembler output, chest, wagon.
- */
-declare function take(from: Entity, item: Item, count?: number): number;
-
-/**
- * Положить в здание в радиусе me.reach — в нужный слот: вход печи и сборщика, топливо котла, патроны турели, наука лаборатории.
- * @en Put into a building within me.reach, into the right slot: furnace and assembler input, boiler fuel, turret ammo, lab science packs.
- */
-declare function put(into: Entity, item: Item, count?: number): number;
-
-/**
- * Подобрать предметы с земли вплотную. Без item — всё подряд.
- * @en Pick up items lying right next to the machine. Without item — everything.
- */
-declare function pickup(item?: Item, count?: number): number;
-
-/**
- * Выбросить предметы на землю.
- * @en Drop items on the ground.
- */
-declare function drop(item: Item, count?: number): number;
-
-/**
- * Передать предметы другой машине в радиусе me.reach — «из рук в руки», без сундука.
- * @en Hand items to another machine within me.reach, without a chest.
- */
-declare function give(to: Robot, item: Item, count?: number): number;
-
 interface Me {
   /**
    * Добыть ресурс, стоя у месторождения. Без count — пока не заполнится груз. Возвращает, сколько добыто. Было mine.
@@ -427,73 +363,23 @@ interface Me {
 
 ```ts
 // Накопать 20 угля и сложить в ближайший сундук
-mine("coal", 20);
-const chest = scan.entities({ type: "container" })[0];
-move(chest);
-put(chest, "coal");
+me.mine("coal", 20);
+const chest = scan.buildings({ kind: Chest })[0];
+me.move(chest);
+chest.insert("coal");
 ```
+
+Положить в здание и взять из него — методы здания: `chest.insert("coal", 5)`, `furnace.extract("iron-plate")`
+(какие у какого класса — [«Классы зданий»](#классы-зданий)); передать другой машине «из рук в руки» —
+`helper.insert("coal", 5)`. Всё — в радиусе `me.reach`, около полсекунды на действие; результат — сколько
+перенесено (частично — не ошибка).
 
 ## Здания
 
 ```ts
-interface Entity {
-  // Всегда: @en Always:
-  readonly id: number;
-  readonly valid: boolean;
-  readonly name: string;               // "stone-furnace"
-  readonly type: string;               // "furnace"
-  readonly position: Position;
-  /**
-   * Видно ли сейчас. Поля и методы ниже — только если видно, иначе ActionError("out-of-sight").
-   * @en Whether it is visible now. The fields and methods below work only while it is visible, otherwise ActionError("out-of-sight").
-   */
-  readonly inSight: boolean;
-  // Только в поле зрения: @en Only within sight:
-  readonly status: BuildingStatus;
-  readonly health: number;             // 0..1
-  readonly recipe: string | null;      // у сборщиков и печей @en for assemblers and furnaces
-  readonly progress: number;           // прогресс текущего крафта, 0..1 @en progress of the current craft, 0..1
-  count(item: Item): number;           // во всех инвентарях здания @en in all of the building's inventories
-  input(): Inventory | null;
-  output(): Inventory | null;
-  fuel(): Inventory | null;
-  fluid(name?: Fluid): number;
-}
-
 type BuildingStatus =
   | "working" | "no-input" | "output-full" | "no-fuel" | "no-power"
   | "no-recipe" | "disabled" | "idle";
-type EntityStatus = BuildingStatus;
-
-/**
- * Починить здание или машину ремкомплектами из груза (в радиусе me.reach).
- * @en Repair a building or a machine with repair packs from the cargo (within me.reach).
- */
-declare function repair(target: Entity | Robot): void;
-
-/**
- * [Наладка] Сменить рецепт сборщика; содержимое здания возвращается в груз.
- * @en [Configuration] Change an assembler's recipe; the building's contents go back to the cargo.
- */
-declare function setRecipe(machine: Entity, recipe: string): void;
-
-/**
- * [Строительство] Поставить здание из груза.
- * @en [Construction] Place a building from the cargo.
- */
-declare function build(item: Item, at: Position, direction?: Direction): Entity;
-
-/**
- * [Строительство] Разобрать здание в груз.
- * @en [Construction] Deconstruct a building into the cargo.
- */
-declare function deconstruct(target: Entity): void;
-
-/**
- * [Строительство] Повернуть здание.
- * @en [Construction] Rotate a building.
- */
-declare function rotate(target: Entity, reverse?: boolean): void;
 
 interface Me {
   /**
@@ -506,17 +392,17 @@ interface Me {
 
 ```ts
 // Печь у метки «печь»: забрать готовые плиты, без топлива — подложить угля
-move(marker("печь"), { radius: 2 });
-const furnace = scan.entities({ type: "furnace" })[0];
-take(furnace, "iron-plate");
-if (furnace.status === "no-fuel") put(furnace, "coal", 5);
+me.move(marker("печь"), { radius: 2 });
+const furnace = scan.buildings({ kind: Furnace })[0];
+furnace.extract("iron-plate");
+if (furnace.status === "no-fuel") furnace.insert("coal", 5);
 ```
 
 - Всё — в радиусе `me.reach` (иначе `out-of-reach`), около полсекунды на действие.
-- `setRecipe`: только сборщики; рецепт должен быть открыт командой и подходить зданию, иначе `invalid-target`.
-- `build`: место занято — `target-full`, предмета нет в грузе — `not-enough-items`. Машины программой не ставятся.
+- `setRecipe` (у `Assembler`): рецепт должен быть открыт командой и подходить зданию, иначе `invalid-target`.
+- `me.build`: место занято — `target-full`, предмета нет в грузе — `not-enough-items`. Машины программой не ставятся.
 - `deconstruct`: только здания своей команды; содержимое здания тоже уходит в груз, не влезает — `cargo-full`.
-  Деревья, камни и руда — это добыча (`mine`), а не разборка.
+  Деревья, камни и руда — это добыча (`me.mine`), а не разборка.
 
 ### Классы зданий
 
@@ -924,7 +810,7 @@ declare class ChargingStation extends Building {
 ```ts
 // Обойти печи зоны «плавильня»: забрать плиты, подложить уголь
 for (const furnace of zone("плавильня").find(Furnace)) {
-  move(furnace);
+  me.move(furnace);
   for (const stack of furnace.output().items()) furnace.extract(stack.name, stack.count);
   if (furnace.status === "no-fuel") furnace.insert("coal", 5);
 }
@@ -948,27 +834,11 @@ interface Tank {
    */
   pump(fluid: Fluid, amount?: number): number;
 }
-type FluidTank = Tank;
-
-/**
- * [Жидкости] Набрать в бак: воду — у берега (клетка воды в me.mineReach), нефть — стоя у месторождения.
- * Без amount — до полного бака. Возвращает, сколько набрано.
- * @en [Fluids] Fill the tank: water at the shore (a water tile within me.mineReach), crude oil while standing at the patch. Without amount — until the tank is full. Returns how much was taken.
- */
-declare function pump(fluid: Fluid, amount?: number): number;
-
-/**
- * [Жидкости] Залить из бака в здание в радиусе me.reach (котёл, резервуар, завод). Без amount — всё, что влезет.
- * @en [Fluids] Pour from the tank into a building within me.reach (boiler, storage tank, refinery). Without amount — as much as fits.
- */
-declare function fill(into: Entity, amount?: number): number;
-
-/**
- * [Жидкости] Слить из здания в бак (пар из котла, продукты нефтезавода).
- * @en [Fluids] Drain from a building into the tank (steam from a boiler, refinery products).
- */
-declare function drain(from: Entity, fluid: Fluid, amount?: number): number;
 ```
+
+Залить из бака в здание и слить из здания в бак — методы здания: `boiler.fill()`, `tank.drain("water", 200)`
+(у каких классов — [«Классы зданий»](#классы-зданий)); бак — у рабочих моделей, у других `me.tank === null`, а
+`fill` / `drain` — `ActionError("no-tank")`.
 
 - Бак держит одну жидкость; температура сохраняется (пар из котла остаётся горячим).
 - Вода — 500 ед/с, перелив в здание и из здания — 500 ед/с. Нефть — как нефтевышкой: раз в секунду
@@ -982,28 +852,16 @@ declare function drain(from: Entity, fluid: Fluid, amount?: number): number;
 // Водовоз: от берега к резервуару у котлов
 const shore = scan.water()!;
 while (true) {
-  move(shore, { radius: 2 });
-  pump("water");
-  move(marker("котельная"), { radius: 2 });
-  fill(scan.entities({ name: "storage-tank" })[0]);
+  me.move(shore, { radius: 2 });
+  me.tank!.pump("water");
+  me.move(marker("котельная"), { radius: 2 });
+  scan.buildings({ kind: StorageTank })[0].fill();
 }
 ```
 
 ## Энергия
 
 ```ts
-/**
- * Mk1: переложить топливо из груза в топливный слот. Без item — лучшее, что есть. С to — в топливный слот другой машины Mk1 в радиусе me.reach: заправщику не нужна её программа.
- * @en Mk1: move fuel from the cargo into the fuel slot. Without item — the best available. With to — into the fuel slot of another Mk1 machine within me.reach: the refueler does not need its program.
- */
-declare function refuel(item?: Item, to?: Robot): void;
-
-/**
- * Mk2+: доехать до станции (по умолчанию — ближайшей видимой) и зарядиться полностью.
- * @en Mk2+: drive to a station (by default the nearest visible one) and charge fully.
- */
-declare function charge(station?: Entity): void;
-
 /**
  * Энергия своей машины (me.energy).
  * @en Your machine's energy (me.energy).
@@ -1025,25 +883,26 @@ interface Energy {
 
 ```ts
 // Mk1 подкладывает уголь из груза, Mk2 и выше — едут на зарядную станцию
-if (me.fuel < 0.2) {
-  if (me.model === "worker-mk1") refuel("coal");
-  else charge();
+if (me.energy.level < 0.2) {
+  if (me.model === "worker-mk1") me.energy.refuel("coal");
+  else me.energy.charge();
 }
 ```
 
 ```ts
 // Заправщик: объезжает машины Mk1 рядом и подливает уголь тем, у кого меньше трети бака
 for (const robot of scan.robots()) {
-  if (robot.model === "worker-mk1" && robot.fuel < 0.3 && me.cargo.count("coal") > 0) {
-    move(robot);
-    refuel("coal", robot);
+  if (robot.model === "worker-mk1" && robot.energy.level < 0.3 && me.cargo.count("coal") > 0) {
+    me.move(robot);
+    robot.refuel("coal");
   }
 }
 ```
 
 Mk1 жжёт топливо из топливного слота; Mk2 и Mk3 работают от аккумулятора (10 и 25 МДж) и топливо
 не принимают (`refuel` — `invalid-target`). Станция заряжает на 1 МВт, пока у неё есть энергия из сети;
-с пустым аккумулятором машина до станции не доедет — её надо принести. `me.fuel` — заряд от 0 до 1.
+с пустым аккумулятором машина до станции не доедет — её надо принести. `me.energy.level` — топливо или заряд
+от 0 до 1; у другой машины — `robot.energy.level`.
 
 ## Зрение
 
@@ -1057,11 +916,6 @@ declare const scan: {
    * @en Machines of your team nearby.
    */
   robots(radius?: number): Robot[];
-  /**
-   * Здания рядом, с фильтром по имени или типу.
-   * @en Buildings nearby, filtered by name or type.
-   */
-  entities(filter?: { name?: string | string[]; type?: string | string[]; radius?: number }): Entity[];
   /**
    * Здания рядом. С kind — только этого класса и сразу с его методами: scan.buildings({ kind: Furnace }) → Furnace[].
    * @en Buildings nearby. With kind — only of that class and right away with its methods: scan.buildings({ kind: Furnace }) → Furnace[].
@@ -1091,6 +945,7 @@ declare const scan: {
 
 interface GroundItem { item: Item; count: number; position: Position }
 interface ResourcePatch { item: Item; amount: number; tiles: number; center: Position; nearest: Position }
+
 /**
  * Враг: кусака, плевака, гнездо, червь.
  * @en An enemy: biter, spitter, nest, worm.
@@ -1110,14 +965,14 @@ declare class Enemy {
 // Увидел врагов — бросаем работу, едем домой, предупреждаем игроков
 if (scan.enemies().length > 0) {
   alert(`Враги у машины ${me.name}!`);
-  goHome();
+  me.goHome();
 }
 ```
 
 ## Карта
 
 Метки и зоны ставят игроки (метка — сущность с именем, зона — прямоугольник, выделенный
-инструментом «Программатор»). Зоны «известны» всей команде, поэтому `find` работает на любом
+инструментом «Программатор»). Зоны «известны» всей команде, поэтому `zone.find` работает на любом
 расстоянии — но возвращает здания, у которых без поля зрения доступно только неизменное.
 
 ```ts
@@ -1156,12 +1011,6 @@ declare class Zone {
   find(name?: string | string[]): Building[];
 }
 
-/**
- * Здания в зоне: по имени ("stone-furnace") или по типу ({ type: "furnace" }).
- * @en Buildings in the zone: by name ("stone-furnace") or by type ({ type: "furnace" }).
- */
-declare function find(what: string | { type: string }, where: Zone): Entity[];
-
 declare const map: {
   /**
    * Метка на карте для игроков (например, найденное месторождение).
@@ -1174,7 +1023,7 @@ declare const map: {
 
 ```ts
 // Все печи зоны «плавильня»; найденное месторождение — метка на карте для игроков
-for (const furnace of find("stone-furnace", zone("плавильня"))) print(furnace.status);
+for (const furnace of zone("плавильня").find(Furnace)) print(furnace.status);
 const patches = scan.resources();
 if (patches.length > 0) map.tag(patches[0].center, `${patches[0].item}: ${patches[0].amount}`, patches[0].item);
 ```
@@ -1185,11 +1034,11 @@ if (patches.length > 0) map.tag(patches[0].center, `${patches[0].item}: ${patche
 Входящий ящик — 64 сообщения; если переполнен, самые старые выбрасываются. Данные копируются при
 отправке (у каждого получателя — своя копия), до 2 000 единиц памяти; функции и экземпляры классов
 передать нельзя (`not-serializable`). Перезапуск программы очищает ящик и её подписки (подписки других
-машин на неё остаются). `send` машине, которой нет, — `invalid-target`; `reply` на обычное сообщение —
-сообщение с той же темой.
+машин на неё остаются). `radio.send` машине, которой нет, — `invalid-target`; `reply` на обычное сообщение —
+сообщение с той же темой. Адрес — машина, её id или имя; себя (`me`) — тоже можно.
 
-**Рассылки всем нет.** Машина публикует обновления (`publish`), а получают их только машины, которые
-подписались именно на неё (`subscribe(id)` — на все её темы, `subscribe(id, "тема")` — на одну). Цена
+**Рассылки всем нет.** Машина публикует обновления (`radio.publish`), а получают их только машины, которые
+подписались именно на неё (`radio.subscribe(id)` — на все её темы, `radio.subscribe(id, "тема")` — на одну). Цена
 публикации — число её подписчиков, а не всех машин: рассылка всем на тысячах машин съедала бы весь тик.
 Найти нужную машину — по доске (`board.set("оркестратор", me.id)` у неё, `board.get` у остальных) или
 зрением (`scan.robots()`).
@@ -1201,61 +1050,17 @@ interface Message<T extends Value = Value> {
   readonly data: T;
   readonly sentAt: number;             // тик отправки @en the tick it was sent
   /**
-   * Ответить отправителю (для request).
-   * @en Reply to the sender (for request).
+   * Ответить отправителю (для radio.request).
+   * @en Reply to the sender (for radio.request).
    */
   reply(data: Value): void;
 }
 
 /**
- * Сообщение конкретной машине: по ссылке, id или имени.
- * @en A message to a specific machine: by reference, id or name.
- */
-declare function send(to: Robot | number | string, topic: string, data?: Value): void;
-
-/**
- * Опубликовать обновление: получат машины, подписанные на эту (на все её темы или на эту тему).
- * @en Publish an update: machines subscribed to this one receive it (to all its topics or to this topic).
- */
-declare function publish(topic: string, data?: Value): void;
-/**
- * Подписаться на публикации машины (по ссылке, id или имени): на все её темы или на одну.
- * @en Subscribe to a machine's publications (by reference, id or name): to all its topics or to one.
- */
-declare function subscribe(robot: Robot | number | string, topic?: string): void;
-/**
- * Отписаться от машины: от темы или (без темы) совсем.
- * @en Unsubscribe from a machine: from a topic or (without a topic) entirely.
- */
-declare function unsubscribe(robot: Robot | number | string, topic?: string): void;
-
-/**
- * Ждать сообщение (необязательно — только по теме). По таймауту (секунды) — null.
- * @en Wait for a message (optionally only on a topic). On timeout (seconds) — null.
- */
-declare function receive<T extends Value = Value>(topic?: string, timeout?: number): Message<T> | null;
-
-/**
- * Взять сообщение, если оно уже есть, не ожидая.
- * @en Take a message if one is already there, without waiting.
- */
-declare function tryReceive<T extends Value = Value>(topic?: string): Message<T> | null;
-
-/**
- * Отправить и дождаться ответа. По таймауту — ActionError("timeout").
- * @en Send and wait for the reply. On timeout — ActionError("timeout").
- */
-declare function request<T extends Value = Value>(
-  to: Robot | number | string, topic: string, data?: Value, timeout?: number,
-): T;
-
-/**
- * Ссылка на машину по id или имени (для send, сравнения, move — если видна).
- * @en A reference to a machine by id or name (for send, comparison, move — if it is visible).
+ * Ссылка на машину по id или имени (для radio.send, сравнения, me.move — если видна).
+ * @en A reference to a machine by id or name (for radio.send, comparison, me.move — if it is visible).
  */
 declare function robot(idOrName: number | string): Robot | null;
-
-declare const inbox: { readonly count: number; readonly dropped: number };
 
 /**
  * [Радиосвязь] Сообщения между машинами — на любом расстоянии. Было send, receive, … и inbox.
@@ -1266,12 +1071,12 @@ declare const radio: {
    * Сообщение конкретной машине: по ссылке, id или имени.
    * @en A message to a specific machine: by reference, id or name.
    */
-  send(to: Robot | number | string, topic: string, data?: Value): void;
+  send(to: Machine | number | string, topic: string, data?: Value): void;
   /**
    * Отправить и дождаться ответа. По таймауту — ActionError("timeout").
    * @en Send and wait for the reply. On timeout — ActionError("timeout").
    */
-  request<T extends Value = Value>(to: Robot | number | string, topic: string, data?: Value, timeout?: number): T;
+  request<T extends Value = Value>(to: Machine | number | string, topic: string, data?: Value, timeout?: number): T;
   /**
    * Ждать сообщение (необязательно — только по теме). По таймауту (секунды) — null.
    * @en Wait for a message (optionally only on a topic). On timeout (seconds) — null.
@@ -1291,25 +1096,25 @@ declare const radio: {
    * Подписаться на публикации машины (по ссылке, id или имени): на все её темы или на одну.
    * @en Subscribe to a machine's publications (by reference, id or name): to all its topics or to one.
    */
-  subscribe(robot: Robot | number | string, topic?: string): void;
+  subscribe(robot: Machine | number | string, topic?: string): void;
   /**
    * Отписаться от машины: от темы или (без темы) совсем.
    * @en Unsubscribe from a machine: from a topic or (without a topic) entirely.
    */
-  unsubscribe(robot: Robot | number | string, topic?: string): void;
+  unsubscribe(robot: Machine | number | string, topic?: string): void;
   readonly inbox: { readonly count: number; readonly dropped: number };
 };
 ```
 
 ```ts
 // Машина далеко от склада спрашивает того, кто склад видит
-const coal = request<number>("кладовщик", "сколько", "coal", 10);
+const coal = radio.request<number>("кладовщик", "сколько", "coal", 10);
 print(`На складе ${coal} угля`);
 
 // «Кладовщик» стоит у сундука и отвечает
-const chest = scan.entities({ name: "steel-chest" })[0];
+const chest = scan.buildings({ kind: Chest, name: "steel-chest" })[0];
 while (true) {
-  const msg = receive<Item>("сколько");
+  const msg = radio.receive<Item>("сколько");
   if (msg !== null) msg.reply(chest.count(msg.data));
 }
 ```
@@ -1375,7 +1180,7 @@ board.increment("уголь", 20);
 tasks.push("доставка", { item: "coal", to: "котельная" });
 const task = tasks.next<{ item: Item; to: string }>("доставка", { timeout: 30 });
 if (task !== null) {
-  move(marker(task.data.to), { radius: 2 });
+  me.move(marker(task.data.to), { radius: 2 });
   task.done();
 }
 ```
@@ -1434,7 +1239,7 @@ type Cell = string | number | { text: string; color?: Color; icon?: Item };
 ```ts
 // Табло «склад»: заголовок и полоска — сколько угля в сундуке зоны «склад»
 const screen = display("склад");
-const chest = find("wooden-chest", zone("склад"))[0];
+const chest = zone("склад").find(Chest, "wooden-chest")[0];
 screen.frame(() => {
   screen.clear("black");
   screen.text(4, 4, "Склад", { color: "yellow" });
@@ -1479,37 +1284,13 @@ interface Weapon {
    */
   patrol(points: Target[], until?: () => boolean): void;
 }
-
-/**
- * Подъехать на дальность выстрела и атаковать, пока цель не уничтожена, не пропала из виду
- * или не кончились патроны. true — цель уничтожена.
- * @en Drive within firing range and attack until the target is destroyed, lost from sight or the ammo runs out. true — the target was destroyed.
- */
-declare function attack(target: Enemy | Entity): boolean;
-
-/**
- * Стоять у точки и отбиваться от всех врагов в радиусе, пока until() не вернёт true.
- * @en Stand at the point and fight off all enemies within the radius until until() returns true.
- */
-declare function guard(at: Target, opts?: { radius?: number; until?: () => boolean }): void;
-
-/**
- * Объезжать точки по кругу, атакуя встреченных врагов, пока until() не вернёт true.
- * @en Patrol the points in a loop, attacking enemies on the way, until until() returns true.
- */
-declare function patrol(points: Target[], until?: () => boolean): void;
-
-/**
- * Зарядить оружие патронами из груза. Без ammo — лучшими, что есть.
- * @en Load the weapon with ammo from the cargo. Without ammo — the best available.
- */
-declare function reload(ammo?: Item): void;
 ```
 
 ```ts
 // Охрана: зарядить оружие и стоять у поста, пока не наступит ночь
-reload();
-guard(marker("пост"), { radius: 15, until: () => time.isNight() });
+const weapon = me.weapon!;
+weapon.reload();
+weapon.guard(marker("пост"), { radius: 15, until: () => time.isNight() });
 ```
 
 - Боевой Mk1 — пулемёт (магазины: `firearm-magazine` 5 урона за выстрел, `piercing-rounds-magazine` 8,
@@ -1519,7 +1300,8 @@ guard(marker("пост"), { radius: 15, until: () => time.isNight() });
 - `me.weapon.ammo.count` — сколько магазинов в слоте (в каждом 10 зарядов).
 - `attack` — `false`, если цель ушла из виду или кончились патроны; `guard` по умолчанию охраняет радиус
   «дальность + 5», `patrol` и `guard` проверяют `until` дважды в секунду.
-- У рабочих моделей оружия нет: `attack`, `guard`, `patrol`, `reload` — `invalid-target`.
+- У рабочих и летающих моделей оружия нет: `me.weapon === null`. Программа для боевой машины проверяет это
+  в начале (`if (me.weapon === null) exit()`) или пишет `me.weapon!`.
 
 ## Сигналы
 
@@ -1544,7 +1326,7 @@ declare const signals: {
 ```ts
 // Сигнальная метка «бак»: воды меньше 1000 — выставить в сеть сигнал P
 const tank = marker("бак");
-move(tank, { radius: 2 });
+me.move(tank, { radius: 2 });
 if (signals.read(tank, "water") < 1000) signals.write(tank, { "signal-P": 1 });
 ```
 
@@ -1595,7 +1377,7 @@ declare const world: {
 ```ts
 // Ночью — домой и ждать утра; рецепт — из справочника игры
 if (time.isNight()) {
-  goHome();
+  me.goHome();
   waitUntil(() => !time.isNight(), { every: 10 });
 }
 const gear = world.recipe("iron-gear-wheel");
@@ -1612,9 +1394,9 @@ declare class ActionError extends Error {
 type ErrorCode =
   | "no-path"            // пути нет @en no path
   | "stuck"              // путь есть, но проехать не дают (застряла) @en there is a path, but the way is blocked (stuck)
-  | "out-of-reach"       // цель дальше досягаемости — сначала move @en the target is out of reach — move first
+  | "out-of-reach"       // цель дальше досягаемости — сначала me.move @en the target is out of reach — me.move first
   | "out-of-sight"       // состояние цели не видно — подъехать или спросить того, кто видит @en the target's state is not visible — drive closer or ask someone who sees it
-  | "invalid-target"     // цель уничтожена или не существует @en the target is destroyed or does not exist
+  | "invalid-target"     // цель уничтожена, не существует или не годится @en the target is destroyed, does not exist or does not fit
   | "no-fuel"            // кончилась энергия @en out of energy
   | "no-ammo"            // кончились патроны @en out of ammo
   | "no-tank"            // fill / drain / pump у машины без бака @en fill / drain / pump on a machine without a tank
@@ -1632,7 +1414,7 @@ type ErrorCode =
 ```ts
 // Сундук полон — подождать, остальные ошибки — дальше (машина остановится с текстом ошибки)
 try {
-  put(scan.entities({ type: "container" })[0], "coal");
+  scan.buildings({ kind: Chest })[0].insert("coal");
 } catch (e) {
   if (e instanceof ActionError && e.code === "target-full") wait(5);
   else throw e;
@@ -1659,20 +1441,20 @@ try {
 
 | Исследование | Открывает |
 |---|---|
-| — (старт) | вывод, `me`, движение, предметы, состояние зданий, `repair`, `refuel`, зрение (10 клеток), карта, время и мир |
-| Радиосвязь | сообщения, `robot`, доска, задачи |
+| — (старт) | вывод, `me`, движение, предметы, классы и состояние зданий, `repair`, `refuel`, зрение (10 клеток), карта, время и мир |
+| Радиосвязь | `radio`, `robot`, доска, задачи |
 | Табло | сущность «Табло», `display` |
-| Наладка | `setRecipe` |
-| Жидкости | бак, `pump`, `fill`, `drain` |
-| Строительство | `build`, `deconstruct`, `rotate` |
+| Наладка | `setRecipe` у сборщика |
+| Жидкости | `me.tank`, `pump`, `fill` / `drain` у зданий |
+| Строительство | `me.build`, `deconstruct`, `rotate` |
 | Цепи | `signals` |
 | Сенсоры 1–3 | радиус зрения 16 / 24 / 32 клетки, `scan.enemies` (со 2-го уровня) |
-| Автоматон Mk2 / Mk3 | новые рабочие модели, `charge`, зарядная станция |
-| Боевые автоматоны 1–2 | боевые модели, `attack`, `guard`, `patrol`, `reload` |
+| Автоматон Mk2 / Mk3 | новые рабочие модели, `me.energy.charge`, зарядная станция |
+| Боевые автоматоны 1–2 | боевые модели, `me.weapon`: `attack`, `guard`, `patrol`, `reload` |
 | Летающие автоматоны 1–2 | летающие модели |
 | Скорость, груз, добыча, процессор, память, баки 1–3 | +15% скорости, +50% слотов груза, +25% скорости добычи, +50% инструкций за тик, +50% памяти, +50% бака — за уровень |
 
-Без нужного исследования функция бросает `ActionError("not-researched")`; `me.tank` без «Жидкостей» — `null`.
+Без нужного исследования функция или метод бросает `ActionError("not-researched")`; `me.tank` без «Жидкостей» — `null`.
 
 | Модель | Скорость, клеток/с | Груз | Бак | Инструкций за тик | Энергия |
 |---|---|---|---|---|---|
@@ -1690,7 +1472,7 @@ try {
 
 ```ts
 // Программа «Оркестратор»
-type Order = { furnace: Entity; ore: Item };
+type Order = { furnace: Furnace; ore: Item };
 type Done = { furnaceId: number };
 
 interface WorkerInfo { robot: Robot; name: string; status: string; busy: boolean }
@@ -1699,16 +1481,16 @@ const screen = display("штаб");
 const workers = new Map<number, WorkerInfo>();
 const assigned = new Set<number>();            // печи, на которые уже выдано задание
 
-move(zone("плавильня"));
+me.move(zone("плавильня"));
 // Рабочие находят оркестратора по доске (рассылки всем нет).
 board.set("оркестратор", me.id);
 
 function handleMail(): void {
-  for (let m = tryReceive<string>("регистрация"); m !== null; m = tryReceive<string>("регистрация")) {
+  for (let m = radio.tryReceive<string>("регистрация"); m !== null; m = radio.tryReceive<string>("регистрация")) {
     workers.set(m.from.id, { robot: m.from, name: m.data, status: "свободен", busy: false });
     m.reply("ok");
   }
-  for (let m = tryReceive<Done>("готово"); m !== null; m = tryReceive<Done>("готово")) {
+  for (let m = radio.tryReceive<Done>("готово"); m !== null; m = radio.tryReceive<Done>("готово")) {
     assigned.delete(m.data.furnaceId);
     const w = workers.get(m.from.id);
     if (w !== undefined) {
@@ -1719,7 +1501,7 @@ function handleMail(): void {
 }
 
 function assignWork(): void {
-  const hungry = scan.entities({ name: "stone-furnace" })
+  const hungry = scan.buildings({ kind: Furnace })
     .filter(f => f.count("iron-ore") < 10 && !assigned.has(f.id));
   let next = 0;
   for (const w of workers.values()) {
@@ -1730,7 +1512,7 @@ function assignWork(): void {
     w.busy = true;
     w.status = `руда → печь #${furnace.id}`;
     const order: Order = { furnace, ore: "iron-ore" };
-    send(w.robot, "задание", order);
+    radio.send(w.robot, "задание", order);
   }
 }
 
@@ -1760,7 +1542,7 @@ while (true) {
 
 ```ts
 // Программа «Рабочий»
-type Order = { furnace: Entity; ore: Item };
+type Order = { furnace: Furnace; ore: Item };
 
 function findBoss(): number {
   const near = scan.robots().find(r => r.program === "Оркестратор");
@@ -1772,22 +1554,22 @@ function findBoss(): number {
 
 const { field } = me.args<{ field: string }>();
 const boss = findBoss();
-request(boss, "регистрация", me.name, 30);
+radio.request(boss, "регистрация", me.name, 30);
 
 while (true) {
-  const msg = receive<Order>("задание");
+  const msg = radio.receive<Order>("задание");
   if (msg === null) continue;
 
   const { furnace, ore } = msg.data;
   try {
-    move(zone(field));
-    mine(ore, 50);
-    move(furnace);
-    put(furnace, ore);
+    me.move(zone(field));
+    me.mine(ore, 50);
+    me.move(furnace);
+    furnace.insert(ore);
   } catch (e) {
-    say(`Не вышло: ${e instanceof ActionError ? e.code : "?"}`);
+    me.say(`Не вышло: ${e instanceof ActionError ? e.code : "?"}`);
   } finally {
-    send(boss, "готово", { furnaceId: furnace.id });
+    radio.send(boss, "готово", { furnaceId: furnace.id });
   }
 }
 ```
@@ -1801,7 +1583,7 @@ const dirs = [[1, 0], [0, 1], [-1, 0], [0, -1]];
 let pos = me.position;
 let step = 10;
 
-for (let turn = 0; me.fuel > 0.3; turn++) {
+for (let turn = 0; me.energy.level > 0.3; turn++) {
   for (const patch of scan.resources()) {
     const key = `${patch.item}:${Math.floor(patch.center.x / 32)}:${Math.floor(patch.center.y / 32)}`;
     if (seen.has(key)) continue;
@@ -1813,14 +1595,14 @@ for (let turn = 0; me.fuel > 0.3; turn++) {
   const [dx, dy] = dirs[turn % 4];
   pos = { x: pos.x + dx * step, y: pos.y + dy * step };
   try {
-    move(pos);
+    me.move(pos);
   } catch {
     // препятствие или вода — просто следующий виток
   }
   if (turn % 2 === 1) step += 10;
 }
 
-goHome();
+me.goHome();
 ```
 
 ## Пример: патруль
@@ -1829,21 +1611,23 @@ goHome();
 // Программа «Патруль»: объезжает посты; кончаются патроны — едет в арсенал,
 // сильно повреждён — зовёт ремонтника и ждёт дома.
 const route = [marker("пост-1"), marker("пост-2"), marker("пост-3")];
-const arsenal = find("steel-chest", zone("арсенал"))[0];
-const ammoLeft = () => me.weapon?.ammo?.count ?? 0;
+const arsenal = zone("арсенал").find(Chest, "steel-chest")[0];
+const weapon = me.weapon;
+if (weapon === null) exit();                // программа для боевой машины
+const ammoLeft = () => weapon.ammo?.count ?? 0;
 
 while (true) {
   if (ammoLeft() < 20) {
-    move(arsenal);
-    take(arsenal, "firearm-magazine", 50);
-    reload();
+    me.move(arsenal);
+    arsenal.extract("firearm-magazine", 50);
+    weapon.reload();
   }
 
-  patrol(route, () => ammoLeft() < 20 || me.health < 0.4);
+  weapon.patrol(route, () => ammoLeft() < 20 || me.health < 0.4);
 
   if (me.health < 0.4) {
-    publish("нужен-ремонт", me.id);   // получат ремонтники, подписанные на эту машину
-    goHome();
+    radio.publish("нужен-ремонт", me.id);   // получат ремонтники, подписанные на эту машину
+    me.goHome();
     waitUntil(() => me.health > 0.9, { every: 2 });
   }
 }
@@ -1854,6 +1638,6 @@ while (true) {
 1. **Табло рисуется с любого расстояния**: считаю это связью, а не работой руками.
 2. **`valid` у далёких зданий и машин читается всегда**: иначе программы обрастают проверками.
    Остальное состояние — только в поле зрения.
-3. **`find` в зонах работает на любом расстоянии**, но отдаёт только неизменное (позиции, имена);
+3. **`zone.find` работает на любом расстоянии**, но отдаёт только неизменное (позиции, имена);
    состояние — в поле зрения или через сообщения.
 4. **Сигналы цепей** читаются и пишутся только у метки, как работа руками.

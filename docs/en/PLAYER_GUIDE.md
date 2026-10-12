@@ -43,12 +43,12 @@ F1 or "?" on the shortcut bar (search by name, "First steps", "Common errors").
    const item: Item = ore ?? "coal"
    const field = scan.resources().find((p) => p.item === item)!.nearest
    while (true) {
-     move(field)
-     mine(item)
+     me.move(field)
+     me.mine(item)
      // A coal miner also tops up its own fuel.
-     if (item === "coal" && me.fuel < 0.5) refuel("coal")
-     move(marker("depot"), { radius: 2 })
-     put(scan.entities({ type: "container" })[0], item)
+     if (item === "coal" && me.energy.level < 0.5) me.energy.refuel("coal")
+     me.move(marker("depot"), { radius: 2 })
+     scan.buildings({ kind: Chest })[0].insert(item)
    }
    ```
 
@@ -61,7 +61,7 @@ F1 or "?" on the shortcut bar (search by name, "First steps", "Common errors").
 4. **Smelting.** Craft a few stone furnaces and place them together. With the **Programmer** shortcut
    on the shortcut bar, drag a box around them and name the zone `smelting`. Place a second
    chest and a `plates` marker. For the third machine, write a smelter: take ore and coal from the depot, load them
-   into the zone's furnaces (`find("stone-furnace", zone("smelting"))`), collect the plates and take them to the `plates` marker.
+   into the zone's furnaces (`zone("smelting").find(Furnace)`), collect the plates and take them to the `plates` marker.
 5. **New machines** are crafted from iron plates and gears — the recipe is available from the start.
 
 More advanced ready-made examples are in the [examples](../../examples) folder: a smelter, a water carrier, a route hauler,
@@ -74,7 +74,7 @@ are commented in Russian and use Russian marker names by default (`склад` =
 
 Next comes electricity. There is no offshore pump: **machines carry water to the boilers**. Craft a boiler —
 this unlocks the **Automaton fluids** research. Put a storage tank next to the boilers (a boiler holds
-only 200 water), a `boilers` marker, and write a water carrier: `pump` at a lake, `drain` into the tank (example:
+only 200 water), a `boilers` marker, and write a water carrier: `me.tank.pump` at a lake, `fill` into the storage tank (example:
 [examples/water.ts](../../examples/water.ts), parameters `{"target": "boilers"}`). One water carrier serves about one boiler.
 
 ![A water carrier fills up at a lake and drives to the boiler](../media/water.gif)
@@ -95,7 +95,7 @@ Click a machine to open its window:
 - **Console** — the last 100 lines of `print` output and error messages; the current program line.
 - **Cargo, Fuel, Tank** — what the machine carries and how much energy it has. Standing next to it, you can move
   items by hand: click with an item in hand to put it into the cargo or the fuel slot, with an empty hand to take it.
-- **Name and Home** — the name is shown above the machine (Alt mode); home is the point for `goHome()`.
+- **Name and Home** — the name is shown above the machine (Alt mode); home is the point for `me.goHome()`.
 
 A machine you pick up remembers its name, number, energy and tank, and its program and parameters wait until
 the machine is placed again. A destroyed machine spills its cargo on the ground.
@@ -163,10 +163,10 @@ import { attempt, chestAt, nearestField } from "./lib/Помощники";
 // Mine iron ore nearby and put it into the chest at the "ore" marker.
 const field = nearestField("iron-ore");
 while (true) {
-  move(field);
-  attempt(() => mine("iron-ore", 20));
+  me.move(field);
+  attempt(() => me.mine("iron-ore", 20));
   const chest = chestAt("ore");
-  attempt(() => put(chest, "iron-ore"), "chest");
+  attempt(() => chest.insert("iron-ore"), "chest");
 }
 ```
 
@@ -176,7 +176,7 @@ A library of your own is an ordinary program with `export` in front of its funct
 // The program "lib/Depot"
 export const DEPOTS = { coal: "coal", iron: "iron" };
 
-export function stock(chest: Entity, item: Item): number {
+export function stock(chest: Chest, item: Item): number {
   return chest.count(item);
 }
 ```
@@ -249,26 +249,26 @@ const ore: Item = "iron-ore"
 let trips = 0
 
 // Functions, arrow functions, closures
-const lowOn = (item: Item, below: number) => (e: Entity) => e.count(item) < below
+const lowOn = (item: Item, below: number) => (f: Furnace) => f.count(item) < below
 
 // Objects, arrays, destructuring, ?. and ??
 const { depot = "depot" } = me.args<{ depot?: string }>()
-const hungry = scan.entities({ type: "furnace" }).filter(lowOn("coal", 5))
+const hungry = scan.buildings({ kind: Furnace }).filter(lowOn("coal", 5))
 const first = hungry[0]?.position ?? me.position
 
 // Classes and interfaces
 interface Job { ready(): boolean; run(): void }
 class Feed implements Job {
-  constructor(readonly furnace: Entity) {}
+  constructor(readonly furnace: Furnace) {}
   ready(): boolean { return this.furnace.count("coal") < 5 }
-  run(): void { move(this.furnace); put(this.furnace, "coal", 5) }
+  run(): void { me.move(this.furnace); this.furnace.insert("coal", 5) }
 }
 
 // Action errors are an ActionError with a code
 try {
-  mine(ore, 50)
+  me.mine(ore, 50)
 } catch (e) {
-  if (e instanceof ActionError && e.code === "no-resource") say("out of ore")
+  if (e instanceof ActionError && e.code === "no-resource") me.say("out of ore")
   else throw e
 }
 
@@ -284,7 +284,7 @@ expressions → string methods, `enum` → a union of strings (`type Dir = "nort
 
 ## How a machine thinks
 
-- **Actions wait.** `move`, `mine`, `put`, `take`, `pump`, `wait`… return control when the job
+- **Actions wait.** `me.move`, `me.mine`, `insert`, `extract`, `me.tank.pump`, `wait`… return control when the job
   is done. While the machine is driving, its program is paused and uses no resources.
 - **Quantum.** Each tick a machine runs up to 50 instructions (Mk2 — 100, Mk3 — 200, more with
   the **Automaton processor** research). A long loop without actions just stretches over several ticks —
@@ -293,9 +293,9 @@ expressions → string methods, `enum` → a union of strings (`type Dir = "nort
   character) and sees within `me.vision` (10 tiles; more with **Automaton sensors** and later models).
   A distant building is only known to exist — to learn its state, drive up to it or ask
   a machine that is nearby.
-- **Energy.** Mk1 burns fuel from its fuel slot (`refuel` moves it there from the cargo, `refuel("coal", robot)` —
+- **Energy.** Mk1 burns fuel from its fuel slot (`me.energy.refuel` moves it there from the cargo, `robot.refuel("coal")` —
   into a nearby machine's slot, a player puts it in through the machine window), Mk2 and up charge a battery
-  at a charging station (`charge`).
+  at a charging station (`me.energy.charge`).
 - **Memory.** Variables live while the program runs; `me.memory` survives a restart
   and the machine being picked up.
 
@@ -305,9 +305,9 @@ Not all of a program's lines run in the same tick. The rules are:
 
 1. **A loop iteration costs 1 instruction** of the quantum, and so does a call to a "long" function (one with a loop or an action).
    Ordinary expressions and short functions are free. When the quantum runs out, the program pauses until the next tick.
-2. **Waiting doesn't use the quantum.** While the machine drives, mines or waits (`wait`, `receive`), its program
+2. **Waiting doesn't use the quantum.** While the machine drives, mines or waits (`wait`, `radio.receive`), its program
    is paused and costs nothing.
-3. **A heavy call runs at once, and the machine rests afterwards.** `publish` to a thousand subscribers, `sort` of a big
+3. **A heavy call runs at once, and the machine rests afterwards.** `radio.publish` to a thousand subscribers, `sort` of a big
    array, `map` over a big array run in full in the current tick, and the machine pays off the overspend over
    the next ticks (it skips them). The costs are in [API.md, "Время программы" (program time)](../API.md#время-программы).
 
@@ -318,7 +318,7 @@ a tenth of a second, but **the world changes in the meantime**: another machine 
 
 Practical advice that follows from this:
 
-- **Check the result of an action instead of assuming it.** `take` returns how much was actually taken;
+- **Check the result of an action instead of assuming it.** `extract` returns how much was actually taken;
   if there is nothing to take, it throws `ActionError("not-enough-items")`. The `lib/Помощники` library has `attempt` for this.
 - **Don't optimize for the quantum.** A long loop just takes longer; that doesn't break the program.
 - **Wait with `wait` and actions**, not with an empty loop: waiting is free, an empty loop burns the quantum.
@@ -331,7 +331,7 @@ Action errors are an `ActionError` with a code:
 | Code | What happened |
 |---|---|
 | `no-path` / `stuck` | No path / the machine is boxed in |
-| `out-of-reach` | The building is more than 10 tiles away — `move` first |
+| `out-of-reach` | The building is more than 10 tiles away — `me.move` first |
 | `out-of-sight` | The building's state isn't visible — drive closer |
 | `invalid-target` | The target is gone or isn't suitable |
 | `no-fuel` | Out of energy |
@@ -339,15 +339,15 @@ Action errors are an `ActionError` with a code:
 | `not-enough-items` | The cargo doesn't have the item |
 | `no-resource` | Nothing to mine nearby |
 | `not-researched` | The function is unlocked by research |
-| `timeout` | The timeout ran out (`request`, `move` with `timeout`) |
+| `timeout` | The timeout ran out (`radio.request`, `me.move` with `timeout`) |
 
 ## The world: markers, zones, vision
 
 - **Marker** — a named flag that machines can drive through. `marker("depot")` is its position.
   To rename it, hover the cursor over it and type `/am-name`.
 - **Zone** — a rectangle selected with the **Programmer** (left-drag). `zone("smelting")`, and
-  `find("stone-furnace", zone("smelting"))` gives the furnaces in it at any distance.
-- **Vision** — `scan.entities(...)`, `scan.resources()`, `scan.robots()`, `scan.items()`,
+  `zone("smelting").find(Furnace)` gives the furnaces in it at any distance.
+- **Vision** — `scan.buildings(...)`, `scan.resources()`, `scan.robots()`, `scan.items()`,
   `scan.water()` and (with **Automaton sensors 2**) `scan.enemies()`: only within the vision radius, nearest first.
 - **Map** — `map.tag(position, text, icon)` puts a tag on the map for all players.
 
@@ -358,38 +358,38 @@ Action errors are an `ActionError` with a code:
 ```ts
 const field = scan.resources().find((p) => p.item === "coal")!.nearest
 while (true) {
-  move(field)
-  mine("coal")
-  if (me.fuel < 0.5) refuel("coal")
-  move(marker("depot"), { radius: 2 })
-  put(scan.entities({ type: "container" })[0], "coal")
+  me.move(field)
+  me.mine("coal")
+  if (me.energy.level < 0.5) me.energy.refuel("coal")
+  me.move(marker("depot"), { radius: 2 })
+  scan.buildings({ kind: Chest })[0].insert("coal")
 }
 ```
 
 **Feed every furnace in a zone**
 
 ```ts
-for (const furnace of find({ type: "furnace" }, zone("smelting"))) {
-  move(furnace)
-  if (furnace.count("coal") < 5) put(furnace, "coal", 5)
-  put(furnace, "iron-ore", 10)
+for (const furnace of zone("smelting").find(Furnace)) {
+  me.move(furnace)
+  if (furnace.count("coal") < 5) furnace.insert("coal", 5)
+  furnace.insert("iron-ore", 10)
 }
 ```
 
 **Ask a machine that can see the depot** (needs **Automaton radio**)
 
 ```ts
-const coal = request<number>("storekeeper", "how-many", "coal", 10)
+const coal = radio.request<number>("storekeeper", "how-many", "coal", 10)
 print(`${coal} coal in the depot`)
 ```
 
 **Share work without conflicts** — claims on the board
 
 ```ts
-for (const furnace of find({ type: "furnace" }, zone("smelting"))) {
+for (const furnace of zone("smelting").find(Furnace)) {
   if (!board.claim(`furnace-${furnace.id}`, 30)) continue  // another machine is already feeding this furnace
-  move(furnace)
-  put(furnace, "iron-ore", 20)
+  me.move(furnace)
+  furnace.insert("iron-ore", 20)
   board.release(`furnace-${furnace.id}`)
 }
 ```
@@ -402,7 +402,7 @@ tasks.push("delivery", { item: "iron-plate", to: "assembly" }, { priority: 5 })
 
 // Worker: a task not finished within 60 s goes back to the queue
 const task = tasks.next<{ item: Item; to: string }>("delivery")!
-move(marker(task.data.to))
+me.move(marker(task.data.to))
 task.done()
 ```
 
@@ -415,7 +415,7 @@ const screen = display("hq")
 screen.frame(() => {
   screen.clear("black")
   screen.text(4, 4, `Coal: ${board.get<number>("coal") ?? 0}`, { color: "yellow", size: 12 })
-  screen.bar(4, 24, screen.width - 8, 6, me.fuel, "green")
+  screen.bar(4, 24, screen.width - 8, 6, me.energy.level, "green")
 })
 ```
 
@@ -429,12 +429,12 @@ a scout, a patrol.
 | Automaton radio (in place of Logistics) | messages, `robot()`, the board, task queues |
 | Display | small and large displays, `display()` |
 | Tuning | `setRecipe` — machines change assembler recipes themselves |
-| Automaton fluids (craft a boiler) | the tank, `pump`, `fill`, `drain` |
-| Automaton construction | `build`, `deconstruct`, `rotate` |
+| Automaton fluids (craft a boiler) | the tank (`me.tank.pump`), `fill` / `drain` on buildings |
+| Automaton construction | `me.build`, `deconstruct`, `rotate` |
 | Automatons and circuits | the signal marker, `signals` |
 | Automaton sensors 1–3 | vision of 16 / 24 / 32 tiles, `scan.enemies` |
 | Automaton Mk2, Mk3 | electric models, the charging station |
-| Combat automatons 1–2 | machine gun and rocket launcher, `attack`, `guard`, `patrol`, `reload` |
+| Combat automatons 1–2 | machine gun and rocket launcher, `me.weapon`: `attack`, `guard`, `patrol`, `reload` |
 | Flying automatons 1–2 | haulers that fly in a straight line over everything |
 | Automaton speed, cargo, mining, processor, memory, tanks 1–3 | upgrades for all machines |
 
@@ -539,9 +539,9 @@ What to borrow when you build your own:
 
 | You see | Cause |
 |---|---|
-| `out-of-reach` on `put`/`take` | you forgot to `move` to the building |
+| `out-of-reach` on `insert`/`extract` | you forgot to `me.move` to the building |
 | `out-of-sight` when reading `furnace.count(…)` | the building is far away — drive closer or ask over the radio |
-| `no-path` | the target is behind water or a wall; `canReach(...)` checks in advance |
-| the machine stands still with a fuel icon | `refuel` from the cargo (Mk1) or `charge()` at a station (Mk2+) |
+| `no-path` | the target is behind water or a wall; `me.canReach(...)` checks in advance |
+| the machine stands still with a fuel icon | `me.energy.refuel()` from the cargo (Mk1) or `me.energy.charge()` at a station (Mk2+) |
 | `not-researched` | the required research isn't done yet |
 | the program is "quarantined" | fix the infinite recursion or the memory growth and publish again |

@@ -61,10 +61,10 @@ describe("связь между машинами", () => {
   test("send / receive: данные копируются, отправитель и время отправки известны", (t) => {
     const a = robotNamed("альфа")
     const b = robotNamed("бета")
-    const mb = start(b, `const m = receive<{ n: number }>("привет")!
+    const mb = start(b, `const m = radio.receive<{ n: number }>("привет")!
 print(m.data.n, m.from.name, m.topic, m.sentAt < time.tick)`)
     const ma = start(a, `const data = { n: 1 }
-send("бета", "привет", data)
+radio.send("бета", "привет", data)
 data.n = 2
 print("ok")`)
     waitUntil(t, "конца программ", finished(ma, mb), 300, () => {
@@ -78,11 +78,11 @@ print("ok")`)
     const keeper = robotNamed("кладовщик")
     const asker = robotNamed("спрашивающий")
     const silent = robotNamed("молчун")
-    const mk = start(keeper, `while (true) { const m = receive<string>("сколько")!; m.reply(m.data === "coal" ? 42 : 0) }`)
+    const mk = start(keeper, `while (true) { const m = radio.receive<string>("сколько")!; m.reply(m.data === "coal" ? 42 : 0) }`)
     const ms = start(silent, `while (true) wait(10)`)
-    const ma = start(asker, `print(request<number>("кладовщик", "сколько", "coal", 5))
-print(receive("ничего", 0.3))
-try { request("молчун", "эй", 1, 0.3) } catch (e) { print(e instanceof ActionError ? e.code : "?") }`)
+    const ma = start(asker, `print(radio.request<number>("кладовщик", "сколько", "coal", 5))
+print(radio.receive("ничего", 0.3))
+try { radio.request("молчун", "эй", 1, 0.3) } catch (e) { print(e instanceof ActionError ? e.code : "?") }`)
     waitUntil(t, "конца спрашивающего", finished(ma), 300, () => {
       expect(output(ma)).toBe("42|undefined|timeout")
       expect(mk.machine.status).toBe("waiting")
@@ -96,20 +96,20 @@ try { request("молчун", "эй", 1, 0.3) } catch (e) { print(e instanceof A
     const listener = robotNamed("слушатель")
     const all = robotNamed("всеслух")
     const deaf = robotNamed("глухой")
-    const ml = start(listener, `subscribe("диктор", "новости")
+    const ml = start(listener, `radio.subscribe("диктор", "новости")
 wait(1)
-const first = tryReceive<number>("новости")!
-print(inbox.count, inbox.dropped, first.data, tryReceive("погода") === null)`)
-    const ma = start(all, `subscribe(robot("диктор")!)
+const first = radio.tryReceive<number>("новости")!
+print(radio.inbox.count, radio.inbox.dropped, first.data, radio.tryReceive("погода") === null)`)
+    const ma = start(all, `radio.subscribe(robot("диктор")!)
 wait(1)
-print(tryReceive("погода") !== null)`)
+print(radio.tryReceive("погода") !== null)`)
     // Подписка на тему (как было с broadcast) — ошибка с подсказкой: подписываются на машину.
-    const md = start(deaf, `try { subscribe("новости") } catch (e) { print(e instanceof ActionError ? e.code : "?") }
+    const md = start(deaf, `try { radio.subscribe("новости") } catch (e) { print(e instanceof ActionError ? e.code : "?") }
 wait(1)
-print(tryReceive("новости") === null, inbox.count)`)
+print(radio.tryReceive("новости") === null, radio.inbox.count)`)
     const msd = start(sender, `wait(0.2)
-for (let i = 1; i <= 70; i++) publish("новости", i)
-publish("погода", "дождь")`)
+for (let i = 1; i <= 70; i++) radio.publish("новости", i)
+radio.publish("погода", "дождь")`)
     waitUntil(t, "конца программ", finished(ml, ma, md, msd), 300, () => {
       // 70 новостей: 6 самых старых выброшены, первая оставшаяся — №7, после неё в ящике 63; погоды нет.
       expect(output(ml)).toBe("63 6 7 true")
@@ -126,7 +126,7 @@ publish("погода", "дождь")`)
     // Подписки — напрямую, без 120 программ.
     for (const fan of fans) storage.comms.followers[speaker.id] = { ...(storage.comms.followers[speaker.id] ?? {}), [fan.id]: { "": true } }
     const m = start(speaker, `const t0 = time.tick
-publish("новость", 1)
+radio.publish("новость", 1)
 for (let i = 0; i < 3; i++) {}
 print(time.tick - t0)`)
     waitUntil(t, "конца программы", finished(m), 120, () => {
@@ -158,16 +158,16 @@ print(JSON.stringify({ a: 1 }, null, 2))`)
   test("отписка и перезапуск: свои подписки снимаются, подписки на машину остаются", (t) => {
     const source = robotNamed("источник")
     const fan = robotNamed("поклонник")
-    const mf = start(fan, `subscribe("источник")
-unsubscribe("источник")
-subscribe("источник", "a")
-unsubscribe("источник", "a")
-subscribe("источник", "b")
+    const mf = start(fan, `radio.subscribe("источник")
+radio.unsubscribe("источник")
+radio.subscribe("источник", "a")
+radio.unsubscribe("источник", "a")
+radio.subscribe("источник", "b")
 wait(1)
-print(tryReceive("a") === null, tryReceive("b") !== null)`)
+print(radio.tryReceive("a") === null, radio.tryReceive("b") !== null)`)
     const ms = start(source, `wait(0.3)
-publish("a")
-publish("b")`)
+radio.publish("a")
+radio.publish("b")`)
     waitUntil(t, "конца программ", finished(mf, ms), 300, () => {
       expect(output(mf)).toBe("true true")
       // Подписчик закончил — его подписка жива до перезапуска; перезапуск источника её не трогает.
@@ -185,7 +185,7 @@ publish("b")`)
     const b = robotNamed("найдёныш")
     const m = start(a, `const r = robot("найдёныш")!
 print(r.name, robot(r.id)!.name, robot("никто") === null)
-try { send("никто", "x") } catch (e) { print(e instanceof ActionError ? e.code : "?") }`)
+try { radio.send("никто", "x") } catch (e) { print(e instanceof ActionError ? e.code : "?") }`)
     waitUntil(t, "конца программы", finished(m), 120, () => {
       expect(output(m)).toBe("найдёныш найдёныш true|invalid-target")
       cleanup(a, b)
@@ -195,7 +195,7 @@ try { send("никто", "x") } catch (e) { print(e instanceof ActionError ? e.c
   test("без «Радиосвязи» — not-researched", (t) => {
     const a = robotNamed("немой")
     game.forces.player.technologies[TECH.radio].researched = false
-    const m = start(a, `try { send(me.id, "x") } catch (e) { print(e instanceof ActionError ? e.code : "?") }
+    const m = start(a, `try { radio.send(me.id, "x") } catch (e) { print(e instanceof ActionError ? e.code : "?") }
 try { board.get("x") } catch (e) { print(e instanceof ActionError ? e.code : "?") }`)
     waitUntil(t, "конца программы", finished(m), 120, () => {
       game.forces.player.technologies[TECH.radio].researched = true

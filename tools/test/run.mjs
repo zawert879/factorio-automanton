@@ -8,6 +8,7 @@ import { checkAssets } from "./assets.mjs"
 import { checkLocale } from "./locale.mjs"
 import { checkSource } from "./source.mjs"
 import { checkTsPlugin } from "./tsplugin.mjs"
+import { isDeclarationBlock } from "../dts/blocks.mjs"
 
 const root = join(fileURLToPath(import.meta.url), "..", "..", "..")
 const lua = join(root, "tools", "lua", "5.2", "bin", "lua")
@@ -65,7 +66,7 @@ if (filter === "--build-only") process.exit(0)
 /**
  * tests/lang/examples.generated.ts: программы из блоков ```ts в docs/API.md и docs/language-samples/3-typescript.md
  * и программы-примеры examples/*.ts
- * (без блоков с объявлениями declare — это описание API, а не программы).
+ * (без блоков с объявлениями — это описание API, а не программы: tools/dts/blocks.mjs).
  */
 function generateExamples() {
   const examples = []
@@ -76,7 +77,7 @@ function generateExamples() {
     let index = 0
     for (const match of text.matchAll(/```ts\n([\s\S]*?)```/g)) {
       index++
-      if (/\bdeclare\b/.test(match[1]) || match[1].startsWith("type Item")) continue
+      if (isDeclarationBlock(match[1])) continue
       examples.push({ name: `${file} #${index}`, source: match[1] })
     }
   }

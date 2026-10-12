@@ -1,6 +1,8 @@
 // Каталог узлов схемы (этап 15): разъёмы, настройки и код каждого вида. Действия (exec) выполняются по красным
 // проводам и дают результат, данные (без exec) — выражения, которые пересчитываются при каждом использовании,
 // как чистые узлы в Unreal. Порядок (если, циклы, попытка, функции, переменные) собирает src/graph/codegen.ts.
+// Код — API объектами (19.6): me.move, furnace.insert, radio.send. Разъём «здание» в коде — Building; узлы, которым
+// нужны методы класса (взять, положить, залить), приводят его к типу-помощнику: (x as ItemSource).extract(…).
 import { GraphNode, GraphValue, PinType } from "./model"
 
 export interface PinSpec {
@@ -186,19 +188,25 @@ action("wait-until", "flow", "cond:boolean every:number? timeout:number?", "resu
 
 // ---------- Движение ----------
 
-action("move", "move", "to:target radius:number?", "", (a) => call("move", a.to, options([["radius", a.radius]])))
-action("go-home", "move", "", "", () => "goHome()")
-action("can-reach", "move", "to:target", "result:boolean", (a) => call("canReach", a.to))
-action("follow", "move", "target:robot until:boolean", "result:boolean", (a) => call("follow", a.target, `() => ${a.until}`))
+action("move", "move", "to:target radius:number?", "", (a) => call("me.move", a.to, options([["radius", a.radius]])))
+action("go-home", "move", "", "", () => "me.goHome()")
+action("can-reach", "move", "to:target", "result:boolean", (a) => call("me.canReach", a.to))
+action("follow", "move", "target:robot until:boolean", "result:boolean", (a) => call("me.follow", a.target, `() => ${a.until}`))
 
 // ---------- Предметы ----------
 
-action("mine", "items", "item:item=coal count:number?", "result:number", (a) => call("mine", a.item, a.count))
-action("take", "items", "from:entity item:item count:number?", "result:number", (a) => call("take", a.from, a.item, a.count))
-action("put", "items", "into:entity item:item count:number?", "result:number", (a) => call("put", a.into, a.item, a.count))
-action("pickup", "items", "item:item? count:number?", "result:number", (a) => call("pickup", a.item, a.count))
-action("drop", "items", "item:item count:number?", "result:number", (a) => call("drop", a.item, a.count))
-action("give", "items", "robot:robot item:item count:number?", "result:number", (a) => call("give", a.robot, a.item, a.count))
+action("mine", "items", "item:item=coal count:number?", "result:number", (a) => call("me.mine", a.item, a.count))
+action("take", "items", "from:entity item:item count:number?", "result:number", (a, ctx) => {
+  ctx.use("ItemSource")
+  return call(`(${a.from} as ItemSource).extract`, a.item, a.count)
+})
+action("put", "items", "into:entity item:item count:number?", "result:number", (a, ctx) => {
+  ctx.use("ItemTarget")
+  return call(`(${a.into} as ItemTarget).insert`, a.item, a.count)
+})
+action("pickup", "items", "item:item? count:number?", "result:number", (a) => call("me.pickup", a.item, a.count))
+action("drop", "items", "item:item count:number?", "result:number", (a) => call("me.drop", a.item, a.count))
+action("give", "items", "robot:robot item:item count:number?", "result:number", (a) => call(`(${a.robot} as Robot).insert`, a.item, a.count))
 action("chest-at", "items", "marker:marker", "chest:entity", (a, ctx) => {
   ctx.use("chestAt")
   return call("chestAt", a.marker)
@@ -206,24 +214,32 @@ action("chest-at", "items", "marker:marker", "chest:entity", (a, ctx) => {
 
 // ---------- Здания ----------
 
-action("set-recipe", "buildings", "machine:entity recipe:string", "", (a) => call("setRecipe", a.machine, a.recipe))
+action("set-recipe", "buildings", "machine:entity recipe:string", "", (a) => call(`(${a.machine} as Assembler).setRecipe`, a.recipe))
 action("build", "buildings", "item:item at:position direction:string?", "entity:entity", (a) =>
-  call("build", a.item, a.at, a.direction === undefined ? undefined : `${a.direction} as Direction`),
+  call("me.build", a.item, a.at, a.direction === undefined ? undefined : `${a.direction} as Direction`),
 )
-action("deconstruct", "buildings", "target:entity", "", (a) => call("deconstruct", a.target))
-action("rotate", "buildings", "target:entity reverse:boolean?", "", (a) => call("rotate", a.target, a.reverse))
-action("repair", "buildings", "target:entity", "", (a) => call("repair", a.target))
+action("deconstruct", "buildings", "target:entity", "", (a) => call(`${a.target}.deconstruct`))
+action("rotate", "buildings", "target:entity reverse:boolean?", "", (a) => call(`${a.target}.rotate`, a.reverse))
+action("repair", "buildings", "target:entity", "", (a) => call(`${a.target}.repair`))
 
 // ---------- Жидкости ----------
 
-action("pump", "fluids", "fluid:fluid=water amount:number?", "result:number", (a) => call("pump", a.fluid, a.amount))
-action("fill", "fluids", "into:entity amount:number?", "result:number", (a) => call("fill", a.into, a.amount))
-action("drain", "fluids", "from:entity fluid:fluid amount:number?", "result:number", (a) => call("drain", a.from, a.fluid, a.amount))
+action("pump", "fluids", "fluid:fluid=water amount:number?", "result:number", (a) => call("me.tank!.pump", a.fluid, a.amount))
+action("fill", "fluids", "into:entity amount:number?", "result:number", (a, ctx) => {
+  ctx.use("FluidTarget")
+  return call(`(${a.into} as FluidTarget).fill`, a.amount)
+})
+action("drain", "fluids", "from:entity fluid:fluid amount:number?", "result:number", (a, ctx) => {
+  ctx.use("FluidSource")
+  return call(`(${a.from} as FluidSource).drain`, a.fluid, a.amount)
+})
 
 // ---------- Энергия ----------
 
-action("refuel", "energy", "item:item? robot:robot?", "", (a) => call("refuel", a.item, a.robot))
-action("charge", "energy", "station:entity?", "", (a) => call("charge", a.station))
+action("refuel", "energy", "item:item? robot:robot?", "", (a) =>
+  a.robot === undefined ? call("me.energy.refuel", a.item) : call(`(${a.robot} as Robot).refuel`, a.item),
+)
+action("charge", "energy", "station:entity?", "", (a) => call("me.energy.charge", a.station === undefined ? undefined : `${a.station} as ChargingStation`))
 
 // ---------- Зрение ----------
 
@@ -237,7 +253,7 @@ data("nearest-water", "vision", "", "position:position", (_a, ctx) => {
 })
 data("water-near", "vision", "radius:number?", "value:boolean", (a) => `(scan.water(${a.radius ?? "me.mineReach"}) !== null)`)
 data("entities-near", "vision", "type:string=container radius:number?", "entities:entities", (a) =>
-  call("scan.entities", options([["type", a.type], ["radius", a.radius]])),
+  `${call("scan.buildings", options([["radius", a.radius]]))}.filter((b) => b.type === ${a.type})`,
 )
 data("nearest-entity", "vision", "type:string=container", "entity:entity", (a, ctx) => {
   ctx.use("nearestEntity")
@@ -255,7 +271,7 @@ data(
   "map",
   "what:string=stone-furnace zone:zone",
   "entities:entities",
-  (a, ctx) => (ctx.node.values.by === "type" ? call("find", `{ type: ${a.what} }`, a.zone) : call("find", a.what, a.zone)),
+  (a, ctx) => (ctx.node.values.by === "type" ? `${a.zone}.find().filter((b) => b.type === ${a.what})` : call(`${a.zone}.find`, a.what)),
   [{ id: "by", kind: "enum", options: ["name", "type"], default: "name" }],
 )
 data("markers", "map", "names:string=пост-1,пост-2", "points:targets", (a, ctx) => {
@@ -265,7 +281,7 @@ data("markers", "map", "names:string=пост-1,пост-2", "points:targets", (
 
 // ---------- Своя машина ----------
 
-data("me-fuel", "me", "", "value:number", () => "me.fuel")
+data("me-fuel", "me", "", "value:number", () => "me.energy.level")
 data("me-cargo-count", "me", "item:item?", "value:number", (a) => call("me.cargo.count", a.item))
 data("me-cargo-free", "me", "item:item?", "value:number", (a) => call("me.cargo.free", a.item))
 data("me-cargo-full", "me", "", "value:boolean", () => "me.cargo.isFull()")
@@ -291,13 +307,19 @@ define({
 
 // ---------- Здания, машины, сообщения: свойства ----------
 
-data("entity-count", "objects", "entity:entity item:item", "value:number", (a) => `${a.entity}.count(${a.item})`)
+data("entity-count", "objects", "entity:entity item:item", "value:number", (a, ctx) => {
+  ctx.use("ItemTarget")
+  return `(${a.entity} as ItemTarget).count(${a.item})`
+})
 data("entity-status", "objects", "entity:entity", "value:string", (a) => `${a.entity}.status`)
 data("entity-position", "objects", "entity:entity", "value:position", (a) => `${a.entity}.position`)
-data("entity-fluid", "objects", "entity:entity fluid:fluid?", "value:number", (a) => call(`${a.entity}.fluid`, a.fluid))
+data("entity-fluid", "objects", "entity:entity fluid:fluid?", "value:number", (a, ctx) => {
+  ctx.use("FluidTarget")
+  return call(`(${a.entity} as FluidTarget).fluid`, a.fluid)
+})
 data("entity-name", "objects", "entity:entity", "value:string", (a) => `${a.entity}.name`)
 data("entity-id", "objects", "entity:entity", "value:number", (a) => `${a.entity}.id`)
-data("robot-fuel", "objects", "robot:robot", "value:number", (a) => `${a.robot}.fuel`)
+data("robot-fuel", "objects", "robot:robot", "value:number", (a) => `${a.robot}.energy.level`)
 data("robot-state", "objects", "robot:robot", "value:string", (a) => `${a.robot}.state`)
 data("robot-position", "objects", "robot:robot", "value:position", (a) => `${a.robot}.position`)
 data("robot-name", "objects", "robot:robot", "value:string", (a) => `${a.robot}.name`)
@@ -397,18 +419,20 @@ define({ kind: "call", category: "functions", exec: true, inputs: [], outputs: [
 // ---------- Вывод ----------
 
 action("print", "output", "value:value", "", (a) => call("print", a.value))
-action("say", "output", "text:string seconds:number?", "", (a) => call("say", a.text, a.seconds))
+action("say", "output", "text:string seconds:number?", "", (a) => call("me.say", a.text, a.seconds))
 action("alert", "output", "text:string", "", (a) => call("alert", a.text))
 action("chat", "output", "text:string", "", (a) => call("chat", a.text))
 
 // ---------- Команда ----------
 
-action("send", "team", "robot:robot topic:string=задача data:value?", "", (a) => call("send", a.robot, a.topic, a.data))
-action("publish", "team", "topic:string=задача data:value?", "", (a) => call("publish", a.topic, a.data))
-action("subscribe", "team", "robot:robot topic:string?", "", (a) => call("subscribe", a.robot, a.topic))
-action("receive", "team", "topic:string? timeout:number?", "message:message!", (a) => call("receive", a.topic, a.timeout))
-action("try-receive", "team", "topic:string?", "message:message!", (a) => call("tryReceive", a.topic))
-action("request", "team", "robot:robot topic:string data:value? timeout:number?", "result:value", (a) => call("request", a.robot, a.topic, a.data, a.timeout))
+action("send", "team", "robot:robot topic:string=задача data:value?", "", (a) => call("radio.send", a.robot, a.topic, a.data))
+action("publish", "team", "topic:string=задача data:value?", "", (a) => call("radio.publish", a.topic, a.data))
+action("subscribe", "team", "robot:robot topic:string?", "", (a) => call("radio.subscribe", a.robot, a.topic))
+action("receive", "team", "topic:string? timeout:number?", "message:message!", (a) => call("radio.receive", a.topic, a.timeout))
+action("try-receive", "team", "topic:string?", "message:message!", (a) => call("radio.tryReceive", a.topic))
+action("request", "team", "robot:robot topic:string data:value? timeout:number?", "result:value", (a) =>
+  call("radio.request", a.robot, a.topic, a.data, a.timeout),
+)
 action("reply", "team", "message:message data:value", "", (a) => `${a.message}.reply(${a.data})`)
 data("message-data", "team", "message:message", "value:value", (a) => `${a.message}.data`)
 data("message-from", "team", "message:message", "robot:robot", (a) => `${a.message}.from`)
@@ -444,10 +468,12 @@ action("signal-write", "team", "at:marker signal:string=signal-A value:number", 
 
 // ---------- Бой ----------
 
-action("attack", "combat", "target:enemy", "result:boolean", (a) => call("attack", a.target))
-action("guard", "combat", "at:target radius:number?", "", (a) => call("guard", a.at, options([["radius", a.radius]])))
-action("patrol", "combat", "points:targets until:boolean?", "", (a) => call("patrol", a.points, a.until === undefined ? undefined : `() => ${a.until}`))
-action("reload", "combat", "ammo:item?", "", (a) => call("reload", a.ammo))
+action("attack", "combat", "target:enemy", "result:boolean", (a) => call("me.weapon!.attack", a.target))
+action("guard", "combat", "at:target radius:number?", "", (a) => call("me.weapon!.guard", a.at, options([["radius", a.radius]])))
+action("patrol", "combat", "points:targets until:boolean?", "", (a) =>
+  call("me.weapon!.patrol", a.points, a.until === undefined ? undefined : `() => ${a.until}`),
+)
+action("reload", "combat", "ammo:item?", "", (a) => call("me.weapon!.reload", a.ammo))
 
 /** Помощники схемы: функции в конце кода — только нужные. */
 export const HELPERS: Record<string, string> = {
@@ -470,8 +496,8 @@ function nearestWater(): Position {
   return water;
 }`,
   nearestEntity: `/** Ближайшее здание этого типа; нет — сообщить и остановить программу. */
-function nearestEntity(type: string): Entity {
-  const found = scan.entities({ type })[0];
+function nearestEntity(type: string): Building {
+  const found = scan.buildings().find((b) => b.type === type);
   if (found === undefined) {
     alert(\`\${me.name}: рядом нет \${type}\`);
     exit();
@@ -479,11 +505,11 @@ function nearestEntity(type: string): Entity {
   return found;
 }`,
   chestAt: `/** Доехать до метки и найти сундук рядом с ней; нет — сообщить и остановить программу. */
-function chestAt(at: Marker): Entity {
-  move(at, { radius: 2 });
-  let best: Entity | null = null;
+function chestAt(at: Marker): Chest {
+  me.move(at, { radius: 2 });
+  let best: Chest | null = null;
   let bestDistance = Infinity;
-  for (const e of scan.entities({ type: ["container", "logistic-container"], radius: 6 })) {
+  for (const e of scan.buildings({ kind: Chest, radius: 6 })) {
     const d = (e.position.x - at.position.x) ** 2 + (e.position.y - at.position.y) ** 2;
     if (d < bestDistance) {
       best = e;
@@ -500,6 +526,14 @@ function chestAt(at: Marker): Entity {
 function markersOf(names: string): Target[] {
   return names.split(",").map((name) => marker(name));
 }`,
+  ItemSource: `/** Здания, из которых можно взять предметы (extract). */
+type ItemSource = Chest | Furnace | Assembler | RocketSilo | Lab | Reactor | Turret | CargoWagon | Vehicle;`,
+  ItemTarget: `/** Здания с предметами: положить (insert), сколько (count). */
+type ItemTarget = Chest | Furnace | Assembler | RocketSilo | Lab | Boiler | Reactor | Turret | CargoWagon | Locomotive | Vehicle;`,
+  FluidTarget: `/** Здания, в которые можно залить жидкость (fill). */
+type FluidTarget = Assembler | Boiler | Generator | StorageTank | Pipe | FlameTurret | FluidWagon;`,
+  FluidSource: `/** Здания, из которых можно слить жидкость (drain). */
+type FluidSource = Assembler | Boiler | Generator | StorageTank | Pipe | FluidWagon;`,
   writeSignal: `/** Выставить один сигнал на сигнальной метке. */
 function writeSignal(at: Marker, signal: string, value: number): void {
   const values: Record<string, number> = {};

@@ -165,11 +165,11 @@ describe("жидкости", () => {
     const result = publishProgram(
       "test-fluids",
       `print(me.tank!.fluid, me.tank!.capacity)
-pump("water", 200)
+me.tank!.pump("water", 200)
 print(me.tank!.fluid, Math.round(me.tank!.amount))
-const tank = scan.entities({ name: "storage-tank" })[0]
-print(Math.round(fill(tank, 50)), Math.round(tank.fluid("water")))
-try { drain(tank, "steam") } catch (e) { print(e instanceof ActionError ? e.code : "?") }`,
+const tank = scan.buildings({ kind: StorageTank })[0]
+print(Math.round(tank.fill(50)), Math.round(tank.fluid("water")))
+try { tank.drain("steam") } catch (e) { print(e instanceof ActionError ? e.code : "?") }`,
     )
     if (!result.ok) error(describeDiagnostics(result.diagnostics).join("; "))
     const m: MachineRecord = assignProgram(robot, result.program)

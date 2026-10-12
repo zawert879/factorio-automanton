@@ -90,7 +90,7 @@ The path is relative, from the program's folder, without an extension: the progr
 // lib/Помощники
 export interface Route { item: Item; keep?: number }
 export const FUEL: Item = "coal"
-export function chestAt(name: string): Entity | null { … }
+export function chestAt(name: string): Chest { … }
 export default class Depot { … }
 ```
 
@@ -155,7 +155,7 @@ What is checked:
 - calling a non-function, arithmetic on non-numbers (`"x" * 2`).
 
 Inferred: types of variables, call results (including generic ones: `map`, `reduce`, `find`,
-`Map<K, V>`, `receive<T>`), lambda parameters from context (`xs.map(s => s.length)`), classes
+`Map<K, V>`, `radio.receive<T>`), lambda parameters from context (`xs.map(s => s.length)`), classes
 and interfaces (structurally). Narrowing: `=== null` / `!== undefined`, `typeof x === "string"`,
 `e instanceof ActionError` and game object classes (`x instanceof Furnace || x instanceof Chest`), a discriminant
 field (`s.kind === "circle"`), early return

@@ -1,6 +1,6 @@
 // @program Патруль
 // Боевая машина объезжает посты; кончаются патроны — едет в арсенал за магазинами,
-// сильно повреждена — зовёт ремонтника и ждёт дома (ремонтник подписан на неё: subscribe(id, "нужен-ремонт")).
+// сильно повреждена — зовёт ремонтника и ждёт дома (ремонтник подписан на неё: radio.subscribe(id, "нужен-ремонт")).
 // Как запустить:
 //   1. Исследуйте «Боевые автоматоны», сделайте боевой автоматон Mk1.
 //   2. Поставьте метки «пост-1», «пост-2», «пост-3» вдоль маршрута; выделите «Программатором» зону
@@ -10,21 +10,28 @@
 const args = me.args<{ posts?: string[]; arsenal?: string; ammo?: Item }>();
 const route = (args.posts ?? ["пост-1", "пост-2", "пост-3"]).map((name) => marker(name));
 const ammo: Item = args.ammo ?? "firearm-magazine";
-const arsenal = find({ type: "container" }, zone(args.arsenal ?? "арсенал"))[0];
-const ammoLeft = () => me.weapon?.ammo?.count ?? 0;
+const arsenal = zone(args.arsenal ?? "арсенал").find(Chest)[0];
+
+// Оружие есть только у боевых моделей: у остальных me.weapon === null.
+const weapon = me.weapon;
+if (weapon === null) {
+  alert(`${me.name}: «Патруль» — программа для боевой машины`);
+  exit();
+}
+const ammoLeft = () => weapon.ammo?.count ?? 0;
 
 while (true) {
   if (ammoLeft() < 20) {
-    move(arsenal);
-    take(arsenal, ammo, 50);
-    reload();
+    me.move(arsenal);
+    arsenal.extract(ammo, 50);
+    weapon.reload();
   }
 
-  patrol(route, () => ammoLeft() < 20 || me.health < 0.4);
+  weapon.patrol(route, () => ammoLeft() < 20 || me.health < 0.4);
 
   if (me.health < 0.4) {
-    publish("нужен-ремонт", me.id);
-    goHome();
+    radio.publish("нужен-ремонт", me.id);
+    me.goHome();
     waitUntil(() => me.health > 0.9, { every: 2 });
   }
 }

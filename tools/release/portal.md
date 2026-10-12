@@ -6,10 +6,10 @@
 // Mine coal and carry it to the chest at the "depot" marker.
 const field = scan.resources().find((p) => p.item === "coal")!.nearest
 while (true) {
-  move(field)
-  mine("coal")
-  move(marker("depot"), { radius: 2 })
-  put(scan.entities({ type: "container" })[0], "coal")
+  me.move(field)
+  me.mine("coal")
+  me.move(marker("depot"), { radius: 2 })
+  scan.buildings({ kind: Chest })[0].insert("coal")
 }
 ```
 

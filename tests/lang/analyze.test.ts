@@ -35,7 +35,7 @@ describe("анализ: короткие и возобновляемые фун�
       function pure(x: number) { return x * 2 }
       function loop() { while (true) {} }
       function callsLoop() { return loop() }
-      function act() { move({ x: 1, y: 2 }) }
+      function act() { me.move({ x: 1, y: 2 }) }
       function fact(n: number): number { return n <= 1 ? 1 : n * fact(n - 1) }
       function even(n: number): boolean { return n === 0 ? true : odd(n - 1) }
       function odd(n: number): boolean { return n === 0 ? false : even(n - 1) }
@@ -54,7 +54,7 @@ describe("анализ: короткие и возобновляемые фун�
 
   test("методы: вызов по имени возобновляемого метода делает функцию возобновляемой", () => {
     const a = run(`
-      class Job { run() { mine("iron-ore", 5) } ready() { return true } }
+      class Job { run() { me.mine("iron-ore", 5) } ready() { return true } }
       const go = (j: Job) => j.run()
       const check = (j: Job) => j.ready()
     `)
@@ -67,7 +67,7 @@ describe("анализ: короткие и возобновляемые фун�
 
   test("методы высшего порядка: лямбда с действием делает вызывающую возобновляемой", () => {
     const a = run(`
-      function feed(fs: Entity[]) { fs.forEach(f => put(f, "coal", 5)) }
+      function feed(fs: Furnace[]) { fs.forEach(f => f.insert("coal", 5)) }
       function double(xs: number[]) { return xs.map(x => x * 2) }
       function apply(xs: number[], g: (x: number) => number) { return xs.map(g) }
     `)
@@ -192,6 +192,13 @@ describe("связь: рассылки всем нет", () => {
     const result = compile(`broadcast("новости", 1)`)
     expect(result.ok).toBe(false)
     expect(result.diagnostics[0].code).toBe("broadcast-removed")
-    expect(compile(`subscribe(7, "новости")\npublish("новости", 1)\nunsubscribe(7)`).ok).toBe(true)
+    expect(compile(`radio.subscribe(7, "новости")\nradio.publish("новости", 1)\nradio.unsubscribe(7)`).ok).toBe(true)
+  })
+
+  test("прежние функции API (до 19.6) — ошибка с новой записью", () => {
+    const result = compile(`move({ x: 1, y: 2 })\nput(chest, "coal")`)
+    expect(result.diagnostics.map((d) => `${d.code}:${d.params.join(",")}`).join(" ")).toBe(
+      "api-moved:move,me.move(…) unknown-name:chest api-moved:put,chest.insert(item, count)",
+    )
   })
 })

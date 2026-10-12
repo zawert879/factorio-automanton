@@ -5,12 +5,13 @@ import { createRequire } from "node:module"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import ts from "typescript"
+import { isDeclarationBlock } from "../dts/blocks.mjs"
 
 export function checkTsPlugin(root) {
   const problems = []
   const require = createRequire(import.meta.url)
   const plugin = require(join(root, "mod", "tools", "automaton-ts-plugin.js"))
-  const { unsupported, iterations, loopHint, callCost, WAITING } = plugin.internals
+  const { unsupported, iterations, loopHint, callCost, WAITING, WAITING_METHODS } = plugin.internals
   const sourceOf = (code) => ts.createSourceFile("x.ts", code, ts.ScriptTarget.ES2020, true)
   const features = (code) => unsupported(ts, sourceOf(code)).map((u) => u.feature).sort().join(",")
   const expect = (what, got, want) => {
@@ -34,7 +35,7 @@ export function checkTsPlugin(root) {
     let i = 0
     for (const m of readFileSync(join(root, doc), "utf8").matchAll(/```ts\n([\s\S]*?)```/g)) {
       i++
-      if (/\bdeclare\b/.test(m[1]) || m[1].startsWith("type Item")) continue
+      if (isDeclarationBlock(m[1])) continue
       expect(`${doc} #${i}`, features(m[1]), "")
     }
   }
@@ -47,15 +48,21 @@ export function checkTsPlugin(root) {
   expect("for…of литерала", iterations(ts, loopOf("for (const x of [1, 2, 3]) {}")), 3)
   expect("неизвестно", iterations(ts, loopOf("for (const x of items) {}")), undefined)
   expect("подсказка 1000 витков", loopHint(ts, loopOf("for (let i = 0; i < 1000; i++) {}"), "ru").short, "1000 витков: Mk1 — 20 тиков, Mk2 — 10 тиков, Mk3 — 5 тиков. ≈ 0.33 с на Mk1")
-  expect("цикл с ожиданием — без «…»", loopHint(ts, loopOf("for (let i = 0; i < 1000; i++) { move(p) }"), "ru").short, undefined)
-  const pub = sourceOf("publish('a', 1)").statements[0].expression.expression
-  expect("цена publish", (callCost(ts, pub, "ru") ?? "").startsWith("publish: 1 инструкция"), true)
+  expect("цикл с ожиданием — без «…»", loopHint(ts, loopOf("for (let i = 0; i < 1000; i++) { me.move(p) }"), "ru").short, undefined)
+  expect("ожидание метода здания", loopHint(ts, loopOf("for (let i = 0; i < 1000; i++) { furnace.insert('coal') }"), "ru").text.includes("furnace.insert"), true)
+  const pub = sourceOf("radio.publish('a', 1)").statements[0].expression.expression.name
+  expect("цена radio.publish", (callCost(ts, pub, "ru") ?? "").startsWith("radio.publish: 1 инструкция"), true)
 
   // Ожидающие функции — те же, что у компилятора (src/lang/builtins.ts, HOST_FUNCTIONS: true).
   const builtins = readFileSync(join(root, "src", "lang", "builtins.ts"), "utf8")
   const block = /const HOST_FUNCTIONS[^{]*\{([\s\S]*?)\n\}/.exec(builtins)[1]
   const blocking = [...block.matchAll(/^\s+(\w+): true,/gm)].map((m) => m[1]).sort().join(",")
   expect("ожидающие функции", [...WAITING].sort().join(","), blocking)
+  // Ожидающие методы — те же, что у компилятора (BLOCKING_OBJECT_METHODS и методы в BLOCKING_HOST_METHODS, кроме tasks.next).
+  const objectMethods = /export const BLOCKING_OBJECT_METHODS = \[([\s\S]*?)\]/.exec(builtins)[1]
+  const hostMethods = /export const BLOCKING_HOST_METHODS[^{]*\{([\s\S]*?)\n\}/.exec(builtins)[1]
+  const methods = [...objectMethods.matchAll(/"(\w+)"/g), ...hostMethods.matchAll(/(\w+): true/g)].map((m) => m[1]).filter((m) => m !== "next")
+  expect("ожидающие методы", [...WAITING_METHODS].sort().join(","), [...new Set(methods)].sort().join(","))
 
   // В языковом сервисе: ошибки — только у файлов src папки программ.
   const dir = mkdtempSync(join(tmpdir(), "automaton-tsplugin-"))

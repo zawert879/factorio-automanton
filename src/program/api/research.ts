@@ -7,7 +7,7 @@ import { Fn, host, hostBlocking, hostGetters, hostMethods, Val } from "../../lan
 import { TECH } from "../../names"
 import { actionError, currentRobot } from "../context"
 
-/** Функция API → технология. Связь, табло, цепи и бой добавятся с их этапами (9, 10). */
+/** Реализация в реестре host → технология: их вызывают radio.*, me.weapon.*, me.tank.pump, me.build; robot и display — глобальные. */
 export const REQUIRED_RESEARCH: Record<string, string> = {
   send: TECH.radio,
   publish: TECH.radio,
@@ -23,12 +23,7 @@ export const REQUIRED_RESEARCH: Record<string, string> = {
   patrol: TECH.combat1,
   reload: TECH.combat1,
   pump: TECH.fluids,
-  fill: TECH.fluids,
-  drain: TECH.fluids,
-  setRecipe: TECH.tuning,
   build: TECH.construction,
-  deconstruct: TECH.construction,
-  rotate: TECH.construction,
 }
 
 /** Методы объектов API → технология. */

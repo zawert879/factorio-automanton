@@ -17,7 +17,7 @@ const ORE_PER_FURNACE = 10;
 const COAL_PER_FURNACE = 2;
 
 while (true) {
-  const furnaces = find({ type: "furnace" }, area);
+  const furnaces = area.find(Furnace);
   if (furnaces.length === 0) {
     alert(`${me.name}: в зоне «${area.name}» нет печей`);
     exit();
@@ -25,29 +25,29 @@ while (true) {
 
   // Загрузиться на все печи сразу (то, что не влезло в печи в прошлый раз, уже в грузе).
   const source = chestAt(from);
-  if (me.fuel < 0.5) {
+  if (me.energy.level < 0.5) {
     // refuel перекладывает в топливо весь уголь из груза — поэтому до того, как брать уголь для печей.
-    attempt(() => take(source, "coal", 5), "топливо");
-    if (me.cargo.count("coal") > 0) refuel("coal");
+    attempt(() => source.extract("coal", 5), "топливо");
+    if (me.cargo.count("coal") > 0) me.energy.refuel("coal");
   }
   const needOre = ORE_PER_FURNACE * furnaces.length - me.cargo.count(ore);
   const needCoal = COAL_PER_FURNACE * furnaces.length - me.cargo.count("coal");
-  if (needOre > 0) attempt(() => take(source, ore, needOre), "руда");
-  if (needCoal > 0) attempt(() => take(source, "coal", needCoal), "уголь");
+  if (needOre > 0) attempt(() => source.extract(ore, needOre), "руда");
+  if (needCoal > 0) attempt(() => source.extract("coal", needCoal), "уголь");
 
   // Обойти печи: забрать готовое, подложить уголь и руду.
   for (const furnace of furnaces) {
-    move(furnace);
-    for (const stack of furnace.output()?.items() ?? []) attempt(() => take(furnace, stack.name, stack.count), "плиты");
-    if (me.cargo.count("coal") > 0) attempt(() => put(furnace, "coal", COAL_PER_FURNACE), "уголь в печь");
-    if (me.cargo.count(ore) > 0) attempt(() => put(furnace, ore, ORE_PER_FURNACE), "руда в печь");
+    me.move(furnace);
+    for (const stack of furnace.output().items()) attempt(() => furnace.extract(stack.name, stack.count), "плиты");
+    if (me.cargo.count("coal") > 0) attempt(() => furnace.insert("coal", COAL_PER_FURNACE), "уголь в печь");
+    if (me.cargo.count(ore) > 0) attempt(() => furnace.insert(ore, ORE_PER_FURNACE), "руда в печь");
   }
 
   // Отвезти плиты (всё, кроме руды и угля).
   const plates = me.cargo.items().filter((s) => s.name !== ore && s.name !== "coal");
   if (plates.length > 0) {
     const target = chestAt(to);
-    for (const stack of plates) attempt(() => put(target, stack.name, stack.count), "плиты в сундук");
+    for (const stack of plates) attempt(() => target.insert(stack.name, stack.count), "плиты в сундук");
   } else {
     wait(5);
   }

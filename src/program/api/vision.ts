@@ -1,6 +1,6 @@
-// Зрение (4.6): scan.robots / entities / items / resources / enemies / water — только в радиусе зрения
+// Зрение (4.6): scan.robots / buildings / items / resources / enemies / water — только в радиусе зрения
 // (Mk1 — 10 клеток), от ближнего к дальнему. Каждый взгляд стоит энергии, больше радиус — дороже.
-// scan.buildings (19.2) — как entities, но с фильтром по классу: scan.buildings({ kind: Furnace }).
+// scan.buildings (19.2) — здания, с фильтром по классу и имени: scan.buildings({ kind: Furnace }).
 import { LuaEntity, MapPosition } from "factorio:runtime"
 import { spend } from "../../automaton/energy"
 import { defineHostObject, hostMethods, Val } from "../../lang/runtime/core"
@@ -70,24 +70,6 @@ hostMethods.scan.robots = (_o: Val, _k: Val, radius: Val) => {
   const others: LuaEntity[] = []
   for (const entity of found) if (entity !== robot.entity && storage.robots.idByUnit[entity.unit_number!] !== undefined) others.push(entity)
   return programArray(byDistance(others, (e) => e.position).map((e) => robotHandle(storage.robots.idByUnit[e.unit_number!]!)))
-}
-
-hostMethods.scan.entities = (_o: Val, _k: Val, filter: Val) => {
-  const robot = currentRobot()
-  const f = type(filter) === "table" ? filter : {}
-  const r = look(f.radius)
-  const filters: Record<string, unknown> = { force: robot.entity.force_index }
-  const name = nameList(f.name)
-  const kind = nameList(f.type)
-  if (name !== undefined) filters.name = name
-  if (kind !== undefined) filters.type = kind
-  const found = seen(robot, "entities", r, filters)
-  const buildings: LuaEntity[] = []
-  for (const entity of found) {
-    if (SKIPPED_TYPES[entity.type] || MARKER_ENTITIES.includes(entity.name) || ROBOT_PLACERS.includes(entity.name)) continue
-    buildings.push(entity)
-  }
-  return programArray(byDistance(buildings, (e) => e.position).map((e) => entityHandle(e)))
 }
 
 hostMethods.scan.buildings = (_o: Val, _k: Val, filter: Val) => {

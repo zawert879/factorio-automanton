@@ -67,11 +67,11 @@ function setupExtras(): void {
   // Челноки: шесть летающих между двумя метками.
   markerAt("причал-А", at(-18, -10))
   markerAt("причал-Б", at(18, 8))
-  publishProgram("Челнок", `while (true) {\n  move(marker("причал-А"))\n  wait(0.3)\n  move(marker("причал-Б"))\n  wait(0.3)\n}`)
+  publishProgram("Челнок", `while (true) {\n  me.move(marker("причал-А"))\n  wait(0.3)\n  me.move(marker("причал-Б"))\n  wait(0.3)\n}`)
   for (let i = 0; i < 6; i++) robot(5 + (i % 2), at(-18 + i * 2, -10 + (i % 3)), "Челнок")
 
   // Бой: охранник и кусаки.
-  publishProgram("Охрана", `reload()\nguard(me.position, { radius: 20 })`)
+  publishProgram("Охрана", `me.weapon!.reload()\nme.weapon!.guard(me.position, { radius: 20 })`)
   const guard = robot(3, at(0, 45), "Охрана")
   guard.cargo.insert({ name: "piercing-rounds-magazine", count: 20 })
 

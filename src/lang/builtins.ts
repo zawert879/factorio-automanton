@@ -23,52 +23,21 @@ export interface Builtin {
   blocking?: boolean
 }
 
+/**
+ * Глобальные функции API (19.6: остальное — методы объектов: me.move, furnace.insert, radio.send, …). Значение —
+ * ждёт ли вызов. Реализации действий остаются в реестре host (на них ссылаются методы), но имён у программы нет.
+ */
 const HOST_FUNCTIONS: Record<string, boolean> = {
   // Вывод
   print: false,
-  say: false,
   chat: false,
   alert: false,
-  // Движение и действия
-  move: true,
-  canReach: true,
-  follow: true,
-  goHome: true,
-  mine: true,
-  take: true,
-  put: true,
-  pickup: true,
-  drop: true,
-  give: true,
-  repair: true,
-  setRecipe: true,
-  build: true,
-  deconstruct: true,
-  rotate: true,
-  pump: true,
-  fill: true,
-  drain: true,
-  refuel: true,
-  charge: true,
-  attack: true,
-  guard: true,
-  patrol: true,
-  reload: true,
-  // Карта
+  // Поиск по имени
   marker: false,
   zone: false,
-  find: false,
-  // Связь
-  send: false,
-  publish: false,
-  subscribe: false,
-  unsubscribe: false,
-  receive: true,
-  tryReceive: false,
-  request: true,
   robot: false,
   display: false,
-  // Время
+  // Время и управление программой
   wait: true,
   waitUntil: true,
   exit: false,
@@ -95,7 +64,7 @@ export const BLOCKING_HOST_METHODS: Record<string, Record<string, boolean>> = {
   radio: { receive: true, request: true },
 }
 
-const HOST_OBJECTS = ["me", "console", "scan", "map", "radio", "board", "tasks", "signals", "time", "world", "inbox"]
+const HOST_OBJECTS = ["me", "console", "scan", "map", "radio", "board", "tasks", "signals", "time", "world"]
 const LIBRARY_OBJECTS = ["Math", "Object", "Array", "JSON", "Number", "String"]
 // Классы объектов игры (19.2) — тоже встроенные классы: значения для instanceof и поиска по классу.
 const LIBRARY_CLASSES = ["Map", "Set", "Error", "TypeError", "RangeError", "SyntaxError", "ActionError", ...HOST_CLASSES.map(([name]) => name)]

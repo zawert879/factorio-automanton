@@ -35,6 +35,7 @@ export function findTeammate(value: Val): RobotRecord | undefined {
   const force = currentRobot().entity.force as LuaForce
   let record: RobotRecord | undefined
   if (type(value) === "table" && value.__t === "host" && value.__h === "robot") record = storage.robots.byId[value.__id]
+  else if (type(value) === "table" && value.__t === "host" && value.__h === "me") record = currentRobot()
   else if (type(value) === "number") record = storage.robots.byId[value as number]
   else if (type(value) === "string") {
     for (const [, candidate] of pairs(storage.robots.byId)) {
@@ -110,10 +111,6 @@ host.publish = (topic: Val, data: Val) => {
 }
 
 /** Старые программы (до подписок на машину): понятная ошибка вместо «нет такой функции». */
-host.broadcast = () => {
-  actionError("invalid-target", "broadcast removed: publish(topic, data) reaches robots subscribed to you with subscribe(id, topic)")
-}
-
 host.subscribe = (robot: Val, topic: Val) => {
   const source = findTeammate(robot)
   if (source === undefined) {

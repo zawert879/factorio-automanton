@@ -96,7 +96,7 @@ print(b.add(), t.add(), t instanceof Base)`
     expect(outputOf(source, { modules: { shapes: lib } })).toBe("2 2 true")
   })
   test("действия внутри функции библиотеки (возобновляемая функция другого модуля)", () => {
-    const lib = `export function slow(n: number): string {\n  wait(1)\n  move("x")\n  return "done " + n\n}`
+    const lib = `export function slow(n: number): string {\n  wait(1)\n  me.move("x")\n  return "done " + n\n}`
     const source = `import { slow } from "./slow"\nimport * as L from "./slow"\nprint(slow(1))\nprint(L.slow(2))\nconst f = (x: number) => slow(x)\nprint([3].map(f).join(","))`
     expect(outputOf(source, { modules: { slow: lib } })).toBe("done 1|done 2|done 3")
   })

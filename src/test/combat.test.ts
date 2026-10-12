@@ -60,9 +60,9 @@ describe("бой", () => {
       robot,
       "test-reload",
       `print(me.weapon!.type, me.weapon!.ammo === null, me.weapon!.range)
-reload()
+me.weapon!.reload()
 print(me.weapon!.ammo!.name, me.weapon!.ammo!.count, me.cargo.count("piercing-rounds-magazine"))
-reload("firearm-magazine")
+me.weapon!.reload("firearm-magazine")
 print(me.weapon!.ammo!.name, me.cargo.count("piercing-rounds-magazine"), me.cargo.count("firearm-magazine"))`,
       200,
       (output) => {
@@ -84,7 +84,7 @@ print(me.weapon!.ammo!.name, me.cargo.count("piercing-rounds-magazine"), me.carg
       robot,
       "test-attack",
       `const enemy = scan.enemies()[0]
-print(attack(enemy), enemy.valid)`,
+print(me.weapon!.attack(enemy), enemy.valid)`,
       600,
       (output) => {
         player().technologies[TECH.sensors2].researched = false
@@ -96,7 +96,7 @@ print(attack(enemy), enemy.valid)`,
         const target = nauvis().create_entity({ name: "small-biter", position: { x: -705.5, y: 415.5 }, force: "enemy" })!
         target.commandable!.set_command({ type: defines.command.stop, distraction: defines.distraction.none })
         player().technologies[TECH.sensors2].researched = true
-        run(t, robot, "test-no-ammo", `try { attack(scan.enemies()[0]) } catch (e) { print(e instanceof ActionError ? e.code : "?") }`, 120, (second) => {
+        run(t, robot, "test-no-ammo", `try { me.weapon!.attack(scan.enemies()[0]) } catch (e) { print(e instanceof ActionError ? e.code : "?") }`, 120, (second) => {
           player().technologies[TECH.sensors2].researched = false
           // Консоль машины хранит и строки прошлой программы — нужна последняя.
           const lines = second.split("|")
@@ -125,7 +125,7 @@ print(attack(enemy), enemy.valid)`,
       robot,
       "test-patrol",
       `let reachedB = false
-patrol([marker("пост-а"), marker("пост-б")], () => {
+me.weapon!.patrol([marker("пост-а"), marker("пост-б")], () => {
   if (me.distance(marker("пост-б")) < 3) reachedB = true
   return reachedB && me.distance(marker("пост-а")) < 3
 })
@@ -146,7 +146,7 @@ print("круг")`,
     robot.weapon!.insert({ name: "firearm-magazine", count: 5 })
     const biter = nauvis().create_entity({ name: "small-biter", position: { x: -695.5, y: 495.5 }, force: "enemy" })!
     biter.commandable!.set_command({ type: defines.command.stop, distraction: defines.distraction.none })
-    run(t, robot, "test-guard", `guard(me.position, { radius: 15, until: () => scan.enemies().length === 0 })\nprint("чисто")`, 900, (output) => {
+    run(t, robot, "test-guard", `me.weapon!.guard(me.position, { radius: 15, until: () => scan.enemies().length === 0 })\nprint("чисто")`, 900, (output) => {
       player().technologies[TECH.sensors2].researched = false
       expect(output).toBe("чисто")
       expect(biter.valid).toBe(false)

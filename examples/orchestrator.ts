@@ -8,7 +8,7 @@
 //   3. Одна машина — «Оркестратор», несколько — «Рабочий» с параметром {"field": "<зона с рудой>"}.
 // Параметры (необязательно): {"zone": "плавильня", "display": "штаб", "ore": "iron-ore"}.
 
-type Order = { furnace: Entity; ore: Item };
+type Order = { furnace: Furnace; ore: Item };
 type Done = { furnaceId: number };
 
 interface WorkerInfo { robot: Robot; name: string; status: string; busy: boolean }
@@ -28,16 +28,16 @@ function findScreen(): Display | null {
 }
 const screen = findScreen();
 
-move(zone(args.zone ?? "плавильня"));
+me.move(zone(args.zone ?? "плавильня"));
 // Рабочие находят оркестратора по доске (рассылки всем нет).
 board.set("оркестратор", me.id);
 
 function handleMail(): void {
-  for (let m = tryReceive<string>("регистрация"); m !== null; m = tryReceive<string>("регистрация")) {
+  for (let m = radio.tryReceive<string>("регистрация"); m !== null; m = radio.tryReceive<string>("регистрация")) {
     workers.set(m.from.id, { robot: m.from, name: m.data, status: "свободен", busy: false });
     m.reply("ok");
   }
-  for (let m = tryReceive<Done>("готово"); m !== null; m = tryReceive<Done>("готово")) {
+  for (let m = radio.tryReceive<Done>("готово"); m !== null; m = radio.tryReceive<Done>("готово")) {
     assigned.delete(m.data.furnaceId);
     const w = workers.get(m.from.id);
     if (w !== undefined) {
@@ -48,7 +48,7 @@ function handleMail(): void {
 }
 
 function assignWork(): void {
-  const hungry = scan.entities({ type: "furnace" })
+  const hungry = scan.buildings({ kind: Furnace })
     .filter(f => f.count(ore) < 10 && !assigned.has(f.id));
   let next = 0;
   for (const w of workers.values()) {
@@ -59,7 +59,7 @@ function assignWork(): void {
     w.busy = true;
     w.status = `руда → печь #${furnace.id}`;
     const order: Order = { furnace, ore };
-    send(w.robot, "задание", order);
+    radio.send(w.robot, "задание", order);
   }
 }
 

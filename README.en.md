@@ -15,10 +15,10 @@ to the boiler, feed the assemblers and labs. Not a single belt.*
 // The "Miner" program: mines coal and carries it to the chest at a marker
 const field = scan.resources().find((p) => p.item === "coal")!.nearest
 while (true) {
-  move(field)
-  mine("coal")
-  move(marker("depot"), { radius: 2 })
-  put(scan.entities({ type: "container" })[0], "coal")
+  me.move(field)
+  me.mine("coal")
+  me.move(marker("depot"), { radius: 2 })
+  scan.buildings({ kind: Chest })[0].insert("coal")
 }
 ```
 

@@ -20,17 +20,22 @@ if (scan.water(me.mineReach) === null) {
     alert(`${me.name}: рядом нет воды — поставьте машину у берега`);
     exit();
   }
-  move(water, { radius: 2 });
+  me.move(water, { radius: 2 });
   shore = me.position;
+}
+
+/** Резервуары и котлы у метки (сначала резервуары). */
+function tanksNear(): (StorageTank | Boiler)[] {
+  return [...scan.buildings({ kind: StorageTank, radius: 8 }), ...scan.buildings({ kind: Boiler, radius: 8 })];
 }
 
 /** Залить бак в резервуары и котлы у метки; true — что-то залилось. */
 function unload(): boolean {
   let poured = 0;
-  for (const building of scan.entities({ type: ["storage-tank", "boiler"], radius: 8 })) {
+  for (const building of tanksNear()) {
     if (me.tank!.amount <= 0) break;
     try {
-      poured += fill(building);
+      poured += building.fill();
     } catch (e) {
       if (!(e instanceof ActionError) || e.code !== "target-full") throw e;
     }
@@ -40,22 +45,22 @@ function unload(): boolean {
 
 /** Топливо — из сундука у метки. */
 function refill(): void {
-  if (me.fuel >= 0.3) return;
-  const chest = scan.entities({ type: ["container", "logistic-container"], radius: 8 })[0];
+  if (me.energy.level >= 0.3) return;
+  const chest = scan.buildings({ kind: Chest, radius: 8 })[0];
   if (chest === undefined || chest.count("coal") === 0) {
-    say("Мало топлива: положите уголь в сундук у метки", 10);
+    me.say("Мало топлива: положите уголь в сундук у метки", 10);
     return;
   }
-  take(chest, "coal", 10);
-  refuel("coal");
+  chest.extract("coal", 10);
+  me.energy.refuel("coal");
 }
 
 while (true) {
-  move(shore, { radius: 2 });
-  pump("water");
-  move(marker(targetName), { radius: 2 });
+  me.move(shore, { radius: 2 });
+  me.tank!.pump("water");
+  me.move(marker(targetName), { radius: 2 });
   refill();
-  if (scan.entities({ type: ["storage-tank", "boiler"], radius: 8 }).length === 0) {
+  if (tanksNear().length === 0) {
     alert(`${me.name}: у метки «${targetName}» нет ни резервуара, ни котла`);
     exit();
   }

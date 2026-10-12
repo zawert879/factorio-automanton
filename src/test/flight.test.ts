@@ -65,20 +65,22 @@ describe("летающие машины", () => {
     })
   })
 
-  test("программа: move, canReach, me.position; не добывает, бака нет", (t) => {
+  test("программа: move, canReach, me.position; не добывает, бака нет — fill у здания: no-tank", (t) => {
     const robot = placeFlyer({ x: -800.5, y: 540.5 })
+    const tank = game.get_surface("nauvis")!.create_entity({ name: "storage-tank", position: { x: -778.5, y: 543.5 }, force: "player" })!
     const result = publishProgram(
       "test-flyer",
-      `print(me.model, canReach({ x: -780, y: 540 }), me.tank === null)
-move({ x: -780.5, y: 540.5 })
+      `print(me.model, me.canReach({ x: -780, y: 540 }), me.tank === null)
+me.move({ x: -780.5, y: 540.5 })
 print(Math.round(me.position.x)) // останавливается в 0.5 клетки от точки
-try { mine("iron-ore") } catch (e) { print(e instanceof ActionError ? e.code : "?") }
-try { pump("water") } catch (e) { print(e instanceof ActionError ? e.code : "?") }`,
+try { me.mine("iron-ore") } catch (e) { print(e instanceof ActionError ? e.code : "?") }
+try { scan.buildings({ kind: StorageTank })[0].fill() } catch (e) { print(e instanceof ActionError ? e.code : "?") }`,
     )
     if (!result.ok) error(describeDiagnostics(result.diagnostics).join("; "))
     const m = assignProgram(robot, result.program)
     waitUntil(t, "конца программы", () => m.machine.status === "done" || m.machine.status === "error", 300, () => {
       expect(m.console.filter((line) => !line.startsWith("—")).join("|")).toBe("flyer-mk1 true true|-781|invalid-target|no-tank")
+      tank.destroy()
       robot.entity.destroy()
     })
   })

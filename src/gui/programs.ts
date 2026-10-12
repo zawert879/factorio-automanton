@@ -292,7 +292,7 @@ function windowOf(player: LuaPlayer): ProgramsWindow | undefined {
 /** Строка программы в списке: последняя часть имени, версия, пометки. */
 function programItem(p: ProgramRecord, indent: string): LocalisedString {
   const short = p.name.split("/").pop()!
-  const warn = p.quarantined || p.stale !== undefined ? "⚠ " : ""
+  const warn = p.quarantined || p.stale !== undefined || p.outdated !== undefined ? "⚠ " : ""
   if (p.graph !== undefined) return ["", `${indent}${warn}[color=${GRAPH_COLOR}]▦[/color] ${short} v${p.version} · `, ["automaton-workshop.graph-badge"]]
   if (!p.library) return `${indent}${warn}${short} v${p.version}`
   return ["", `${indent}${warn}[color=${LIBRARY_COLOR}]${short}[/color] v${p.version} · `, ["automaton-gui.library-badge"]]
@@ -437,6 +437,19 @@ function showNotes(window: ProgramsWindow, program: ProgramRecord): void {
     const label = window.notes.add({ type: "label", caption: ["automaton-gui.used-by", users.join(", ")] })
     label.style.single_line = false
     label.style.maximal_width = 900
+  }
+  const outdated = program.outdated
+  if (outdated !== undefined) {
+    // Обновление мода (19.6): текст на прежнем API не собирается — машины стоят.
+    const first = outdated[0]
+    const label = window.notes.add({
+      type: "label",
+      caption: ["automaton-gui.outdated", first === undefined ? "" : diagnosticText(first)],
+      tags: first === undefined ? {} : { action: "programs-goto", line: first.line, module: first.module ?? "" },
+    })
+    label.style.single_line = false
+    label.style.maximal_width = 900
+    label.style.font_color = { r: 1, g: 0.45, b: 0.35 }
   }
   const stale = program.stale
   if (stale !== undefined) {

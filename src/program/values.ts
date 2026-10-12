@@ -2,7 +2,16 @@
 // для параметров, памяти и сообщений.
 import { MapPosition } from "factorio:runtime"
 import { charge, Val } from "../lang/runtime/core"
-import { actionError } from "./context"
+import { actionError, currentRobot } from "./context"
+
+/** Обёртка машины (Robot): одна на машину, чтобы === и ключи Map работали. Здесь, а не в handles.ts, — её берёт copyValue. */
+export function robotHandle(id: number): Val {
+  const existing = storage.handles.robots[id]
+  if (existing !== undefined) return existing
+  const handle = { __t: "host", __h: "robot", __id: id }
+  storage.handles.robots[id] = handle
+  return handle
+}
 
 /** Виды обёрток, которые можно хранить и передавать (ссылки на объекты игры). */
 const SHAREABLE_HANDLES: Record<string, boolean> = { entity: true, robot: true, marker: true, zone: true }
@@ -38,6 +47,8 @@ export function copyValue(value: Val, depth = 0): Val {
   if (depth > 50) actionError("limit-exceeded", "data is nested too deeply")
   if (value.__t === "host") {
     if (SHAREABLE_HANDLES[value.__h]) return value
+    // me (19.6: Value включает Machine) — ссылка на эту машину как на Robot: у получателя это другая машина.
+    if (value.__h === "me") return robotHandle(currentRobot().id)
     actionError("not-serializable")
   }
   if (value.__f !== undefined || value.__hf !== undefined || value.__lf !== undefined || value.__k !== undefined) actionError("not-serializable")

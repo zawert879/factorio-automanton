@@ -89,7 +89,7 @@
 // lib/Помощники
 export interface Route { item: Item; keep?: number }
 export const FUEL: Item = "coal"
-export function chestAt(name: string): Entity | null { … }
+export function chestAt(name: string): Chest { … }
 export default class Depot { … }
 ```
 
@@ -154,7 +154,7 @@ const chest = H.chestAt("склад")
 - вызов не-функции, арифметика не над числами (`"x" * 2`).
 
 Выводятся типы переменных, результатов вызовов (в том числе обобщённых: `map`, `reduce`, `find`,
-`Map<K, V>`, `receive<T>`), параметров лямбд из контекста (`xs.map(s => s.length)`), классов
+`Map<K, V>`, `radio.receive<T>`), параметров лямбд из контекста (`xs.map(s => s.length)`), классов
 и интерфейсов (структурно). Сужение: `=== null` / `!== undefined`, `typeof x === "string"`,
 `e instanceof ActionError` и классы объектов игры (`x instanceof Furnace || x instanceof Chest`), поле-дискриминант
 (`s.kind === "circle"`), ранний выход
