@@ -148,14 +148,15 @@ elseif step == 23 and wait == 75 then
   log("machines only: cursor=" .. tostring(player.cursor_stack.valid_for_read and player.cursor_stack.name))
   player.clear_cursor()
   step, wait = 30, 0
--- 4. Строительные роботы: призраки машин с тегами у робопорта, предметы — в сундуке хранения.
+-- 4. Строительные дроны персональной дронстанции (дронстанций-зданий нет, 21.1): призраки машин с тегами,
+-- машины и дроны — в инвентаре игрока.
 elseif step == 30 and wait > 10 then
-  local port = s.create_entity{name = "roboport", position = {0, 14}, force = "player"}
-  s.create_entity{name = "electric-energy-interface", position = {4, 14}, force = "player"}
-  s.create_entity{name = "medium-electric-pole", position = {2, 12}, force = "player"}
-  port.insert{name = "construction-robot", count = 10}
-  local chest = s.create_entity{name = "storage-chest", position = {-3.5, 12.5}, force = "player"}
-  chest.insert{name = "automaton-worker-mk1", count = 5}
+  local armor = player.get_inventory(defines.inventory.character_armor)
+  armor.insert{name = "power-armor-mk2"}
+  armor[1].grid.put{name = "fission-reactor-equipment"}
+  armor[1].grid.put{name = "personal-roboport-mk2-equipment"}
+  player.insert{name = "construction-robot", count = 10}
+  player.insert{name = "automaton-worker-mk1", count = 5}
   s.create_entity{name = "entity-ghost", inner_name = "automaton-worker-mk1-placer", position = {6.5, 16.5}, force = "player", tags = { automaton = { program = "sim/work", args = "{\\"ore\\":\\"coal\\"}" } }}
   s.create_entity{name = "entity-ghost", inner_name = "automaton-worker-mk1-placer", position = {8.5, 16.5}, force = "player", tags = { automaton = { program = "нет-такой" } }}
   step, wait = 31, 0
@@ -232,7 +233,7 @@ check(result.handBuilt === "sim/work", "рукой поверх призрака
 // Ограничение игры: в рамке нет ничего, что игра кладёт в чертёж, — чертёж не создаётся и события нет.
 check(machines(result.machinesOnly).length === 0, "рамка над одними машинами: игра чертёж не создаёт (известное ограничение, в рамке нужно здание)")
 const robotBuilt = arr(result.robotBuilt)
-check(robotBuilt.length === 2, "строительные роботы построили обе машины")
-check(robotBuilt.some((r) => r.program === "sim/work" && r.ore === "coal"), "робот: программа и параметры из тега")
-check(robotBuilt.some((r) => r.program === undefined), "робот: программы нет у команды — без программы")
+check(robotBuilt.length === 2, "дроны персональной дронстанции построили обе машины")
+check(robotBuilt.some((r) => r.program === "sim/work" && r.ore === "coal"), "дрон: программа и параметры из тега")
+check(robotBuilt.some((r) => r.program === undefined), "дрон: программы нет у команды — без программы")
 if (failures.length > 0) process.exit(1)

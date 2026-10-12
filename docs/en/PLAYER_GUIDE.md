@@ -1,7 +1,8 @@
 # Automaton — player guide
 
-This game has no belts, drills, inserters, logistic robots or offshore pump.
-Their work is done by **automatons** — machines that run your TypeScript programs.
+This game has no belts, drills, inserters, logistic or combat robots, roboports or offshore pump.
+Their work is done by **automatons** — machines that run your TypeScript programs. Construction robots
+stay: they work from a personal roboport in your armor and build blueprints around you.
 You build the factory from routes and algorithms instead of belts: "drive to the ore, mine it, take it to the furnace".
 
 ![A science factory run by machines](../media/factory.gif)

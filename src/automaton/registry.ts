@@ -138,7 +138,7 @@ function forgetUnit(unitNumber: number, reason: "mined" | "destroyed"): void {
 }
 
 /** Переложить всё из инвентаря в другой; что не влезло — высыпать на землю. */
-function moveAll(from: LuaInventory, to: LuaInventory | undefined, surface: LuaSurface, position: MapPosition): void {
+export function moveAll(from: LuaInventory, to: LuaInventory | undefined, surface: LuaSurface, position: MapPosition): void {
   for (let i = 0; i < from.length; i++) {
     const stack = from[i]
     if (!stack.valid_for_read) continue

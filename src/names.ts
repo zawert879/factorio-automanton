@@ -262,7 +262,10 @@ export const TECH = {
   flying2: "automaton-flying-2",
 } as const
 
-/** Типы сущностей, которые убирает мод (src/prototypes/removal.ts; логистические сундуки — кроме сундука хранения). */
+/**
+ * Типы сущностей, которые убирает мод (src/prototypes/removal.ts). Дроны остаются только строительные, у игрока
+ * с персональной дронстанцией (21.1): дронстанция, все логистические сундуки и боевые дроны (их капсулы) убраны.
+ */
 export const REMOVED_ENTITY_TYPES = [
   "transport-belt",
   "underground-belt",
@@ -275,6 +278,9 @@ export const REMOVED_ENTITY_TYPES = [
   "mining-drill",
   "logistic-robot",
   "offshore-pump",
+  "roboport",
+  "logistic-container",
+  "combat-robot",
 ]
 
 /** Улучшения исследованиями (8.3): технологии `<tech>-1..3`; каждый уровень добавляет step к множителю. */

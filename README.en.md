@@ -3,8 +3,8 @@
 # Automaton
 
 **Factorio without belts.** An overhaul for Factorio 2.0 (base game only): there are no belts, drills, inserters,
-logistic robots or offshore pump — their work is done by **automatons**, machines that run your
-TypeScript programs. You build the factory from routes and algorithms instead of belts.
+logistic or combat robots, roboports or offshore pump — their work is done by **automatons**, machines that run your
+TypeScript programs. Construction robots stay — they work from a personal roboport in your armor. You build the factory from routes and algorithms instead of belts.
 
 ![A red and green science factory run by machines](docs/media/factory.gif)
 

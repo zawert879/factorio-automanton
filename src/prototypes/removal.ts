@@ -1,5 +1,6 @@
-// Удаление ванили (этап 6): конвейеры, манипуляторы, буры (и нефтевышка), логистические роботы и сундуки
-// (кроме сундука хранения), прибрежный насос — их работу делают автоматоны. Работает по типам прототипов, поэтому
+// Удаление ванили (этап 6): конвейеры, манипуляторы, буры (и нефтевышка), логистические дроны и сундуки,
+// прибрежный насос — их работу делают автоматоны. С 21.1 — и дронстанция, сундук хранения, боевые дроны: дроны
+// остаются только строительные, у игрока с персональной дронстанцией. Работает по типам прототипов, поэтому
 // задевает и такие же здания других модов. Вызывается в data-final-fixes.
 //
 // 6.1 Прототипы не удаляются, а скрываются (hidden): на их имена ссылаются достижения, симуляции,
@@ -20,6 +21,7 @@ const REMOVED_MODIFIERS: Record<string, boolean> = {
   "inserter-stack-size-bonus": true,
   "bulk-inserter-capacity-bonus": true,
   "belt-stack-size-bonus": true,
+  "maximum-following-robots-count": true,
 }
 
 type Proto = Record<string, any>
@@ -28,6 +30,19 @@ const raw = data.raw as unknown as Record<string, Record<string, Proto> | undefi
 function hide(proto: Proto): void {
   proto.hidden = true
   proto.hidden_in_factoriopedia = true
+}
+
+/** Создаёт ли действие (капсулы, снаряда) удалённую сущность: create-entity прямо или через брошенный снаряд. */
+function createsRemoved(value: unknown, removed: Set<string>, seen: Set<string>, depth: number): boolean {
+  if (type(value) !== "table" || depth > 20) return false
+  const action = value as Proto
+  if (typeof action.entity_name === "string" && removed.has(action.entity_name)) return true
+  if (typeof action.projectile === "string" && !seen.has(action.projectile)) {
+    seen.add(action.projectile)
+    if (createsRemoved(raw.projectile?.[action.projectile]?.action, removed, seen, depth + 1)) return true
+  }
+  for (const [, item] of pairs(action)) if (createsRemoved(item, removed, seen, depth + 1)) return true
+  return false
 }
 
 /** Ингредиенты и результаты рецепта в 2.0: { type, name, amount } (у результатов возможны amount_min/max). */
@@ -48,11 +63,6 @@ export function removeVanilla(): void {
       hide(proto)
     }
   }
-  for (const [name, proto] of pairs(raw["logistic-container"] ?? {})) {
-    if (proto.logistic_mode === "storage") continue
-    removedEntities.add(name)
-    hide(proto)
-  }
   // Улучшение (next_upgrade) требует видимого предмета у цели: у удалённых и ведущих к удалённым — убрать.
   for (const [, prototypes] of pairs(raw as Record<string, Record<string, Proto>>)) {
     for (const [name, proto] of pairs(prototypes)) {
@@ -63,7 +73,9 @@ export function removeVanilla(): void {
   const removedItems = new Set<string>()
   for (const [itemType] of pairs(defines.prototypes.item as unknown as Record<string, unknown>)) {
     for (const [name, proto] of pairs(raw[itemType] ?? {})) {
-      if (typeof proto.place_result === "string" && removedEntities.has(proto.place_result)) {
+      // Капсула боевых дронов ничего не ставит — она бросает снаряд, который их создаёт.
+      const places = typeof proto.place_result === "string" && removedEntities.has(proto.place_result)
+      if (places || createsRemoved(proto.capsule_action, removedEntities, new Set(), 0)) {
         removedItems.add(name)
         hide(proto)
       }

@@ -96,16 +96,19 @@ function computeReach(): Reach {
   return reach
 }
 
-/** Предметы, которые ставят удалённые здания (скрытые предметы самой игры, вроде rocket-part, — не в счёт). */
+/** Капсулы боевых дронов (21.1): ничего не ставят, а бросают снаряд, который создаёт дронов. */
+const COMBAT_CAPSULES = ["defender-capsule", "distractor-capsule", "destroyer-capsule"]
+
+/** Предметы, которые ставят удалённые здания, и капсулы боевых дронов (скрытые предметы самой игры, вроде rocket-part, — не в счёт). */
 function removedItems(): LuaSet<string> {
   const result = new LuaSet<string>()
   const types = new LuaSet<string>()
   for (const type of REMOVED_ENTITY_TYPES) types.add(type)
   for (const [name, item] of prototypes.item) {
     const entity = item.place_result
-    if (entity === undefined) continue
-    if (types.has(entity.type) || (entity.type === "logistic-container" && entity.logistic_mode !== "storage")) result.add(name)
+    if (entity !== undefined && types.has(entity.type)) result.add(name)
   }
+  for (const name of COMBAT_CAPSULES) result.add(name)
   return result
 }
 
@@ -119,11 +122,26 @@ describe("целостность после удаления ванили", () =
       }
     }
     expect(visible.join(", ")).toBe("")
-    for (const name of ["transport-belt", "inserter", "burner-mining-drill", "electric-mining-drill", "pumpjack", "offshore-pump", "requester-chest"]) {
+    const removed = ["transport-belt", "inserter", "burner-mining-drill", "electric-mining-drill", "pumpjack", "offshore-pump", "requester-chest"]
+    for (const name of [...removed, "roboport", "storage-chest", ...COMBAT_CAPSULES]) {
       expect(`${name}: ${prototypes.recipe[name]?.hidden}`).toBe(`${name}: true`)
     }
-    // Остаются: сундук хранения, помпа, робопорт.
-    for (const name of ["storage-chest", "pump", "roboport"]) expect(`${name}: ${prototypes.recipe[name]!.hidden}`).toBe(`${name}: false`)
+    for (const name of COMBAT_CAPSULES) expect(`${name}: ${prototypes.item[name]!.hidden}`).toBe(`${name}: true`)
+    // Остаются: помпа, строительный дрон, персональная дронстанция.
+    for (const name of ["pump", "construction-robot", "personal-roboport-equipment", "personal-roboport-mk2-equipment"]) {
+      expect(`${name}: ${prototypes.recipe[name]!.hidden}`).toBe(`${name}: false`)
+    }
+  })
+
+  test("дроны — только строительные: технологии боевых дронов скрыты, строительных — нет", () => {
+    for (const name of ["defender", "distractor", "destroyer", "follower-robot-count-1", "follower-robot-count-5"]) {
+      expect(`${name}: ${prototypes.technology[name]!.hidden}`).toBe(`${name}: true`)
+    }
+    for (const name of ["construction-robotics", "personal-roboport-equipment", "personal-roboport-mk2-equipment", "worker-robots-speed-1", "worker-robots-storage-1"]) {
+      expect(`${name}: ${prototypes.technology[name]!.hidden}`).toBe(`${name}: false`)
+    }
+    const unlocks = prototypes.technology["construction-robotics"]!.effects.map((e) => (e.type === "unlock-recipe" ? e.recipe : e.type))
+    expect(unlocks.join(",")).toBe("construction-robot,create-ghost-on-entity-death")
   })
 
   test("видимые рецепты не ссылаются на удалённые предметы", () => {

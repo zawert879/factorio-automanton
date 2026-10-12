@@ -1,6 +1,6 @@
 ![A red and green science factory run entirely by automatons — no belts, no inserters](docs/media/factory.gif)
 
-**Automaton** is an overhaul for playing with friends: belts, drills, inserters, logistic robots and the offshore pump are gone. Their work is done by **automatons** — machines that run programs you write in a subset of **TypeScript**, right in the game or in VS Code.
+**Automaton** is an overhaul for playing with friends: belts, drills, inserters, logistic and combat robots, roboports and the offshore pump are gone (construction robots stay, with a personal roboport). Their work is done by **automatons** — machines that run programs you write in a subset of **TypeScript**, right in the game or in VS Code.
 
 ```ts
 // Mine coal and carry it to the chest at the "depot" marker.
@@ -38,4 +38,4 @@ Multiplayer is supported: programs run deterministically, saving and loading in 
 
 ---
 
-**По-русски.** Оверхол для игры с друзьями: конвейеров, буров, манипуляторов и логистических роботов нет — их работу делают автоматоны по программам на TypeScript. Программы пишутся в игре (с подсветкой) или в VS Code. Руководство игрока и справка по API — на [GitHub](https://github.com/zawert879/factorio-automanton).
+**По-русски.** Оверхол для игры с друзьями: конвейеров, буров, манипуляторов, логистических и боевых дронов и дронстанций нет (строительные дроны — от персональной дронстанции) — их работу делают автоматоны по программам на TypeScript. Программы пишутся в игре (с подсветкой) или в VS Code. Руководство игрока и справка по API — на [GitHub](https://github.com/zawert879/factorio-automanton).

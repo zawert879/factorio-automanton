@@ -43,6 +43,7 @@ import { initMarkers, registerMarkers } from "./world/markers"
 import { initDisplays, registerDisplays } from "./world/displays"
 import { initStart } from "./world/start"
 import { registerNaming } from "./world/naming"
+import { registerRoboports, removeRoboports } from "./world/roboports"
 import { initZones, registerZones } from "./world/zones"
 import { registerWorkshopEntities } from "./workshop/entities"
 import { registerWorkshopDebug } from "./workshop/debug"
@@ -75,10 +76,12 @@ function initStorage(): void {
 script.on_init(() => {
   initStorage()
   initSchema()
+  removeRoboports()
 })
 script.on_configuration_changed(() => {
   initStorage()
   migrate()
+  removeRoboports()
   closeModWindows()
   restoreWorkshopWindows()
   adoptUnregisteredRobots()
@@ -100,6 +103,7 @@ registerMarkers()
 registerDisplays()
 registerZones()
 registerNaming()
+registerRoboports()
 registerMachines()
 registerScheduler()
 registerActionApi()
