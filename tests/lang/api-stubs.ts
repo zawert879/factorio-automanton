@@ -232,3 +232,25 @@ for (const [name, fn] of Object.entries(blocking)) {
       frame.value = fn(...args)
     })
 }
+
+// Методы зданий и машин (19.3): ждут тик, результат — как у прежних функций.
+const objectMethods: [string, string, (this: void, ...args: Val[]) => Val][] = [
+  ["Building", "insert", () => 5],
+  ["Building", "extract", () => 10],
+  ["Building", "fill", () => 500],
+  ["Building", "drain", () => 100],
+  ["Building", "setRecipe", () => undefined],
+  ["Building", "repair", () => undefined],
+  ["Building", "rotate", () => undefined],
+  ["Building", "deconstruct", () => undefined],
+  ["robot", "insert", () => 5],
+  ["robot", "refuel", () => undefined],
+  ["robot", "repair", () => undefined],
+]
+for (const [cls, name, fn] of objectMethods) {
+  hostMethods[cls][name] = (_o: Val, k: Val, ...args: Val[]) =>
+    blockingCall(k, name, (frame) => {
+      frame.ticks = 1
+      frame.value = fn(...args)
+    })
+}

@@ -31,4 +31,13 @@ const c = zone("склад").find(Chest)[0]
 print(c instanceof Chest, c instanceof Furnace, me instanceof Machine, me instanceof Robot, robot(1) instanceof Robot)`
     expect(outputOf(source, { copy: true, quantum: 3 })).toBe("true true false false true|true false true false true")
   })
+
+  test("методы зданий ждут действия — и в своих функциях, и в колбэках", () => {
+    const source = `function feed(f: Furnace): number { return f.insert("coal", 2) + f.extract("iron-plate") }
+const total = zone("плавильня").find(Furnace).map((f) => feed(f)).reduce((a, b) => a + b, 0)
+const helper = robot(3)!
+helper.refuel()
+print(total, helper.insert("coal", 1))`
+    expect(outputOf(source, { copy: true, quantum: 3 })).toBe("15 5")
+  })
 })

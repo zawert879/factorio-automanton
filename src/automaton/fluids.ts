@@ -138,7 +138,7 @@ function pumpStep(record: RobotRecord, action: ActionState): StepOutcome {
 registerActionHandler("pump", {
   start: (record, action) => {
     // Бака нет (летающие) — жидкости не для этой модели.
-    if (tankCapacity(record) <= 0) return { finish: true, error: "invalid-target" }
+    if (tankCapacity(record) <= 0) return { finish: true, error: "no-tank" }
     const fluid = action.params.item!
     if (tankFree(record, fluid) <= EPSILON) return { finish: true, error: "cargo-full" }
     const resource = findFluidResource(record, fluid)
@@ -190,7 +190,7 @@ function fillStep(record: RobotRecord, action: ActionState): StepOutcome {
 registerActionHandler("fill", {
   start: (record, action) => {
     // Бака нет (летающие) — жидкости не для этой модели.
-    if (tankCapacity(record) <= 0) return { finish: true, error: "invalid-target" }
+    if (tankCapacity(record) <= 0) return { finish: true, error: "no-tank" }
     const target = action.params.target
     if (target === undefined || !target.valid) return { finish: true, error: "invalid-target" }
     if (!inReach(record, target)) return { finish: true, error: "out-of-reach" }
@@ -221,7 +221,7 @@ function drainStep(record: RobotRecord, action: ActionState): StepOutcome {
 registerActionHandler("drain", {
   start: (record, action) => {
     // Бака нет (летающие) — жидкости не для этой модели.
-    if (tankCapacity(record) <= 0) return { finish: true, error: "invalid-target" }
+    if (tankCapacity(record) <= 0) return { finish: true, error: "no-tank" }
     const target = action.params.target
     if (target === undefined || !target.valid) return { finish: true, error: "invalid-target" }
     if (!inReach(record, target)) return { finish: true, error: "out-of-reach" }

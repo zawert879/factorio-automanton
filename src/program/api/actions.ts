@@ -1,12 +1,13 @@
 // Движение и предметы (4.2) поверх систем этапа 2: move, canReach, follow, goHome, mine, take, put,
 // pickup, drop, give, repair, refuel; жидкости (7.1): pump, fill, drain; зарядка (8.2): charge;
 // наладка и строительство (8.5, 8.6): setRecipe, build, deconstruct, rotate. Блокирующие: программа
-// ждёт конца действия или поездки.
+// ждёт конца действия или поездки. Методы зданий и машин (19.3): furnace.insert(…), chest.extract(…),
+// assembler.setRecipe(…), boiler.fill(…), helper.refuel(…) — те же действия, цель — сам объект.
 import { LuaEntity, MapPosition } from "factorio:runtime"
 import { isFlyer } from "../../automaton/models"
 import { cancelMove, isMoving, moveRobot } from "../../automaton/movement"
 import { onEvent } from "../../events"
-import { host, hostBlocking, program, Val } from "../../lang/runtime/core"
+import { Fn, host, hostBlocking, hostMethods, program, Val } from "../../lang/runtime/core"
 import { truthy } from "../../lang/runtime/values"
 import { actionError, currentMachine, currentRobot } from "../context"
 import { entityHandle, handleEntity, handleRobot, inSight, resolveTarget } from "../handles"
@@ -197,6 +198,50 @@ blocking("fill", (k, into, amount) => actionCall(k, "fill", k !== undefined ? {}
 blocking("drain", (k, from, what, amount) =>
   actionCall(k, "drain", k !== undefined ? {} : { target: handleEntity(from), item: fluid(what), count: fluidAmount(amount) }),
 )
+
+// ---------- Методы зданий и машин (19.3) ----------
+// Действие делает эта машина (досягаемость me.reach, её энергия и время), цель — объект метода. Классы и что у них
+// есть — docs/API.md, «Классы зданий»; у классов без метода его нет и во время выполнения.
+
+function methods(classes: string[], name: string, fn: Fn): void {
+  for (const cls of classes) hostMethods[cls][name] = fn
+}
+
+/** Классы с предметами (положить — insert) и с тем, что можно взять (extract). */
+const INSERT_CLASSES = ["Chest", "Furnace", "Assembler", "RocketSilo", "Lab", "Boiler", "Reactor", "Turret", "CargoWagon", "Locomotive", "Vehicle"]
+const EXTRACT_CLASSES = ["Chest", "Furnace", "Assembler", "RocketSilo", "Lab", "Reactor", "Turret", "CargoWagon", "Vehicle"]
+/** Классы с жидкостью: залить из бака (fill) и слить в бак (drain). */
+const FILL_CLASSES = ["Assembler", "Boiler", "Generator", "StorageTank", "Pipe", "FlameTurret", "FluidWagon"]
+const DRAIN_CLASSES = ["Assembler", "Boiler", "Generator", "StorageTank", "Pipe", "FluidWagon"]
+
+methods(INSERT_CLASSES, "insert", (o: Val, k: Val, what: Val, amount: Val) =>
+  actionCall(k, "put", k !== undefined ? {} : { target: handleEntity(o), item: item(what), count: count(amount) }),
+)
+methods(EXTRACT_CLASSES, "extract", (o: Val, k: Val, what: Val, amount: Val) =>
+  actionCall(k, "take", k !== undefined ? {} : { target: handleEntity(o), item: item(what), count: count(amount) }),
+)
+methods(FILL_CLASSES, "fill", (o: Val, k: Val, amount: Val) =>
+  actionCall(k, "fill", k !== undefined ? {} : { target: handleEntity(o), count: fluidAmount(amount) }),
+)
+methods(DRAIN_CLASSES, "drain", (o: Val, k: Val, what: Val, amount: Val) =>
+  actionCall(k, "drain", k !== undefined ? {} : { target: handleEntity(o), item: fluid(what), count: fluidAmount(amount) }),
+)
+hostMethods.Building.repair = (o: Val, k: Val) => actionCall(k, "repair", k !== undefined ? {} : { target: handleEntity(o) })
+hostMethods.Building.rotate = (o: Val, k: Val, reverse: Val) =>
+  actionCall(k, "rotate", k !== undefined ? {} : { target: handleEntity(o), reverse: reverse === true })
+hostMethods.Building.deconstruct = (o: Val, k: Val) => actionCall(k, "deconstruct", k !== undefined ? {} : { target: handleEntity(o) })
+hostMethods.Assembler.setRecipe = (o: Val, k: Val, recipe: Val) => {
+  if (k !== undefined) return finishWaiting(k)
+  if (type(recipe) !== "string" || prototypes.recipe[recipe as string] === undefined) actionError("invalid-target", `unknown recipe ${tostring(recipe)}`)
+  return actionCall(k, "set-recipe", { target: handleEntity(o), item: recipe as string })
+}
+
+// Другая машина: груз — «из рук в руки», топливный слот, ремонт.
+hostMethods.robot.insert = (o: Val, k: Val, what: Val, amount: Val) =>
+  actionCall(k, "give", k !== undefined ? {} : { target: handleRobot(o).entity, item: item(what), count: count(amount) })
+hostMethods.robot.refuel = (o: Val, k: Val, what: Val) =>
+  actionCall(k, "refuel", k !== undefined ? {} : { item: optionalItem(what), target: handleRobot(o).entity })
+hostMethods.robot.repair = (o: Val, k: Val) => actionCall(k, "repair", k !== undefined ? {} : { target: handleRobot(o).entity })
 
 export function registerActionApi(): void {
   onEvent(defines.events.on_script_path_request_finished, (e) => onPathFinished(e.id, e.path !== undefined, e.try_again_later))

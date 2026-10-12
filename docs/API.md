@@ -128,11 +128,11 @@ type Fluid = string;     // "water", "crude-oil", ...
 type Position = { x: number; y: number };
 type Area = { from: Position; to: Position };
 type Direction = "north" | "east" | "south" | "west";
-type Target = Position | Building | Machine | Marker | Zone;
+type Target = Position | Building | Entity | Machine | Marker | Zone;
 
 type Value =
   | null | boolean | number | string
-  | Building | Machine | Position
+  | Building | Entity | Machine | Position
   | Value[]
   | { [key: string]: Value };
 
@@ -233,6 +233,21 @@ declare abstract class Machine {
  */
 declare class Robot extends Machine {
   private constructor();
+  /**
+   * Переложить предметы из своего груза в её груз — «из рук в руки» (в радиусе me.reach). Было give.
+   * @en Move items from your cargo into its cargo, hand to hand (within me.reach). Was give.
+   */
+  insert(item: Item, count?: number): number;
+  /**
+   * Mk1: заправить её топливом из своего груза; без item — лучшим, что есть. Было refuel(item, to).
+   * @en Mk1: refuel it with fuel from your cargo; without item — the best there is. Was refuel(item, to).
+   */
+  refuel(item?: Item): void;
+  /**
+   * Починить ремкомплектами из своего груза. Было repair(robot).
+   * @en Repair it with repair packs from your cargo. Was repair(robot).
+   */
+  repair(): void;
 }
 
 type RobotState =
@@ -445,8 +460,10 @@ if (furnace.status === "no-fuel") put(furnace, "coal", 5);
 ### Классы зданий
 
 У каждого вида зданий свой класс — с тем, что у него есть: у печи — вход, выход и топливо, у сундука — содержимое,
-у резервуара — жидкость. Найти здания класса — `zone("…").find(Furnace)`, `scan.buildings({ kind: Chest })`;
-проверить, что пришло сообщением, — `x instanceof Furnace`. Создать здание через `new` нельзя.
+у резервуара — жидкость. Действие — метод здания: `furnace.insert("coal", 5)`, `chest.extract("iron-plate")`,
+`boiler.fill()`. Делает его эта машина: здание должно быть в радиусе `me.reach`, тратятся её энергия и время.
+Найти здания класса — `zone("…").find(Furnace)`, `scan.buildings({ kind: Chest })`; проверить, что пришло
+сообщением, — `x instanceof Furnace`. Создать здание через `new` нельзя.
 
 ```ts
 /**
@@ -475,6 +492,21 @@ declare class Building {
   // Только в поле зрения: @en Only within sight:
   readonly status: BuildingStatus;
   readonly health: number;             // 0..1
+  /**
+   * Починить ремкомплектами из груза. Было repair.
+   * @en Repair with repair packs from the cargo. Was repair.
+   */
+  repair(): void;
+  /**
+   * [Строительство] Повернуть. Было rotate.
+   * @en [Construction] Rotate. Was rotate.
+   */
+  rotate(reverse?: boolean): void;
+  /**
+   * [Строительство] Разобрать в груз. Было deconstruct.
+   * @en [Construction] Deconstruct into the cargo. Was deconstruct.
+   */
+  deconstruct(): void;
 }
 
 /**
@@ -485,6 +517,16 @@ declare class Chest extends Building {
   private constructor();
   inventory(): Inventory;
   count(item?: Item): number;
+  /**
+   * Положить из груза. Возвращает, сколько положено. Было put.
+   * @en Put from the cargo. Returns how many were put. Was put.
+   */
+  insert(item: Item, count?: number): number;
+  /**
+   * Взять в груз. Возвращает, сколько взято. Было take.
+   * @en Take into the cargo. Returns how many were taken. Was take.
+   */
+  extract(item: Item, count?: number): number;
 }
 
 /**
@@ -499,6 +541,16 @@ declare class Furnace extends Building {
   output(): Inventory;
   fuel(): Inventory | null;            // у электрической — null @en null for an electric one
   count(item?: Item): number;          // во всех слотах @en in all slots
+  /**
+   * Положить: руду — во вход, топливо — в топливо. Было put.
+   * @en Put: ore into the input, fuel into the fuel slot. Was put.
+   */
+  insert(item: Item, count?: number): number;
+  /**
+   * Взять из выхода (или из входа, если там этот предмет). Было take.
+   * @en Take from the output (or from the input, if the item is there). Was take.
+   */
+  extract(item: Item, count?: number): number;
 }
 
 /**
@@ -513,10 +565,35 @@ declare class Assembler extends Building {
   output(): Inventory;
   count(item?: Item): number;
   /**
+   * Положить из груза. Возвращает, сколько положено. Было put.
+   * @en Put from the cargo. Returns how many were put. Was put.
+   */
+  insert(item: Item, count?: number): number;
+  /**
+   * Взять в груз. Возвращает, сколько взято. Было take.
+   * @en Take into the cargo. Returns how many were taken. Was take.
+   */
+  extract(item: Item, count?: number): number;
+  /**
+   * [Наладка] Сменить рецепт; содержимое возвращается в груз машины. Было setRecipe.
+   * @en [Configuration] Change the recipe; the contents go back to the machine's cargo. Was setRecipe.
+   */
+  setRecipe(recipe: string): void;
+  /**
    * Жидкость в здании (без name — всего).
    * @en Fluid in the building (without name — all of it).
    */
   fluid(name?: Fluid): number;
+  /**
+   * [Жидкости] Залить из бака машины. Без amount — всё, что влезет. Было fill.
+   * @en [Fluids] Fill from the machine's tank. Without amount — as much as fits. Was fill.
+   */
+  fill(amount?: number): number;
+  /**
+   * [Жидкости] Слить в бак машины. Было drain.
+   * @en [Fluids] Drain into the machine's tank. Was drain.
+   */
+  drain(fluid: Fluid, amount?: number): number;
 }
 
 /**
@@ -530,6 +607,16 @@ declare class RocketSilo extends Building {
   input(): Inventory;
   output(): Inventory;
   count(item?: Item): number;
+  /**
+   * Положить из груза. Возвращает, сколько положено. Было put.
+   * @en Put from the cargo. Returns how many were put. Was put.
+   */
+  insert(item: Item, count?: number): number;
+  /**
+   * Взять в груз. Возвращает, сколько взято. Было take.
+   * @en Take into the cargo. Returns how many were taken. Was take.
+   */
+  extract(item: Item, count?: number): number;
 }
 
 /**
@@ -540,6 +627,16 @@ declare class Lab extends Building {
   private constructor();
   input(): Inventory;
   count(item?: Item): number;
+  /**
+   * Положить колбы. Было put.
+   * @en Put science packs. Was put.
+   */
+  insert(item: Item, count?: number): number;
+  /**
+   * Взять в груз. Возвращает, сколько взято. Было take.
+   * @en Take into the cargo. Returns how many were taken. Was take.
+   */
+  extract(item: Item, count?: number): number;
 }
 
 /**
@@ -550,7 +647,22 @@ declare class Boiler extends Building {
   private constructor();
   fuel(): Inventory | null;            // у теплообменника — null @en null for a heat exchanger
   count(item?: Item): number;
+  /**
+   * Положить топливо. Было put.
+   * @en Put fuel. Was put.
+   */
+  insert(item: Item, count?: number): number;
   fluid(name?: Fluid): number;
+  /**
+   * [Жидкости] Залить воду из бака. Было fill.
+   * @en [Fluids] Fill with water from the tank. Was fill.
+   */
+  fill(amount?: number): number;
+  /**
+   * [Жидкости] Слить пар в бак. Было drain.
+   * @en [Fluids] Drain steam into the tank. Was drain.
+   */
+  drain(fluid: Fluid, amount?: number): number;
 }
 
 /**
@@ -560,6 +672,16 @@ declare class Boiler extends Building {
 declare class Generator extends Building {
   private constructor();
   fluid(name?: Fluid): number;
+  /**
+   * [Жидкости] Залить пар из бака. Было fill.
+   * @en [Fluids] Fill with steam from the tank. Was fill.
+   */
+  fill(amount?: number): number;
+  /**
+   * [Жидкости] Слить в бак машины. Было drain.
+   * @en [Fluids] Drain into the machine's tank. Was drain.
+   */
+  drain(fluid: Fluid, amount?: number): number;
 }
 
 /**
@@ -570,6 +692,16 @@ declare class Reactor extends Building {
   private constructor();
   fuel(): Inventory;
   count(item?: Item): number;
+  /**
+   * Положить топливные стержни. Было put.
+   * @en Put fuel cells. Was put.
+   */
+  insert(item: Item, count?: number): number;
+  /**
+   * Взять отработанные стержни. Было take.
+   * @en Take used-up fuel cells. Was take.
+   */
+  extract(item: Item, count?: number): number;
 }
 
 /**
@@ -579,6 +711,16 @@ declare class Reactor extends Building {
 declare class StorageTank extends Building {
   private constructor();
   fluid(name?: Fluid): number;
+  /**
+   * [Жидкости] Залить из бака машины. Без amount — всё, что влезет. Было fill.
+   * @en [Fluids] Fill from the machine's tank. Without amount — as much as fits. Was fill.
+   */
+  fill(amount?: number): number;
+  /**
+   * [Жидкости] Слить в бак машины. Было drain.
+   * @en [Fluids] Drain into the machine's tank. Was drain.
+   */
+  drain(fluid: Fluid, amount?: number): number;
 }
 
 /**
@@ -588,6 +730,16 @@ declare class StorageTank extends Building {
 declare class Pipe extends Building {
   private constructor();
   fluid(name?: Fluid): number;
+  /**
+   * [Жидкости] Залить из бака машины. Без amount — всё, что влезет. Было fill.
+   * @en [Fluids] Fill from the machine's tank. Without amount — as much as fits. Was fill.
+   */
+  fill(amount?: number): number;
+  /**
+   * [Жидкости] Слить в бак машины. Было drain.
+   * @en [Fluids] Drain into the machine's tank. Was drain.
+   */
+  drain(fluid: Fluid, amount?: number): number;
 }
 
 /**
@@ -598,6 +750,16 @@ declare class Turret extends Building {
   private constructor();
   ammo(): Inventory;
   count(item?: Item): number;
+  /**
+   * Зарядить патронами или снарядами из груза. Было put.
+   * @en Load with ammo or shells from the cargo. Was put.
+   */
+  insert(item: Item, count?: number): number;
+  /**
+   * Взять в груз. Возвращает, сколько взято. Было take.
+   * @en Take into the cargo. Returns how many were taken. Was take.
+   */
+  extract(item: Item, count?: number): number;
 }
 
 /**
@@ -607,6 +769,11 @@ declare class Turret extends Building {
 declare class FlameTurret extends Building {
   private constructor();
   fluid(name?: Fluid): number;
+  /**
+   * [Жидкости] Залить нефть или топливо из бака. Было fill.
+   * @en [Fluids] Fill with oil or fuel from the tank. Was fill.
+   */
+  fill(amount?: number): number;
 }
 
 /**
@@ -617,6 +784,16 @@ declare class CargoWagon extends Building {
   private constructor();
   inventory(): Inventory;
   count(item?: Item): number;
+  /**
+   * Положить из груза. Возвращает, сколько положено. Было put.
+   * @en Put from the cargo. Returns how many were put. Was put.
+   */
+  insert(item: Item, count?: number): number;
+  /**
+   * Взять в груз. Возвращает, сколько взято. Было take.
+   * @en Take into the cargo. Returns how many were taken. Was take.
+   */
+  extract(item: Item, count?: number): number;
 }
 
 /**
@@ -626,6 +803,16 @@ declare class CargoWagon extends Building {
 declare class FluidWagon extends Building {
   private constructor();
   fluid(name?: Fluid): number;
+  /**
+   * [Жидкости] Залить из бака машины. Без amount — всё, что влезет. Было fill.
+   * @en [Fluids] Fill from the machine's tank. Without amount — as much as fits. Was fill.
+   */
+  fill(amount?: number): number;
+  /**
+   * [Жидкости] Слить в бак машины. Было drain.
+   * @en [Fluids] Drain into the machine's tank. Was drain.
+   */
+  drain(fluid: Fluid, amount?: number): number;
 }
 
 /**
@@ -636,6 +823,11 @@ declare class Locomotive extends Building {
   private constructor();
   fuel(): Inventory;
   count(item?: Item): number;
+  /**
+   * Положить топливо. Было put.
+   * @en Put fuel. Was put.
+   */
+  insert(item: Item, count?: number): number;
 }
 
 /**
@@ -647,6 +839,16 @@ declare class Vehicle extends Building {
   inventory(): Inventory;              // багажник @en the trunk
   fuel(): Inventory | null;            // у паука — null @en null for a spidertron
   count(item?: Item): number;
+  /**
+   * Положить из груза. Возвращает, сколько положено. Было put.
+   * @en Put from the cargo. Returns how many were put. Was put.
+   */
+  insert(item: Item, count?: number): number;
+  /**
+   * Взять в груз. Возвращает, сколько взято. Было take.
+   * @en Take into the cargo. Returns how many were taken. Was take.
+   */
+  extract(item: Item, count?: number): number;
 }
 
 /**
@@ -659,9 +861,11 @@ declare class ChargingStation extends Building {
 ```
 
 ```ts
-// Печи зоны «плавильня» — сразу класса Furnace: у них есть output()
+// Обойти печи зоны «плавильня»: забрать плиты, подложить уголь
 for (const furnace of zone("плавильня").find(Furnace)) {
-  if (furnace.output().count() > 0) print(`печь #${furnace.id}: ${furnace.output().count()} плит`);
+  move(furnace);
+  for (const stack of furnace.output().items()) furnace.extract(stack.name, stack.count);
+  if (furnace.status === "no-fuel") furnace.insert("coal", 5);
 }
 ```
 
@@ -1259,6 +1463,7 @@ type ErrorCode =
   | "invalid-target"     // цель уничтожена или не существует @en the target is destroyed or does not exist
   | "no-fuel"            // кончилась энергия @en out of energy
   | "no-ammo"            // кончились патроны @en out of ammo
+  | "no-tank"            // fill / drain / pump у машины без бака @en fill / drain / pump on a machine without a tank
   | "cargo-full"         // груз полон @en the cargo is full
   | "not-enough-items"   // в грузе нет столько предметов @en not enough items in the cargo
   | "target-full"        // в здание больше не влезает @en the building can't take any more

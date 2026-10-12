@@ -22,6 +22,8 @@ export type ActionError =
   | "no-fuel"
   | "cancelled"
   | "no-ammo"
+  /** fill / drain / pump у машины без бака (19.3). */
+  | "no-tank"
   | "out-of-sight"
   /** Ошибка в коде мода при выполнении действия (записана в лог); машина продолжает работать. */
   | "internal-error"

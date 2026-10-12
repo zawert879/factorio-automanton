@@ -28,6 +28,7 @@ export type ActionErrorCode =
   | "invalid-target"
   | "no-fuel"
   | "no-ammo"
+  | "no-tank"
   | "cargo-full"
   | "not-enough-items"
   | "target-full"
@@ -47,6 +48,7 @@ const MESSAGES: Record<ActionErrorCode, string> = {
   "invalid-target": "The target does not exist",
   "no-fuel": "Out of fuel",
   "no-ammo": "Out of ammo",
+  "no-tank": "This robot has no fluid tank",
   "cargo-full": "Cargo is full",
   "not-enough-items": "Not enough items",
   "target-full": "The target is full",

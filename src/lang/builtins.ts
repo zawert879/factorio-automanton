@@ -75,6 +75,13 @@ const HOST_FUNCTIONS: Record<string, boolean> = {
   restart: false,
 }
 
+/**
+ * Методы объектов игры, которые ждут действия машины (19.3): furnace.insert(…), helper.refuel(…). Объект в программе
+ * может оказаться каким угодно, поэтому — по имени: функция с вызовом метода с таким именем возобновляемая
+ * (у массива arr.fill(0) — лишняя точка остановки, не ошибка).
+ */
+export const BLOCKING_OBJECT_METHODS = ["insert", "extract", "repair", "rotate", "deconstruct", "setRecipe", "fill", "drain", "refuel"]
+
 /** Методы объектов API, которые ждут: tasks.next(…). */
 export const BLOCKING_HOST_METHODS: Record<string, Record<string, boolean>> = {
   tasks: { next: true },

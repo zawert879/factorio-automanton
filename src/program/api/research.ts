@@ -2,7 +2,8 @@
 // исследования команды бросает ActionError("not-researched"). Обёртки ставятся поверх уже
 // зарегистрированных функций, поэтому модуль подключается последним (src/program/api/index.ts).
 import { LuaForce } from "factorio:runtime"
-import { host, hostBlocking, hostGetters, hostMethods, Val } from "../../lang/runtime/core"
+import { HOST_CLASSES } from "../../lang/hostClasses"
+import { Fn, host, hostBlocking, hostGetters, hostMethods, Val } from "../../lang/runtime/core"
 import { TECH } from "../../names"
 import { actionError, currentRobot } from "../context"
 
@@ -81,6 +82,26 @@ for (const [object, methods] of pairs(REQUIRED_METHODS)) {
       if (k === undefined) requireResearch(`${object}.${method}`, tech)
       return original(o, k, ...args)
     }
+  }
+}
+
+// Методы зданий (19.3) — в таблицах классов, где они свои (подклассы берут обёртку у родителя через __index).
+const CLASS_METHOD_RESEARCH: Record<string, string> = {
+  fill: TECH.fluids,
+  drain: TECH.fluids,
+  setRecipe: TECH.tuning,
+  rotate: TECH.construction,
+  deconstruct: TECH.construction,
+}
+for (const [cls] of HOST_CLASSES) {
+  const table = hostMethods[cls]
+  for (const [method, tech] of pairs(CLASS_METHOD_RESEARCH)) {
+    const original = rawget(table, method) as Fn | undefined
+    if (original === undefined) continue
+    rawset(table, method, (o: Val, k: Val, ...args: Val[]) => {
+      if (k === undefined) requireResearch(method, tech)
+      return original(o, k, ...args)
+    })
   }
 }
 

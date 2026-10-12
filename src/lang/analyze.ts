@@ -11,7 +11,7 @@
 // возобновляемого метода (класса или свойства-функции объекта), метод высшего порядка с возобновляемой
 // или неизвестной функцией, рекурсия. Признак распространяется до неподвижной точки.
 import * as A from "./ast"
-import { BLOCKING_HOST_METHODS, Builtin, BUILTINS, HIGHER_ORDER_METHODS } from "./builtins"
+import { BLOCKING_HOST_METHODS, BLOCKING_OBJECT_METHODS, Builtin, BUILTINS, HIGHER_ORDER_METHODS } from "./builtins"
 import { isHostClass } from "./hostClasses"
 import { Diagnostic } from "./lexer"
 import { ModuleUnit } from "./modules"
@@ -901,7 +901,8 @@ function classify(functions: FnInfo[], classes: ClassInfo[], propertyFns: { name
   }
   markRecursive(functions)
 
-  const resumableMethods = new Set<string>()
+  // Методы объектов игры, которые ждут действия (furnace.insert): с паузой при любом объекте.
+  const resumableMethods = new Set<string>(BLOCKING_OBJECT_METHODS)
   let changed = true
   while (changed) {
     changed = false

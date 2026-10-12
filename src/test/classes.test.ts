@@ -1,7 +1,8 @@
 // Классы объектов игры (19.2): поиск зданий по классу в зоне и вокруг машины, instanceof, методы класса.
 import { LuaSurface } from "factorio:runtime"
 import { findRobot, RobotRecord } from "../automaton/registry"
-import { WORKER_MK1, WORKER_MK1_PLACER } from "../names"
+import { tankOf } from "../automaton/tank"
+import { TECH, WORKER_MK1, WORKER_MK1_PLACER } from "../names"
 import { describeDiagnostics } from "../program/commands"
 import { entityHandle } from "../program/handles"
 import { assignProgram, MachineRecord } from "../program/machines"
@@ -61,6 +62,57 @@ try { area.find(Robot as any) } catch (e) { print(e.code) }`,
       )
       expect(entityHandle(assembler).__c).toBe("Assembler")
       for (const e of [furnace, chest, assembler, pole]) e.destroy()
+      robot.entity.destroy()
+    })
+  })
+
+  test("методы зданий и машин: insert, extract, setRecipe, fill, drain; другой машине — insert, refuel; исследования", (t) => {
+    const { surface, robot } = site(-560, 900)
+    const techs = game.forces.player.technologies
+    const before = [techs[TECH.tuning].researched, techs[TECH.fluids].researched, techs[TECH.construction].researched]
+    techs[TECH.tuning].researched = true
+    techs[TECH.fluids].researched = true
+    techs[TECH.construction].researched = false
+    surface.create_entity({ name: WORKER_MK1_PLACER, position: { x: -558.5, y: 905.5 }, force: "player", raise_built: true })
+    const helper = findRobot(surface.find_entities_filtered({ name: WORKER_MK1, position: { x: -558.5, y: 905.5 }, radius: 0.5 })[0])!
+    const chest = surface.create_entity({ name: "iron-chest", position: { x: -554.5, y: 902.5 }, force: "player" })!
+    chest.insert({ name: "iron-ore", count: 20 })
+    const furnace = surface.create_entity({ name: "stone-furnace", position: { x: -552, y: 906 }, force: "player" })!
+    const tank = surface.create_entity({ name: "storage-tank", position: { x: -554.5, y: 910.5 }, force: "player" })!
+    const assembler = surface.create_entity({ name: "assembling-machine-1", position: { x: -550.5, y: 910.5 }, force: "player" })!
+    createZone("методы", surface, { left_top: { x: -557, y: 900 }, right_bottom: { x: -548, y: 913 } })
+    robot.cargo.insert({ name: "coal", count: 10 })
+    tankOf(robot).fluid = "water"
+    tankOf(robot).amount = 100
+    const m = run(
+      robot,
+      "test-methods",
+      `const area = zone("методы")
+const chest = area.find(Chest)[0]
+const furnace = area.find(Furnace)[0]
+print(chest.extract("iron-ore", 10), me.cargo.count("iron-ore"))
+print(furnace.insert("iron-ore", 4), furnace.insert("coal", 2), furnace.count("iron-ore"))
+try { furnace.rotate() } catch (e) { print(e.code) }
+const asm = area.find(Assembler)[0]
+asm.setRecipe("iron-gear-wheel")
+print(asm.recipe)
+const helper = scan.robots()[0]
+print(helper.insert("coal", 3))
+helper.refuel("coal")
+print(helper.fuel > 0, me.cargo.count("coal"))
+const tank = area.find(StorageTank)[0]
+print(tank.fill(50), tank.drain("water", 20), Math.round(tank.fluid("water")))`,
+    )
+    waitUntil(t, "конца программы", finished(m), 900, () => {
+      expect(m.console.filter((line) => !line.startsWith("—")).join("|")).toBe(
+        "10 10|4 2 4|not-researched|iron-gear-wheel|3|true 0|50 20 30",
+      )
+      expect(helper.cargo.get_item_count("coal")).toBe(3)
+      techs[TECH.tuning].researched = before[0]
+      techs[TECH.fluids].researched = before[1]
+      techs[TECH.construction].researched = before[2]
+      for (const e of [chest, furnace, tank, assembler]) e.destroy()
+      helper.entity.destroy()
       robot.entity.destroy()
     })
   })

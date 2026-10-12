@@ -40,6 +40,9 @@ const BAD: [string, string, string][] = [
   ["здание по имени — просто Building", `const b = zone("склад").find("stone-furnace")[0]\nprint(b.recipe)`, "type-no-property@2"],
   ["класс здания из scan.buildings", `const f = scan.buildings({ kind: Furnace })[0]\nf.inventory()`, "type-no-property@2"],
   ["new у объекта игры", `const f = new Furnace()`, "host-class-new@1"],
+  ["у трубы нет insert", `zone("a").find(Pipe)[0].insert("coal")`, "type-no-property@1"],
+  ["setRecipe — только у сборщика", `zone("a").find(Furnace)[0].setRecipe("x")`, "type-no-property@1"],
+  ["fill: количество — число", `zone("a").find(StorageTank)[0].fill("всё")`, "type-not-assignable@1"],
 ]
 
 const GOOD: [string, string][] = [

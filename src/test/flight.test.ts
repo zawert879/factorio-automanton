@@ -78,7 +78,7 @@ try { pump("water") } catch (e) { print(e instanceof ActionError ? e.code : "?")
     if (!result.ok) error(describeDiagnostics(result.diagnostics).join("; "))
     const m = assignProgram(robot, result.program)
     waitUntil(t, "конца программы", () => m.machine.status === "done" || m.machine.status === "error", 300, () => {
-      expect(m.console.filter((line) => !line.startsWith("—")).join("|")).toBe("flyer-mk1 true true|-781|invalid-target|invalid-target")
+      expect(m.console.filter((line) => !line.startsWith("—")).join("|")).toBe("flyer-mk1 true true|-781|invalid-target|no-tank")
       robot.entity.destroy()
     })
   })

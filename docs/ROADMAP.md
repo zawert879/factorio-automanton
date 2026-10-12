@@ -321,7 +321,7 @@
 - [x] **19.2 Классы объектов игры.** `instanceof` для объектов игры в рантайме; классы API в проверке типов мода
   (`declare class`, `extends`, закрытые конструкторы, поиск по классу через `{ prototype: T }`); класс здания —
   по типу прототипа (4C); `zone.find`, `scan.buildings`.
-- [ ] **19.3 Методы зданий и машин.** `insert`, `extract`, `repair`, `rotate`, `deconstruct`, `setRecipe`, `fill`,
+- [x] **19.3 Методы зданий и машин.** `insert`, `extract`, `repair`, `rotate`, `deconstruct`, `setRecipe`, `fill`,
   `drain` у зданий; `insert`, `refuel`, `repair` у `Robot` — поверх действий этапа 2.
 - [ ] **19.4 `me` и его системы.** `me.move` … `me.say`; `me.energy`, `me.tank`, `me.weapon` (сейчас `me.weapon`
   всегда `null`, даже у боевых, — исправить).
