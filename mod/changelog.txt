@@ -1,4 +1,21 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.8.0
+Date: 2026-10-12
+  Major Features:
+    - Object API for machine programs: an action is a method of what it acts on (furnace.insert("coal", 5), chest.extract("iron-plate"), assembler.setRecipe("iron-gear-wheel"), boiler.fill()); your own machine's actions and systems are on me (me.move, me.mine, me.say, me.energy, me.tank, me.weapon); messaging is on radio. Only 11 global functions remain: print, chat, alert, wait, waitUntil, exit, restart, marker, zone, robot, display.
+    - Building classes: Chest, Furnace, Assembler, Boiler, StorageTank and 12 more, each with only the methods it supports. zone("smelter").find(Furnace) and scan.buildings({ kind: Chest }) return buildings of that class; x instanceof Furnace works for values received in messages too.
+  Changes:
+    - Breaking: programs written for 0.7 no longer build. On update every team program is rebuilt; the ones that fail are listed in the chat and marked in the Programs window, and their machines stop with an error until the program is fixed and published again. The compiler shows the new form of each old function ("move is gone — it is now me.move(…)").
+    - Was → now: move, canReach, follow, goHome, mine, pickup, drop, build, say(…) → me.move(…) and so on; take(b, item, n) → b.extract(item, n); put(b, item, n) → b.insert(item, n); give(robot, item, n) → robot.insert(item, n); repair(x) → x.repair(); setRecipe(a, r) → a.setRecipe(r); deconstruct(b) → b.deconstruct(); rotate(b) → b.rotate().
+    - Was → now: pump(fluid) → me.tank.pump(fluid); fill(b) → b.fill(); drain(b, fluid) → b.drain(fluid); refuel(item) → me.energy.refuel(item); refuel(item, robot) → robot.refuel(item); charge() → me.energy.charge(); me.fuel and robot.fuel → me.energy.level and robot.energy.level.
+    - Was → now: attack, guard, patrol, reload(…) → me.weapon.attack(…) and so on (me.weapon is null on non-combat models); send, publish, subscribe, unsubscribe, receive, tryReceive, request(…) and inbox → radio.send(…) and so on, radio.inbox; find("name", zone(z)) → zone(z).find("name") or zone(z).find(Furnace); scan.entities(…) → scan.buildings(…); Entity → Building.
+    - fill, drain and pump on a machine without a tank fail with the new error code no-tank.
+  Features:
+    - New example program Refueler (Заправщик): brings coal to whoever asks and checks with instanceof whether that is a machine or a building.
+    - Graphs keep their nodes; their code is rebuilt with the new API.
+  Info:
+    - Player guide, README, in-game help (F1) and VS Code types use the new API (Russian and English).
+---------------------------------------------------------------------------------------------------
 Version: 0.7.0
 Date: 2026-10-10
   Major Features:
