@@ -43,9 +43,31 @@ const BAD: [string, string, string][] = [
   ["у трубы нет insert", `zone("a").find(Pipe)[0].insert("coal")`, "type-no-property@1"],
   ["setRecipe — только у сборщика", `zone("a").find(Furnace)[0].setRecipe("x")`, "type-no-property@1"],
   ["fill: количество — число", `zone("a").find(StorageTank)[0].fill("всё")`, "type-not-assignable@1"],
+  ["у me нет insert (это у другой машины)", `me.insert("coal")`, "type-no-property@1"],
+  ["me.mine: предмет — строка", `me.mine(5)`, "type-not-assignable@1"],
+  ["у бака нет fill (это у здания)", `me.tank?.fill()`, "type-no-property@1"],
 ]
 
 const GOOD: [string, string][] = [
+  [
+    "me: действия и системы своей машины",
+    `me.move(marker("склад"), { radius: 2 })
+if (me.canReach(zone("шахта"))) me.mine("coal", me.cargo.free("coal"))
+me.pickup()
+me.drop("stone", 5)
+const built: Building = me.build("wooden-chest", { x: 1, y: 2 }, "north")
+if (me.energy.level < 0.3) me.energy.refuel("coal")
+const tank = me.tank
+if (tank !== null && tank.amount < tank.capacity) tank.pump("water")
+me.weapon?.reload("firearm-magazine")
+const hit: boolean = me.weapon?.attack(scan.enemies()[0]) ?? false
+me.weapon?.guard(marker("пост"), { radius: 10, until: () => time.isNight() })
+const other = scan.robots()[0]
+if (other.energy.level < 0.5) other.refuel("coal")
+me.say(\`\${built.id} \${hit}\`)
+me.follow(other, () => me.cargo.isFull())
+me.goHome()`,
+  ],
   [
     "классы объектов игры: поиск по классу, перегрузки, instanceof, BuildingKind<T>",
     `for (const f of zone("плавильня").find(Furnace)) print(f.output().count(), f.recipe, f.fuel()?.count())

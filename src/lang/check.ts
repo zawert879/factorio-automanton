@@ -272,9 +272,21 @@ function loadGlobals(): Globals {
     for (const stmt of parsed.program.body) declarations.push(stmt)
   }
   const ctx: TypeContext = { types, params: new Map(), valueOf }
+  // Интерфейс в нескольких объявлениях (interface Me в разделах «Движение», «Предметы»… docs/API.md, 19.4) —
+  // одно описание: члены и предки всех объявлений, как в TypeScript.
+  const interfaces = new Map<string, Extract<A.Stmt, { kind: "TypeDecl" }>>()
   for (const stmt of declarations) {
-    if (stmt.kind === "TypeDecl") types.set(stmt.name, interfaceDef(stmt, types, valueOf))
+    if (stmt.kind !== "TypeDecl") continue
+    const previous = interfaces.get(stmt.name)
+    if (previous !== undefined && previous.alias === undefined && stmt.alias === undefined) {
+      interfaces.set(stmt.name, {
+        ...previous,
+        members: [...(previous.members ?? []), ...(stmt.members ?? [])],
+        extends: [...(previous.extends ?? []), ...(stmt.extends ?? [])],
+      })
+    } else interfaces.set(stmt.name, stmt)
   }
+  for (const [name, stmt] of interfaces) types.set(name, interfaceDef(stmt, types, valueOf))
   for (const stmt of declarations) {
     if (stmt.kind === "DeclareClass") {
       const decl = stmt

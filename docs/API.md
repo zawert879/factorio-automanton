@@ -153,6 +153,7 @@ interface ItemStack { name: Item; count: number }
 | Здание, машина | `Furnace(stone-furnace #12 @ 10.5, 5.5)` — класс здания и имя, `Robot(АМ-7 #7)` (`me` — тоже) |
 | Метка, зона, табло | `Marker(склад)`, `Zone(плавильня)`, `Display(штаб)` |
 | Груз, сообщение, задача | `Inventory { coal: 7 }`, `Message(Robot(АМ-3 #3), "тема": данные)`, `Task(работа #4: данные)` |
+| Энергия, бак, оружие | `Energy(0.5)`, `Tank(water 100/1000)`, `Weapon(gun, firearm-magazine × 2)` |
 | Функция, класс, цикл | `[Function]`, `[class Route]`, `[Circular]` |
 
 Глубже 4 уровней — кратко (`[Array(5)]`, `{…}`), в массиве и объекте — первые 30 элементов (`…+70`).
@@ -171,6 +172,14 @@ declare const console: { log(...values: unknown[]): void };   // то же, чт
  * @en A speech bubble with text above the machine for `seconds` seconds (3 by default). All players see it.
  */
 declare function say(text: string, seconds?: number): void;
+
+interface Me {
+  /**
+   * Облачко с текстом над машиной на `seconds` секунд (по умолчанию 3). Видят все игроки. Было say.
+   * @en A speech bubble with text above the machine for `seconds` seconds (3 by default). All players see it. Was say.
+   */
+  say(text: string, seconds?: number): void;
+}
 
 /**
  * Сообщение в чат команды. Не чаще раза в 5 секунд с одной машины.
@@ -224,6 +233,7 @@ declare abstract class Machine {
   readonly program: string | null;     // имя программы из библиотеки @en name of the program from the library
   readonly health: number;             // 0..1
   readonly fuel: number;               // 0..1 — топливо или заряд @en 0..1 — fuel or charge
+  readonly energy: { readonly level: number };   // 0..1 — топливо или заряд @en 0..1 — fuel or charge
   distance(to: Target): number;
 }
 
@@ -259,8 +269,9 @@ interface Me extends Machine {
   label: string;                       // постоянная подпись над машиной (в отличие от say) @en a permanent label above the machine (unlike say)
   readonly cargo: Inventory;
   readonly fuel: number;               // 0..1 — топливо или заряд @en 0..1 — fuel or charge
-  readonly tank: FluidTank | null;     // бак, если есть у модели @en the tank, if the model has one
-  readonly weapon: Weapon | null;      // оружие, если модель боевая @en the weapon, if it is a combat model
+  readonly energy: Energy;             // уровень, заправка, зарядка @en level, refueling, charging
+  readonly tank: Tank | null;          // бак — только у рабочих моделей @en the tank — only on worker models
+  readonly weapon: Weapon | null;      // оружие — только у боевых моделей @en the weapon — only on combat models
   readonly reach: number;              // досягаемость до зданий, клеток (как у персонажа) @en reach to buildings, in tiles (like a character's)
   readonly mineReach: number;          // досягаемость до месторождения, клеток @en reach to resource patches, in tiles
   readonly vision: number;             // радиус зрения, клеток @en vision radius, in tiles
@@ -323,6 +334,30 @@ declare function follow(target: Robot | Entity, until: () => boolean): boolean;
  * @en Return to me.home.
  */
 declare function goHome(): void;
+
+interface Me {
+  /**
+   * Доехать до цели. К машине — только если она в поле зрения (иначе спроси у неё позицию сообщением).
+   * ActionError("no-path"), если пути нет. Было move.
+   * @en Drive to the target. To a machine — only if it is within sight (otherwise ask it for its position with a message). ActionError("no-path") if there is no path. Was move.
+   */
+  move(to: Target, opts?: { radius?: number; timeout?: number }): void;
+  /**
+   * Есть ли путь до цели (спрашивает поиск пути, занимает несколько тиков). Было canReach.
+   * @en Whether there is a path to the target (asks the pathfinder, takes a few ticks). Was canReach.
+   */
+  canReach(to: Target): boolean;
+  /**
+   * Ехать следом за целью, пока `until` не вернёт true. false — цель потеряна из виду. Было follow.
+   * @en Follow the target until `until` returns true. false — the target was lost from sight. Was follow.
+   */
+  follow(target: Robot | Building, until: () => boolean): boolean;
+  /**
+   * Вернуться в me.home. Было goHome.
+   * @en Return to me.home. Was goHome.
+   */
+  goHome(): void;
+}
 ```
 
 ```ts
@@ -370,6 +405,24 @@ declare function drop(item: Item, count?: number): number;
  * @en Hand items to another machine within me.reach, without a chest.
  */
 declare function give(to: Robot, item: Item, count?: number): number;
+
+interface Me {
+  /**
+   * Добыть ресурс, стоя у месторождения. Без count — пока не заполнится груз. Возвращает, сколько добыто. Было mine.
+   * @en Mine a resource while standing at the patch. Without count — until the cargo is full. Returns how much was mined. Was mine.
+   */
+  mine(item: Item, count?: number): number;
+  /**
+   * Подобрать предметы с земли вплотную. Без item — всё подряд. Было pickup.
+   * @en Pick up items lying right next to the machine. Without item — everything. Was pickup.
+   */
+  pickup(item?: Item, count?: number): number;
+  /**
+   * Выбросить предметы на землю. Было drop.
+   * @en Drop items on the ground. Was drop.
+   */
+  drop(item: Item, count?: number): number;
+}
 ```
 
 ```ts
@@ -441,6 +494,14 @@ declare function deconstruct(target: Entity): void;
  * @en [Construction] Rotate a building.
  */
 declare function rotate(target: Entity, reverse?: boolean): void;
+
+interface Me {
+  /**
+   * [Строительство] Поставить здание из груза. Было build.
+   * @en [Construction] Place a building from the cargo. Was build.
+   */
+  build(item: Item, at: Position, direction?: Direction): Building;
+}
 ```
 
 ```ts
@@ -872,11 +933,22 @@ for (const furnace of zone("плавильня").find(Furnace)) {
 ## Жидкости
 
 ```ts
-interface FluidTank {
+/**
+ * [Жидкости] Бак рабочей машины (me.tank; у других моделей — null).
+ * @en [Fluids] A worker machine's tank (me.tank; null on other models).
+ */
+interface Tank {
   readonly fluid: Fluid | null;        // null — бак пуст @en null — the tank is empty
   readonly amount: number;
   readonly capacity: number;           // Mk1 — 1000
+  /**
+   * Набрать в бак: воду — у берега (клетка воды в me.mineReach), нефть — стоя у месторождения.
+   * Без amount — до полного бака. Возвращает, сколько набрано. Было pump.
+   * @en Fill the tank: water at the shore (a water tile within me.mineReach), crude oil while standing at the patch. Without amount — until the tank is full. Returns how much was taken. Was pump.
+   */
+  pump(fluid: Fluid, amount?: number): number;
 }
+type FluidTank = Tank;
 
 /**
  * [Жидкости] Набрать в бак: воду — у берега (клетка воды в me.mineReach), нефть — стоя у месторождения.
@@ -931,6 +1003,24 @@ declare function refuel(item?: Item, to?: Robot): void;
  * @en Mk2+: drive to a station (by default the nearest visible one) and charge fully.
  */
 declare function charge(station?: Entity): void;
+
+/**
+ * Энергия своей машины (me.energy).
+ * @en Your machine's energy (me.energy).
+ */
+interface Energy {
+  readonly level: number;              // 0..1 — топливо или заряд. Было me.fuel @en 0..1 — fuel or charge. Was me.fuel
+  /**
+   * Mk1: переложить топливо из груза в топливный слот. Без item — лучшее, что есть. Было refuel.
+   * @en Mk1: move fuel from the cargo into the fuel slot. Without item — the best available. Was refuel.
+   */
+  refuel(item?: Item): void;
+  /**
+   * Mk2+: доехать до станции (по умолчанию — ближайшей видимой) и зарядиться полностью. Было charge.
+   * @en Mk2+: drive to a station (by default the nearest visible one) and charge fully. Was charge.
+   */
+  charge(station?: ChargingStation): void;
+}
 ```
 
 ```ts
@@ -1324,6 +1414,27 @@ interface Weapon {
   readonly type: "gun" | "shotgun" | "rocket" | "flamethrower";
   readonly ammo: ItemStack | null;       // заряжено @en loaded
   readonly range: number;                // дальность, клеток @en range, in tiles
+  /**
+   * Зарядить патронами из груза. Без ammo — лучшими, что есть. Было reload.
+   * @en Load ammo from the cargo. Without ammo — the best available. Was reload.
+   */
+  reload(ammo?: Item): void;
+  /**
+   * Подъехать на дальность выстрела и атаковать, пока цель не уничтожена, не пропала из виду
+   * или не кончились патроны. true — цель уничтожена. Было attack.
+   * @en Drive within firing range and attack until the target is destroyed, lost from sight or the ammo runs out. true — the target was destroyed. Was attack.
+   */
+  attack(target: Enemy | Building): boolean;
+  /**
+   * Стоять у точки и отбиваться от всех врагов в радиусе, пока until() не вернёт true. Было guard.
+   * @en Stand at the point and fight off all enemies within the radius until until() returns true. Was guard.
+   */
+  guard(at: Target, opts?: { radius?: number; until?: () => boolean }): void;
+  /**
+   * Объезжать точки по кругу, атакуя встреченных врагов, пока until() не вернёт true. Было patrol.
+   * @en Patrol the points in a loop, attacking enemies on the way, until until() returns true. Was patrol.
+   */
+  patrol(points: Target[], until?: () => boolean): void;
 }
 
 /**

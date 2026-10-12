@@ -2,7 +2,7 @@
 import { LuaSurface } from "factorio:runtime"
 import { findRobot, RobotRecord } from "../automaton/registry"
 import { tankOf } from "../automaton/tank"
-import { TECH, WORKER_MK1, WORKER_MK1_PLACER } from "../names"
+import { COMBAT_MK1, TECH, WORKER_MK1, WORKER_MK1_PLACER } from "../names"
 import { describeDiagnostics } from "../program/commands"
 import { entityHandle } from "../program/handles"
 import { assignProgram, MachineRecord } from "../program/machines"
@@ -113,6 +113,45 @@ print(tank.fill(50), tank.drain("water", 20), Math.round(tank.fluid("water")))`,
       techs[TECH.construction].researched = before[2]
       for (const e of [chest, furnace, tank, assembler]) e.destroy()
       helper.entity.destroy()
+      robot.entity.destroy()
+    })
+  })
+
+  test("me: действия своей машины, энергия, бак; оружие — у боевой модели", (t) => {
+    const { surface, robot } = site(-520, 900)
+    const techs = game.forces.player.technologies
+    const before = [techs[TECH.fluids].researched, techs[TECH.combat1].researched]
+    techs[TECH.fluids].researched = true
+    techs[TECH.combat1].researched = true
+    robot.cargo.insert({ name: "coal", count: 5 })
+    surface.create_entity({ name: `${COMBAT_MK1}-placer`, position: { x: -510.5, y: 910.5 }, force: "player", raise_built: true })
+    const fighter = findRobot(surface.find_entities_filtered({ name: COMBAT_MK1, position: { x: -510.5, y: 910.5 }, radius: 0.5 })[0])!
+    fighter.cargo.insert({ name: "firearm-magazine", count: 2 })
+    const worker = run(
+      robot,
+      "test-me-worker",
+      `const x0 = me.position.x
+me.move({ x: x0 + 5, y: me.position.y })
+print(Math.abs(me.position.x - (x0 + 5)) < 1.5)
+me.energy.refuel("coal")
+print(me.energy.level > 0, me.cargo.count("coal"), me.fuel === me.energy.level)
+print(me.tank !== null ? me.tank.capacity : -1, me.tank?.fluid ?? "пусто", me.weapon === null)
+me.say("готово")`,
+    )
+    const combat = run(
+      fighter,
+      "test-me-fighter",
+      `const weapon = me.weapon!
+print(weapon.type, weapon.range, weapon.ammo === null, me.tank === null)
+weapon.reload()
+print(weapon.ammo!.name, weapon.ammo!.count)`,
+    )
+    waitUntil(t, "конца программ", () => finished(worker)() && finished(combat)(), 600, () => {
+      expect(worker.console.filter((line) => !line.startsWith("—")).join("|")).toBe("true|true 0 true|1000 пусто true|say: готово")
+      expect(combat.console.filter((line) => !line.startsWith("—")).join("|")).toBe("gun 15 true true|firearm-magazine 2")
+      techs[TECH.fluids].researched = before[0]
+      techs[TECH.combat1].researched = before[1]
+      fighter.entity.destroy()
       robot.entity.destroy()
     })
   })

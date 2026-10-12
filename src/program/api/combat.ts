@@ -4,7 +4,7 @@
 import { LuaEntity, MapPosition } from "factorio:runtime"
 import { combatPose, hasAmmo, stopCombat, weaponOf } from "../../automaton/combat"
 import { RobotRecord } from "../../automaton/registry"
-import { host, hostBlocking, hostGetters, program, Val, Y } from "../../lang/runtime/core"
+import { charge, defineHostObject, host, hostBlocking, hostGetters, hostMethods, program, Val, Y } from "../../lang/runtime/core"
 import { truthy } from "../../lang/runtime/values"
 import { actionError, currentRobot } from "../context"
 import { handleEntity, resolveTarget } from "../handles"
@@ -179,13 +179,19 @@ host.reload = (k: Val, ammo: Val) => {
 }
 hostBlocking.reload = true
 
-hostGetters.me.weapon = () => {
-  const robot = currentRobot()
-  const weapon = weaponOf(robot)
-  if (weapon === undefined) return undefined
-  const stack = robot.weapon?.[0]
-  const ammo = stack !== undefined && stack.valid_for_read ? { name: stack.name, count: stack.count } : undefined
-  return { type: weapon.type, ammo, range: weapon.range }
+// me.weapon (19.4): оружие боевой модели — состояние при обращении и действия боя (те же функции API).
+const weaponObject = defineHostObject("weapon")
+hostGetters.me.weapon = () => (weaponOf(currentRobot()) === undefined ? undefined : weaponObject)
+hostGetters.weapon.type = () => weaponOf(currentRobot())?.type
+hostGetters.weapon.range = () => weaponOf(currentRobot())?.range
+hostGetters.weapon.ammo = () => {
+  const stack = currentRobot().weapon?.[0]
+  if (stack === undefined || !stack.valid_for_read) return undefined
+  charge(1)
+  return { name: stack.name, count: stack.count }
+}
+for (const name of ["reload", "attack", "guard", "patrol"]) {
+  hostMethods.weapon[name] = (_o: Val, k: Val, ...args: Val[]) => host[name](k, ...args)
 }
 
 // Программу остановили или перезапустили посреди боя — команда движку снимается.

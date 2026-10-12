@@ -80,11 +80,17 @@ const HOST_FUNCTIONS: Record<string, boolean> = {
  * может оказаться каким угодно, поэтому — по имени: функция с вызовом метода с таким именем возобновляемая
  * (у массива arr.fill(0) — лишняя точка остановки, не ошибка).
  */
-export const BLOCKING_OBJECT_METHODS = ["insert", "extract", "repair", "rotate", "deconstruct", "setRecipe", "fill", "drain", "refuel"]
+export const BLOCKING_OBJECT_METHODS = [
+  "insert", "extract", "repair", "rotate", "deconstruct", "setRecipe", "fill", "drain", "refuel",
+  // Системы своей машины (19.4): me.energy.charge(), me.tank.pump(…), me.weapon.attack(…) и т. д.
+  "charge", "pump", "reload", "attack", "guard", "patrol",
+]
 
 /** Методы объектов API, которые ждут: tasks.next(…). */
 export const BLOCKING_HOST_METHODS: Record<string, Record<string, boolean>> = {
   tasks: { next: true },
+  // Действия своей машины (19.4).
+  me: { move: true, canReach: true, follow: true, goHome: true, mine: true, pickup: true, drop: true, build: true },
 }
 
 const HOST_OBJECTS = ["me", "console", "scan", "map", "board", "tasks", "signals", "time", "world", "inbox"]

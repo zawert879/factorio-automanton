@@ -111,9 +111,10 @@ const meFields: Record<string, (this: void) => Val> = {
   vision: () => 20,
   label: () => "",
   home: () => ({ x: 0, y: 0 }),
-  weapon: () => ({ ammo: { count: 30 } }),
+  weapon: () => hostObject("weapon", {}),
   cargo: () => inventory(arr({ name: "iron-plate", count: 8 })),
-  tank: () => ({ fluid: "water", amount: 0, capacity: 1000 }),
+  tank: () => hostObject("tank", {}),
+  energy: () => hostObject("energy", {}),
   model: () => "worker-mk2",
 }
 for (const [name, fn] of Object.entries(meFields)) hostGetters.me[name] = fn
@@ -121,6 +122,23 @@ hostSetters.me.label = (_o: Val, v: Val) => log.push(`label ${tostring(v)}`)
 hostMethods.me.args = () => ({ ore: "iron-ore", field: "north-iron" })
 hostMethods.me.distance = () => 3
 hostMethods.me.refuel = () => undefined
+// Действия и системы своей машины (19.4) — как в игре (src/program/api/me.ts): те же функции API.
+for (const name of ["move", "canReach", "follow", "goHome", "mine", "pickup", "drop", "build"]) {
+  hostMethods.me[name] = (_o: Val, k: Val, ...args: Val[]) => host[name](k, ...args)
+}
+defineHostObject("energy")
+hostGetters.energy.level = () => 0.5
+for (const name of ["refuel", "charge"]) hostMethods.energy[name] = (_o: Val, k: Val, ...args: Val[]) => host[name](k, ...args)
+defineHostObject("tank")
+hostGetters.tank.fluid = () => "water"
+hostGetters.tank.amount = () => 0
+hostGetters.tank.capacity = () => 1000
+hostMethods.tank.pump = (_o: Val, k: Val, ...args: Val[]) => host.pump(k, ...args)
+defineHostObject("weapon")
+hostGetters.weapon.type = () => "gun"
+hostGetters.weapon.range = () => 15
+hostGetters.weapon.ammo = () => ({ name: "firearm-magazine", count: 30 })
+for (const name of ["reload", "attack", "guard", "patrol"]) hostMethods.weapon[name] = (_o: Val, k: Val, ...args: Val[]) => host[name](k, ...args)
 
 // scan, map
 defineHostObject("scan")
@@ -209,6 +227,9 @@ const blocking: Record<string, (this: void, ...args: Val[]) => Val> = {
   fill: () => 500,
   drain: () => 100,
   reload: () => undefined,
+  attack: () => true,
+  pickup: () => 2,
+  drop: () => 1,
   refuel: () => undefined,
   charge: () => undefined,
   guard: () => undefined,

@@ -3,6 +3,9 @@ import { say as showBubble } from "../../automaton/status"
 import { defineHostObject, host, hostMethods, Val } from "../../lang/runtime/core"
 import { inspect, setHostInspector } from "../../lang/runtime/inspect"
 import { formatNumber } from "../../lang/runtime/values"
+import { fuelLevel } from "../../automaton/energy"
+import { tankCapacity, tankOf } from "../../automaton/tank"
+import { weaponOf } from "../../automaton/combat"
 import { currentMachine, currentRobot } from "../context"
 import { resolveInventory } from "../handles"
 import { appendConsole } from "../machines"
@@ -44,6 +47,20 @@ setHostInspector((x, inner) => {
     case "message": {
       const mail = x.__mail
       return `Message(${robotText(mail.from)}, ${inner(mail.topic)}: ${inner(mail.data)})`
+    }
+    // Системы своей машины (19.4): Energy(0.5), Tank(water 100/1000), Weapon(gun, firearm-magazine × 2).
+    case "energy":
+      return `Energy(${formatNumber(fuelLevel(currentRobot()))})`
+    case "tank": {
+      const robot = currentRobot()
+      const tank = tankOf(robot)
+      return `Tank(${tank.amount > 0 ? `${tank.fluid} ${formatNumber(tank.amount)}` : "—"}/${formatNumber(tankCapacity(robot))})`
+    }
+    case "weapon": {
+      const robot = currentRobot()
+      const stack = robot.weapon?.[0]
+      const ammo = stack !== undefined && stack.valid_for_read ? `${stack.name} × ${stack.count}` : "—"
+      return `Weapon(${weaponOf(robot)?.type ?? "?"}, ${ammo})`
     }
     case "inventory": {
       // Содержимое — если его видно (своё или здание в поле зрения).

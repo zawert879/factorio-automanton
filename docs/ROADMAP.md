@@ -323,8 +323,7 @@
   по типу прототипа (4C); `zone.find`, `scan.buildings`.
 - [x] **19.3 Методы зданий и машин.** `insert`, `extract`, `repair`, `rotate`, `deconstruct`, `setRecipe`, `fill`,
   `drain` у зданий; `insert`, `refuel`, `repair` у `Robot` — поверх действий этапа 2.
-- [ ] **19.4 `me` и его системы.** `me.move` … `me.say`; `me.energy`, `me.tank`, `me.weapon` (сейчас `me.weapon`
-  всегда `null`, даже у боевых, — исправить).
+- [x] **19.4 `me` и его системы.** `me.move` … `me.say`; `me.energy`, `me.tank`, `me.weapon` — объекты с действиями.
 - [ ] **19.5 `radio`.** Сообщения, запросы, подписки и `inbox` в одном объекте.
 - [ ] **19.6 Переход.** Примеры, «Помощники», сохранение «наука», код из схем мастерской, тесты — на новый API;
   старые глобальные функции убрать; `docs/API.md` (ru, en), `automaton.d.ts`, справка в игре; при обновлении мод

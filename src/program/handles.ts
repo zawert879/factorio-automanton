@@ -320,6 +320,7 @@ robotGetters.state = (o: Val) => robotState(sightedRobot(o))
 robotGetters.program = (o: Val) => robotProgramName(sightedRobot(o))
 robotGetters.health = (o: Val) => robotHealth(sightedRobot(o))
 robotGetters.fuel = (o: Val) => fuelLevel(sightedRobot(o))
+robotGetters.energy = (o: Val) => ({ level: fuelLevel(sightedRobot(o)) })
 hostMethods.robot.distance = (o: Val, _k: Val, to: Val) => distanceBetween(sightedRobot(o).entity.position, to)
 rawset(hostMethods.robot, "toString", (o: Val) => `${storage.robots.byId[o.__id]?.name ?? "robot"}#${o.__id}`)
 

@@ -1,9 +1,10 @@
 // Своя машина — me (4.4): состояние, имя и подпись, груз, топливо, параметры программы (args),
-// память (memory: переживает перезапуск программы и подбор машины).
+// память (memory: переживает перезапуск программы и подбор машины). Действия своей машины (19.4): me.move, me.mine,
+// me.say, …; системы — me.energy (у всех), me.tank (у рабочих), me.weapon (у боевых; см. combat.ts).
 import { fuelLevel } from "../../automaton/energy"
 import { tankCapacity, tankOf } from "../../automaton/tank"
 import { robotPosition } from "../../automaton/flight"
-import { charge, defineHostObject, hostGetters, hostKindClass, hostMethods, hostSetters, Val } from "../../lang/runtime/core"
+import { defineHostObject, host, hostGetters, hostKindClass, hostMethods, hostSetters, Val } from "../../lang/runtime/core"
 import { actionError, currentMachine, currentRobot } from "../context"
 import { modelOfRecord, robotBattery, robotVision } from "../../automaton/models"
 import { cargoHandle, distanceBetween, ROBOT_REACH, robotHandle, robotHealth, robotProgramName, robotState } from "../handles"
@@ -26,14 +27,9 @@ getters.health = () => robotHealth(currentRobot())
 getters.label = () => currentMachine().label ?? ""
 getters.cargo = () => cargoHandle(currentRobot())
 getters.fuel = () => fuelLevel(currentRobot())
-getters.tank = () => {
-  const robot = currentRobot()
-  const tank = tankOf(robot)
-  if (tankCapacity(robot) <= 0) return undefined
-  charge(1)
-  return { fluid: tank.amount > 0 ? tank.fluid : undefined, amount: tank.amount, capacity: tankCapacity(robot) }
-}
-getters.weapon = () => undefined
+getters.energy = () => energyObject
+getters.tank = () => (tankCapacity(currentRobot()) <= 0 ? undefined : tankObject)
+// me.weapon — в combat.ts.
 getters.reach = () => ROBOT_REACH.reach
 getters.mineReach = () => ROBOT_REACH.mineReach
 getters.vision = () => robotVision(currentRobot())
@@ -60,6 +56,29 @@ hostSetters.me.label = (_o: Val, value: Val) => {
 }
 
 hostMethods.me.args = () => copyValue(currentMachine().args)
+
+// Действия своей машины (19.4) — те же функции API (move, mine, …); ищутся при вызове, поэтому с проверкой
+// исследований (research.ts оборачивает их позже).
+for (const name of ["move", "canReach", "follow", "goHome", "mine", "pickup", "drop", "build"]) {
+  hostMethods.me[name] = (_o: Val, k: Val, ...args: Val[]) => host[name](k, ...args)
+}
+hostMethods.me.say = (_o: Val, _k: Val, ...args: Val[]) => host.say(...args)
+
+// Энергия: уровень и заправка (Mk1) или зарядка (Mk2+).
+const energyObject = defineHostObject("energy")
+hostGetters.energy.level = () => fuelLevel(currentRobot())
+hostMethods.energy.refuel = (_o: Val, k: Val, item: Val) => host.refuel(k, item)
+hostMethods.energy.charge = (_o: Val, k: Val, station: Val) => host.charge(k, station)
+
+// Бак: состояние читается при обращении (не снимок), pump — та же функция API.
+const tankObject = defineHostObject("tank")
+hostGetters.tank.fluid = () => {
+  const tank = tankOf(currentRobot())
+  return tank.amount > 0 ? tank.fluid : undefined
+}
+hostGetters.tank.amount = () => tankOf(currentRobot()).amount
+hostGetters.tank.capacity = () => tankCapacity(currentRobot())
+hostMethods.tank.pump = (_o: Val, k: Val, ...args: Val[]) => host.pump(k, ...args)
 hostMethods.me.distance = (_o: Val, _k: Val, to: Val) => distanceBetween(currentRobot().entity.position, to)
 
 // Память: значения копируются (как сообщения) — изменение прочитанного объекта не меняет память.

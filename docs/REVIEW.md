@@ -364,6 +364,10 @@
     `boiler.fill()`, `tank.drain("water")`, `building.repair()` / `rotate()` / `deconstruct()`; другой машине —
     `helper.insert("coal", 3)`, `helper.refuel()`, `helper.repair()`. Проверь в игре пример раздела «Классы зданий»
     (обход печей) и заправщика из «Энергии» на новый лад.
+    **19.4 `me`:** `me.move`, `me.canReach`, `me.follow`, `me.goHome`, `me.mine`, `me.pickup`, `me.drop`, `me.build`,
+    `me.say`; `me.energy` (`level`, `refuel()`, `charge()`), `me.tank` (`pump()`, у рабочих), `me.weapon` (`reload()`,
+    `attack()`, `guard()`, `patrol()`, у боевых). **Я ошибся** в чате: `me.weapon` работал и раньше — заглушка в
+    me.ts, которую заменяет combat.ts. В `print` — `Energy(0.5)`, `Tank(water 100/1000)`, `Weapon(gun, firearm-magazine × 2)`.
 
 ## Решения, принятые без тебя
 
@@ -620,3 +624,6 @@
 | 19.3 | Исследования: `fill` / `drain` — «Жидкости», `setRecipe` — «Наладка», `rotate` / `deconstruct` — «Строительство», как у прежних функций | |
 | 19.3 | `Locomotive` — только `insert` (топливо), `Boiler` — `insert` без `extract`, `FlameTurret` — только `fill`: как в черновике | Добавить можно, если понадобится |
 | 19.3 | Проверка десинков один раз из пяти упала в шаге сценария (расстановка машин на случайной карте, `find_non_colliding_position`), сообщение потерялось; остальные четыре — ок. Шаги сценария новый API не трогают | Похоже на давнюю зависимость от карты, как у теста мастерской (поправил его в 19.2) |
+| 19.4 | Методы `me` в API.md — по разделам (`interface Me { move … }` в «Движении», `{ mine … }` в «Предметах»): в справке они рядом с прежними функциями; проверка типов в игре научилась сливать одноимённые интерфейсы, как TypeScript | |
+| 19.4 | `me.tank` и `me.weapon` — живые объекты (поля читаются при обращении), а не снимок, как раньше `me.tank` | Иначе `const t = me.tank` после `t.pump()` показывал бы старое |
+| 19.4 | У другой машины `robot.energy.level` (как `me.energy.level`); `robot.fuel` и `me.fuel` остаются до 19.6 | |

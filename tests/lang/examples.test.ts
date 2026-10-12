@@ -40,4 +40,16 @@ helper.refuel()
 print(total, helper.insert("coal", 1))`
     expect(outputOf(source, { copy: true, quantum: 3 })).toBe("15 5")
   })
+
+  test("me: действия своей машины и её системы ждут действия", () => {
+    const source = `me.move({ x: 1, y: 2 })
+const n = me.mine("coal", 3)
+me.say("ok")
+me.energy.refuel("coal")
+const pumped = me.tank?.pump("water", 100) ?? -1
+const weapon = me.weapon
+if (weapon !== null) { weapon.reload(); print(weapon.attack(zone("a").find(Furnace)[0]), weapon.ammo?.count) }
+print(n, pumped, me.energy.level, me.tank?.capacity, me.pickup(), me.drop("coal"))`
+    expect(outputOf(source, { copy: true, quantum: 3 })).toBe("ok|true 30|3 1000 0.5 1000 2 1")
+  })
 })
