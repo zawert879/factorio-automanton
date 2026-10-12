@@ -7,6 +7,7 @@ import type { SyncBuffer } from "./program/sync"
 import type { CommsState } from "./program/comms"
 import type { BoardState, TasksState } from "./program/board"
 import type { MovementState } from "./automaton/movement"
+import type { GatesState } from "./automaton/gates"
 import type { FlightState } from "./automaton/flight"
 import type { RobotRegistry } from "./automaton/registry"
 import type { HandlesState } from "./program/handles"
@@ -27,6 +28,8 @@ declare global {
     commandUses: number
     robots: RobotRegistry
     movement: MovementState
+    /** Ворота по чанкам — открываются перед машинами (src/automaton/gates.ts). */
+    gates: GatesState
     /** Полёты летающих машин (src/automaton/flight.ts). */
     flight: FlightState
     actions: ActionsState

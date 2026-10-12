@@ -11,6 +11,7 @@ import "./automaton/construction"
 import { registerCombat } from "./automaton/combat"
 import { initFlight, registerFlight } from "./automaton/flight"
 import { initMovement, registerMovement } from "./automaton/movement"
+import { initGates, registerGates } from "./automaton/gates"
 import { registerModels } from "./automaton/models"
 import { registerBlueprints } from "./automaton/blueprints"
 import { registerPlacement } from "./automaton/placement"
@@ -54,6 +55,7 @@ function initStorage(): void {
   initSync()
   initRegistry()
   initMovement()
+  initGates()
   initFlight()
   initActions()
   initMining()
@@ -90,6 +92,7 @@ registerCombat()
 registerFlight()
 registerRegistryEvents()
 registerMovement()
+registerGates()
 registerAppearance()
 registerActions()
 registerDebugCommands()

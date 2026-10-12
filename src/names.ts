@@ -239,6 +239,8 @@ export function modelOf(name: string): ModelSpec | undefined {
 }
 
 export const ROBOT_ENTITIES: readonly string[] = MODELS.map((m) => m.entity)
+/** Слой столкновений наземных машин: всё, с чем они сталкиваются, кроме ворот (src/prototypes/gates.ts). */
+export const AUTOMATON_COLLISION_LAYER = "automaton-solid"
 export const ROBOT_PLACERS: readonly string[] = MODELS.map((m) => m.placer)
 
 /** Технологии автоматонов (6.3): открывают возможности API и модели машин (таблица — docs/API.md, «Исследования»). */
