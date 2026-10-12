@@ -355,8 +355,9 @@ for (const stack of me.cargo.items()) counts.set(stack.name, stack.count)
   Переименовать — `/am-name`, наведя курсор.
 - **Зона** — прямоугольник, выделенный «Программатором» (рамка левой кнопкой). `zone("плавильня")`, а
   `zone("плавильня").find(Furnace)` — печи в ней на любом расстоянии.
-- **Зрение** — `scan.buildings(...)`, `scan.resources()`, `scan.robots()`, `scan.items()`,
-  `scan.water()` и (с «Сенсорами 2») `scan.enemies()`: только в радиусе зрения, от ближнего к дальнему.
+- **Зрение** — `scan.buildings(...)`, `scan.resources()`, `scan.robots()`, `scan.items()`, `scan.trees()`,
+  `scan.rocks()`, `scan.water()` и (с «Сенсорами 2») `scan.enemies()`: только в радиусе зрения, от ближнего
+  к дальнему. Деревья рубит и скалы разбивает `me.mine(tree)`, а `me.mine("wood")` — ближайшее дерево рядом.
 - **Карта** — `map.tag(позиция, текст, значок)` ставит отметку на карте для всех игроков.
 
 ## Рецепты
@@ -371,6 +372,22 @@ while (true) {
   if (me.energy.level < 0.5) me.energy.refuel("coal")
   me.move(marker("склад"), { radius: 2 })
   scan.buildings({ kind: Chest })[0].insert("coal")
+}
+```
+
+**Дровосек**
+
+```ts
+// Рубит деревья у метки «лес» и возит дрова в сундук у метки «склад».
+while (true) {
+  me.move(marker("лес"), { radius: 3 })
+  for (const tree of scan.trees()) {
+    if (me.cargo.isFull()) break
+    me.move(tree, { radius: 2 })
+    me.mine(tree)
+  }
+  me.move(marker("склад"), { radius: 2 })
+  if (me.cargo.count("wood") > 0) scan.buildings({ kind: Chest })[0].insert("wood")
 }
 ```
 

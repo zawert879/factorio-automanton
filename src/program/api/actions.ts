@@ -4,6 +4,8 @@
 // Методы зданий и машин (19.3): furnace.insert(…), chest.extract(…), assembler.setRecipe(…), boiler.fill(…),
 // helper.refuel(…) — цель действия — сам объект.
 import { LuaEntity, MapPosition } from "factorio:runtime"
+import { ActionParams } from "../../automaton/actions"
+import { isNatural } from "../../automaton/mining"
 import { isFlyer } from "../../automaton/models"
 import { cancelMove, isMoving, moveRobot } from "../../automaton/movement"
 import { onEvent } from "../../events"
@@ -136,7 +138,15 @@ registerPoll("follow", (record, frame, tick) => {
 
 // ---------- Предметы ----------
 
-blocking("mine", (k, what, amount) => actionCall(k, "mine", k !== undefined ? {} : { item: item(what), count: count(amount) }))
+/** me.mine(item, count?) — из ближайшего источника; me.mine(tree) — это дерево или скала целиком (21.2). */
+function mineParams(what: Val, amount: Val): ActionParams {
+  if (type(what) !== "table" || what.__t !== "host") return { item: item(what), count: count(amount) }
+  const entity = handleEntity(what)
+  if (!isNatural(entity)) actionError("invalid-target", "me.mine needs an item, a tree or a rock")
+  return { target: entity, only: true }
+}
+
+blocking("mine", (k, what, amount) => actionCall(k, "mine", k !== undefined ? {} : mineParams(what, amount)))
 blocking("pickup", (k, what, amount) => actionCall(k, "pickup", k !== undefined ? {} : { item: optionalItem(what), count: count(amount) }))
 blocking("drop", (k, what, amount) => actionCall(k, "drop", k !== undefined ? {} : { item: item(what), count: count(amount) }))
 blocking("refuel", (k, what, to) =>

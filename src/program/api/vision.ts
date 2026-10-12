@@ -1,6 +1,7 @@
-// Зрение (4.6): scan.robots / buildings / items / resources / enemies / water — только в радиусе зрения
+// Зрение (4.6): scan.robots / buildings / items / trees / rocks / resources / enemies / water — только в радиусе зрения
 // (Mk1 — 10 клеток), от ближнего к дальнему. Каждый взгляд стоит энергии, больше радиус — дороже.
 // scan.buildings (19.2) — здания, с фильтром по классу и имени: scan.buildings({ kind: Furnace }).
+// scan.trees, scan.rocks (21.2) — деревья и скалы: их рубят и разбивают me.mine.
 import { LuaEntity, MapPosition } from "factorio:runtime"
 import { spend } from "../../automaton/energy"
 import { defineHostObject, hostMethods, Val } from "../../lang/runtime/core"
@@ -12,6 +13,7 @@ import { buildingKind, nameList } from "./common"
 import { programArray, programPosition } from "../values"
 import { findCached } from "../cache"
 import { RobotRecord } from "../../automaton/registry"
+import { isRock } from "../../automaton/mining"
 
 /** Энергия взгляда радиусом 10 клеток. */
 const SCAN_JOULES = 2_000
@@ -97,6 +99,18 @@ hostMethods.scan.items = (_o: Val, _k: Val, radius: Val) => {
   const found = seen(robot, "items", look(radius), { type: "item-entity" })
   const items = byDistance(found, (e) => e.position)
   return programArray(items.map((e) => ({ item: e.stack!.name, count: e.stack!.count, position: programPosition(e.position) })))
+}
+
+hostMethods.scan.trees = (_o: Val, _k: Val, radius: Val) => {
+  const robot = currentRobot()
+  const found = seen(robot, "trees", look(radius), { type: "tree" })
+  return programArray(byDistance(found, (e) => e.position).map((e) => entityHandle(e)))
+}
+
+hostMethods.scan.rocks = (_o: Val, _k: Val, radius: Val) => {
+  const robot = currentRobot()
+  const found = seen(robot, "rocks", look(radius), { type: "simple-entity" }).filter((e) => isRock(e))
+  return programArray(byDistance(found, (e) => e.position).map((e) => entityHandle(e)))
 }
 
 hostMethods.scan.resources = (_o: Val, _k: Val, radius: Val) => {

@@ -360,8 +360,9 @@ Action errors are an `ActionError` with a code:
   To rename it, hover the cursor over it and type `/am-name`.
 - **Zone** — a rectangle selected with the **Programmer** (left-drag). `zone("smelting")`, and
   `zone("smelting").find(Furnace)` gives the furnaces in it at any distance.
-- **Vision** — `scan.buildings(...)`, `scan.resources()`, `scan.robots()`, `scan.items()`,
-  `scan.water()` and (with **Automaton sensors 2**) `scan.enemies()`: only within the vision radius, nearest first.
+- **Vision** — `scan.buildings(...)`, `scan.resources()`, `scan.robots()`, `scan.items()`, `scan.trees()`,
+  `scan.rocks()`, `scan.water()` and (with **Automaton sensors 2**) `scan.enemies()`: only within the vision radius,
+  nearest first. `me.mine(tree)` chops a tree or breaks a rock, and `me.mine("wood")` chops the nearest tree.
 - **Map** — `map.tag(position, text, icon)` puts a tag on the map for all players.
 
 ## Recipes
@@ -376,6 +377,22 @@ while (true) {
   if (me.energy.level < 0.5) me.energy.refuel("coal")
   me.move(marker("depot"), { radius: 2 })
   scan.buildings({ kind: Chest })[0].insert("coal")
+}
+```
+
+**A woodcutter**
+
+```ts
+// Chops trees at the "forest" marker and takes the wood to the chest at the "depot" marker.
+while (true) {
+  me.move(marker("forest"), { radius: 3 })
+  for (const tree of scan.trees()) {
+    if (me.cargo.isFull()) break
+    me.move(tree, { radius: 2 })
+    me.mine(tree)
+  }
+  me.move(marker("depot"), { radius: 2 })
+  if (me.cargo.count("wood") > 0) scan.buildings({ kind: Chest })[0].insert("wood")
 }
 ```
 

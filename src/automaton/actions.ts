@@ -42,6 +42,8 @@ export interface ActionParams {
   direction?: defines.direction
   /** Повернуть против часовой стрелки (rotate). */
   reverse?: boolean
+  /** Добыть только цель (me.mine(tree)): дерево срублено — действие кончилось. */
+  only?: boolean
 }
 
 export interface ActionState {

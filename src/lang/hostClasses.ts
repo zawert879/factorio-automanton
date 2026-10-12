@@ -1,4 +1,4 @@
-// Классы объектов игры (19.2, DESIGN.md «API объектами»): здания, машины, враги, метки, зоны.
+// Классы объектов игры (19.2, DESIGN.md «API объектами»): здания, машины, враги, деревья и скалы (21.2), метки, зоны.
 // Экземпляры создаёт только игра (new — ошибка), программа проверяет их через instanceof. Общий список
 // для компилятора (имена — встроенные классы, src/lang/builtins.ts) и рантайма (иерархия для instanceof и
 // методов, src/lang/runtime/core.ts). Объявления для проверки типов и VS Code — docs/API.md.
@@ -8,6 +8,8 @@ export const HOST_CLASSES: [name: string, parent: string | undefined][] = [
   ["Machine", undefined],
   ["Robot", "Machine"],
   ["Enemy", undefined],
+  ["Tree", undefined],
+  ["Rock", undefined],
   ["Marker", undefined],
   ["Zone", undefined],
   ["Building", undefined],

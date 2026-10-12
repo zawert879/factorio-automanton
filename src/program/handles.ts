@@ -12,6 +12,7 @@ import { currentAction } from "../automaton/actions"
 import { distanceToEntity } from "../automaton/actions"
 import { entityFluid, entityFuel, entityInput, entityItemCount, entityOutput, entityProgress, entityRecipe, entityStatus } from "../automaton/inspect"
 import { fuelLevel } from "../automaton/energy"
+import { isRock, isTree, naturalProducts } from "../automaton/mining"
 import { robotPosition } from "../automaton/flight"
 import { modelOfRecord, robotVision } from "../automaton/models"
 import { isMoving } from "../automaton/movement"
@@ -68,9 +69,11 @@ const CLASS_BY_TYPE: Record<string, string> = {
   "spider-vehicle": "Vehicle",
 }
 
-/** Класс объекта игры для обёртки здания: враги — Enemy, станция зарядки — по имени, остальное — по типу. */
+/** Класс объекта игры для обёртки здания: враги — Enemy, деревья и скалы — Tree и Rock, станция зарядки — по имени, остальное — по типу. */
 export function buildingClass(entity: LuaEntity): string {
   if (entity.force.name === "enemy") return "Enemy"
+  if (isTree(entity)) return "Tree"
+  if (isRock(entity)) return "Rock"
   if (entity.name === CHARGING_STATION) return "ChargingStation"
   return CLASS_BY_TYPE[entity.type] ?? "Building"
 }
@@ -275,6 +278,14 @@ rawset(entityMethods, "toString", (o: Val) => `${o.__name}#${tostring(o.__id ?? 
 // Враги — обёртки зданий с классом Enemy: только то, что объявлено у Enemy.
 for (const key of ["id", "valid", "inSight", "name", "position", "health"]) hostGetters.Enemy[key] = entityGetters[key]
 rawset(hostMethods.Enemy, "toString", entityMethods.toString)
+
+// Деревья и скалы (21.2) — тоже обёртки сущностей, с классами Tree и Rock: место, имя и что дают. Номера у них
+// нет, поэтому обёртка не одна на дерево: сравнивать деревья — по месту.
+for (const cls of ["Tree", "Rock"]) {
+  for (const key of ["valid", "inSight", "name", "position"]) hostGetters[cls][key] = entityGetters[key]
+  hostGetters[cls].products = (o: Val) => programArray(naturalProducts(o.__name))
+  rawset(hostMethods[cls], "toString", (o: Val) => `${o.__name}(${o.__x}, ${o.__y})`)
+}
 
 // ---------- Машины ----------
 

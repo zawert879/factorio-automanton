@@ -19,7 +19,8 @@
   квант не тратят, поэтому ждать через них выгоднее, чем крутиться вхолостую. Что сколько стоит и когда
   выполняется строка — раздел [«Время программы»](#время-программы).
 - **Руки — как у персонажа.** Брать, класть, чинить, строить можно только в радиусе досягаемости
-  `me.reach` (как у персонажа — 10 клеток); добывать — стоя у месторождения (`me.mineReach`, 2.7 клетки);
+  `me.reach` (как у персонажа — 10 клеток); добывать руду, рубить деревья и разбивать скалы — стоя рядом
+  (`me.mineReach`, 2.7 клетки);
   подбирать с земли — вплотную. Дальше — `ActionError("out-of-reach")`: подъехать нужно самому через `me.move`.
 - **Глаза — только рядом.** Машина видит в радиусе зрения `me.vision`. Неизменное — id, имя, тип,
   позиция здания — читается всегда. Текущее состояние зданий (содержимое, статус, рецепт) и других
@@ -111,11 +112,11 @@ chest.extract("coal", 10)                               // D
 | [Вывод](#вывод) | `print`, `console.log`, `me.say`, `chat`, `alert` | сразу |
 | [Своя машина](#своя-машина-me) | `me`: груз, энергия, здоровье, параметры программы, память, подпись; `Machine`, `Robot` | сразу |
 | [Движение](#движение) | `me.move`, `me.canReach`, `me.follow`, `me.goHome` | сразу |
-| [Предметы](#предметы) | `me.mine`, `me.pickup`, `me.drop`; `extract` / `insert` у зданий, `insert` у машины | сразу |
+| [Предметы](#предметы) | `me.mine` (руда, деревья, скалы), `me.pickup`, `me.drop`; `extract` / `insert` у зданий, `insert` у машины | сразу |
 | [Здания](#здания) | классы зданий (`Furnace`, `Chest`, …), состояние (в поле зрения), `repair`, `setRecipe`, `me.build`, `deconstruct`, `rotate` | сразу / [Наладка] / [Строительство] |
 | [Жидкости](#жидкости) | `me.tank.pump`, `fill` / `drain` у зданий | [Жидкости] |
 | [Энергия](#энергия) | `me.energy` (`level`, `refuel`, `charge`), `robot.refuel` | сразу / Mk2 |
-| [Зрение](#зрение) | `scan.robots`, `scan.buildings`, `scan.items`, `scan.resources`, `scan.enemies`, `scan.water` | сразу, радиус растёт исследованиями |
+| [Зрение](#зрение) | `scan.robots`, `scan.buildings`, `scan.items`, `scan.trees`, `scan.rocks`, `scan.resources`, `scan.enemies`, `scan.water`; `Tree`, `Rock` | сразу, радиус растёт исследованиями |
 | [Карта](#карта) | метки, зоны, `zone.find`, `map.tag` | сразу |
 | [Связь](#связь) | `radio` (`send`, `publish`, `subscribe`, `receive`, `request`, `inbox`), `robot` | [Радиосвязь] |
 | [Доска и задачи](#доска-и-задачи) | `board` (общая память), `tasks` (очереди заданий) | [Радиосвязь] |
@@ -133,7 +134,7 @@ type Fluid = string;     // "water", "crude-oil", ...
 type Position = { x: number; y: number };
 type Area = { from: Position; to: Position };
 type Direction = "north" | "east" | "south" | "west";
-type Target = Position | Building | Machine | Marker | Zone;
+type Target = Position | Building | Machine | Marker | Zone | Tree | Rock;
 
 type Value =
   | null | boolean | number | string
@@ -344,10 +345,17 @@ else me.goHome();
 ```ts
 interface Me {
   /**
-   * Добыть ресурс, стоя у месторождения. Без count — пока не заполнится груз. Возвращает, сколько добыто. Было mine.
-   * @en Mine a resource while standing at the patch. Without count — until the cargo is full. Returns how much was mined. Was mine.
+   * Добыть предмет из ближайшего источника в me.mineReach: клетки месторождения, а если её нет — дерева или скалы
+   * ("wood" — рубить деревья). Без count — пока не заполнится груз. Возвращает, сколько добыто. Было mine.
+   * @en Mine an item from the nearest source within me.mineReach: a resource patch tile, or if there is none — a tree or a rock ("wood" — chop trees). Without count — until the cargo is full. Returns how much was mined. Was mine.
    */
   mine(item: Item, count?: number): number;
+  /**
+   * Срубить это дерево или разбить эту скалу целиком (в me.mineReach). Что не влезло в груз — на земле рядом.
+   * Возвращает, сколько предметов попало в груз.
+   * @en Chop down this tree or break this rock entirely (within me.mineReach). Whatever does not fit in the cargo stays on the ground nearby. Returns how many items went into the cargo.
+   */
+  mine(target: Tree | Rock): number;
   /**
    * Подобрать предметы с земли вплотную. Без item — всё подряд. Было pickup.
    * @en Pick up items lying right next to the machine. Without item — everything. Was pickup.
@@ -367,6 +375,16 @@ me.mine("coal", 20);
 const chest = scan.buildings({ kind: Chest })[0];
 me.move(chest);
 chest.insert("coal");
+```
+
+```ts
+// Нарубить дров: к ближайшему дереву, срубить, и так, пока не наберётся 40
+while (me.cargo.count("wood") < 40) {
+  const tree = scan.trees()[0];
+  if (tree === undefined) break;
+  me.move(tree, { radius: 2 });
+  me.mine(tree);
+}
 ```
 
 Положить в здание и взять из него — методы здания: `chest.insert("coal", 5)`, `furnace.extract("iron-plate")`
@@ -927,6 +945,16 @@ declare const scan: {
    */
   items(radius?: number): GroundItem[];
   /**
+   * Деревья рядом. Рубит me.mine(tree) или me.mine("wood").
+   * @en Trees nearby. Chop them with me.mine(tree) or me.mine("wood").
+   */
+  trees(radius?: number): Tree[];
+  /**
+   * Скалы рядом. Разбивает me.mine(rock): камень, у больших — и уголь.
+   * @en Rocks nearby. Break them with me.mine(rock): stone, big ones also give coal.
+   */
+  rocks(radius?: number): Rock[];
+  /**
    * Месторождения рядом, сгруппированные по ресурсу.
    * @en Resource patches nearby, grouped by resource.
    */
@@ -944,6 +972,32 @@ declare const scan: {
 };
 
 interface GroundItem { item: Item; count: number; position: Position }
+
+/**
+ * Дерево. Номера у дерева нет: два взгляда дают разные объекты, сравнивать — по месту.
+ * @en A tree. A tree has no number: two scans give different objects, compare by position.
+ */
+declare class Tree {
+  private constructor();
+  readonly valid: boolean;             // false — срублено @en false — chopped down
+  readonly inSight: boolean;
+  readonly name: string;               // "tree-01", "dead-dry-hairy-tree", …
+  readonly position: Position;
+  readonly products: Item[];           // что даёт: ["wood"] @en what it gives: ["wood"]
+}
+
+/**
+ * Скала. Номера у скалы нет: два взгляда дают разные объекты, сравнивать — по месту.
+ * @en A rock. A rock has no number: two scans give different objects, compare by position.
+ */
+declare class Rock {
+  private constructor();
+  readonly valid: boolean;             // false — разбита @en false — broken
+  readonly inSight: boolean;
+  readonly name: string;               // "big-rock", "huge-rock", …
+  readonly position: Position;
+  readonly products: Item[];           // что даёт: ["stone"], ["stone", "coal"] @en what it gives: ["stone"], ["stone", "coal"]
+}
 interface ResourcePatch { item: Item; amount: number; tiles: number; center: Position; nearest: Position }
 
 /**
