@@ -2,13 +2,14 @@
 // с ярлыком на панели быстрого доступа.
 import { PrototypeData } from "factorio:common"
 import {
+  CustomInputPrototype,
   ItemPrototype,
   RecipePrototype,
   SelectionToolPrototype,
   ShortcutPrototype,
   SimpleEntityWithOwnerPrototype,
 } from "factorio:prototype"
-import { MARKER, MODELS, PROGRAMMER, SIGNAL_MARKER } from "../names"
+import { MARKER, MODELS, PROGRAMMER, SIGNAL_MARKER, ZONE_PRESS } from "../names"
 
 declare const data: PrototypeData
 
@@ -68,6 +69,15 @@ const programmer: SelectionToolPrototype = {
   // Правой кнопкой — машины в рамке (17.4): выбрать им программу; с Shift — остановить.
   reverse_select: { border_color: { r: 0.35, g: 0.9, b: 0.4 }, cursor_box_type: "entity", mode: ["same-force", "any-entity"], entity_filters: MODELS.map((m) => m.entity) },
   alt_reverse_select: { border_color: { r: 0.95, g: 0.45, b: 0.2 }, cursor_box_type: "not-allowed", mode: ["same-force", "any-entity"], entity_filters: MODELS.map((m) => m.entity) },
+}
+
+// Нажатие выделения (21.7): мод узнаёт, где начали рамку «Программатора», — у края зоны рамка двигает край.
+const zonePress: CustomInputPrototype = {
+  type: "custom-input",
+  name: ZONE_PRESS,
+  key_sequence: "",
+  linked_game_control: "select-for-blueprint",
+  consuming: "none",
 }
 
 const shortcut: ShortcutPrototype = {
@@ -134,4 +144,4 @@ const signalMarkerRecipe: RecipePrototype = {
 
 data.extend([signalMarker as never, signalMarkerItem, signalMarkerRecipe])
 
-data.extend([marker, markerItem, markerRecipe, programmer, shortcut])
+data.extend([marker, markerItem, markerRecipe, programmer, shortcut, zonePress])

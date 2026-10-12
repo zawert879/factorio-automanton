@@ -382,7 +382,9 @@ Action errors are an `ActionError` with a code:
 - **Marker** — a named flag that machines can drive through. `marker("depot")` is its position.
   To rename it, hover the cursor over it and type `/am-name`.
 - **Zone** — a rectangle selected with the **Programmer** (left-drag). `zone("smelting")`, and
-  `zone("smelting").find(Furnace)` gives the furnaces in it at any distance.
+  `zone("smelting").find(Furnace)` gives the furnaces in it at any distance. With the Programmer in hand, zones show
+  handles: a drag started at an edge or a corner moves it to where you release; a drag started at the center handle
+  moves the whole zone. The name stays, and programs see the new border right away.
 - **Vision** — `scan.buildings(...)`, `scan.resources()`, `scan.robots()`, `scan.items()`, `scan.trees()`,
   `scan.rocks()`, `scan.water()` and (with **Automaton sensors 2**) `scan.enemies()`: only within the vision radius,
   nearest first. `me.mine(tree)` chops a tree or breaks a rock, and `me.mine("wood")` chops the nearest tree.

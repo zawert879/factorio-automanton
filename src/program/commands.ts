@@ -1,7 +1,7 @@
 // Управление программами до окна машины (этап 5): команды чата и remote-интерфейс.
 // /am-run <машина> <программа>, /am-stop <машина>, /am-log <машина> [строк], /am-args <машина> <json>,
 // /am-home <машина> — дом там, где стоит машина. Публикация — remote.call("automaton", "publish", имя, текст).
-import { CustomCommandData, LuaPlayer } from "factorio:runtime"
+import { BoundingBox, CustomCommandData, LuaPlayer } from "factorio:runtime"
 import { lib } from "../lang/runtime/library"
 import { assignProgram, machineOf, stopMachine } from "./machines"
 import { findProgram, publishProgram } from "./store"
@@ -116,6 +116,12 @@ export function registerProgramCommands(): void {
       const record = machineOf(robot.id)
       const program = record.programId === undefined ? undefined : storage.programs.byId[record.programId]
       return { id: robot.id, name: robot.name, program: program?.name, status: record.machine.status, args: record.args }
+    },
+    /** Зоны: имя и рамка — для других модов и проверок (21.7). */
+    zones: () => {
+      const list: { name: string; area: BoundingBox }[] = []
+      for (const [name, zone] of pairs(storage.zones.byName)) list.push({ name, area: zone.area })
+      return list
     },
   })
 }

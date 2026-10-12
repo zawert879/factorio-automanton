@@ -19,6 +19,8 @@ export const SIGNAL_MARKER = "automaton-signal-marker"
 export const MARKER_ENTITIES: readonly string[] = [MARKER, SIGNAL_MARKER]
 /** «Программатор» — инструмент выделения зон: zone("имя"). */
 export const PROGRAMMER = "automaton-programmer"
+/** Нажатие выделения (связано с select-for-blueprint): начало рамки «Программатора» у края зоны (21.7). */
+export const ZONE_PRESS = "automaton-zone-press"
 /** Справка в игре (18.5): ярлык на панели быстрого доступа и клавиша (F1). */
 export const HELP_SHORTCUT = "automaton-help"
 export const HELP_INPUT = "automaton-help"
