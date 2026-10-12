@@ -180,7 +180,15 @@ host.robot = (idOrName: Val) => {
   return record === undefined ? undefined : robotHandle(record.id)
 }
 
-defineHostObject("inbox")
+// radio (19.5): вся связь в одном объекте — те же функции API (ищутся при вызове, с проверкой исследования).
+defineHostObject("radio")
+for (const name of ["send", "publish", "subscribe", "unsubscribe", "tryReceive"]) {
+  hostMethods.radio[name] = (_o: Val, _k: Val, ...args: Val[]) => host[name](...args)
+}
+for (const name of ["receive", "request"]) hostMethods.radio[name] = (_o: Val, k: Val, ...args: Val[]) => host[name](k, ...args)
+
+const inboxObject = defineHostObject("inbox")
+hostGetters.radio.inbox = () => inboxObject
 hostGetters.inbox.count = () => {
   const id = currentRobot().id
   const box = storage.comms.inbox[id]

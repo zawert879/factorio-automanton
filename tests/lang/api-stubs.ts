@@ -275,3 +275,11 @@ for (const [cls, name, fn] of objectMethods) {
       frame.value = fn(...args)
     })
 }
+
+// radio (19.5) — как в игре (src/program/api/comms.ts): те же функции API.
+defineHostObject("radio")
+for (const name of ["send", "publish", "subscribe", "unsubscribe", "tryReceive"]) {
+  hostMethods.radio[name] = (_o: Val, _k: Val, ...args: Val[]) => host[name](...args)
+}
+for (const name of ["receive", "request"]) hostMethods.radio[name] = (_o: Val, k: Val, ...args: Val[]) => host[name](k, ...args)
+hostGetters.radio.inbox = () => hostObject("inbox", {})

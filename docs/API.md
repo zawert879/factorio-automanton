@@ -112,7 +112,7 @@ take(chest, "coal", 10)                      // D
 | [Энергия](#энергия) | `refuel`, `charge` | сразу / Mk2 |
 | [Зрение](#зрение) | `scan.robots`, `scan.buildings`, `scan.entities`, `scan.items`, `scan.resources`, `scan.enemies`, `scan.water` | сразу, радиус растёт исследованиями |
 | [Карта](#карта) | метки, зоны, `zone.find`, `find`, `map.tag` | сразу |
-| [Связь](#связь) | `send`, `publish`, `subscribe`, `receive`, `request`, `robot` | [Радиосвязь] |
+| [Связь](#связь) | `radio` (`send`, `publish`, `subscribe`, `receive`, `request`, `inbox`), `robot` | [Радиосвязь] |
 | [Доска и задачи](#доска-и-задачи) | `board` (общая память), `tasks` (очереди заданий) | [Радиосвязь] |
 | [Табло](#табло) | `display`: пиксельный холст — линии, фигуры, текст, иконки, таблицы | [Табло] |
 | [Бой](#бой) | `attack`, `guard`, `patrol`, `reload`, `me.weapon` | [Боевые автоматоны] |
@@ -1256,6 +1256,49 @@ declare function request<T extends Value = Value>(
 declare function robot(idOrName: number | string): Robot | null;
 
 declare const inbox: { readonly count: number; readonly dropped: number };
+
+/**
+ * [Радиосвязь] Сообщения между машинами — на любом расстоянии. Было send, receive, … и inbox.
+ * @en [Radio] Messages between machines — at any distance. Was send, receive, … and inbox.
+ */
+declare const radio: {
+  /**
+   * Сообщение конкретной машине: по ссылке, id или имени.
+   * @en A message to a specific machine: by reference, id or name.
+   */
+  send(to: Robot | number | string, topic: string, data?: Value): void;
+  /**
+   * Отправить и дождаться ответа. По таймауту — ActionError("timeout").
+   * @en Send and wait for the reply. On timeout — ActionError("timeout").
+   */
+  request<T extends Value = Value>(to: Robot | number | string, topic: string, data?: Value, timeout?: number): T;
+  /**
+   * Ждать сообщение (необязательно — только по теме). По таймауту (секунды) — null.
+   * @en Wait for a message (optionally only on a topic). On timeout (seconds) — null.
+   */
+  receive<T extends Value = Value>(topic?: string, timeout?: number): Message<T> | null;
+  /**
+   * Взять сообщение, если оно уже есть, не ожидая.
+   * @en Take a message if one is already there, without waiting.
+   */
+  tryReceive<T extends Value = Value>(topic?: string): Message<T> | null;
+  /**
+   * Опубликовать обновление: получат машины, подписанные на эту (на все её темы или на эту тему).
+   * @en Publish an update: machines subscribed to this one receive it (to all its topics or to this topic).
+   */
+  publish(topic: string, data?: Value): void;
+  /**
+   * Подписаться на публикации машины (по ссылке, id или имени): на все её темы или на одну.
+   * @en Subscribe to a machine's publications (by reference, id or name): to all its topics or to one.
+   */
+  subscribe(robot: Robot | number | string, topic?: string): void;
+  /**
+   * Отписаться от машины: от темы или (без темы) совсем.
+   * @en Unsubscribe from a machine: from a topic or (without a topic) entirely.
+   */
+  unsubscribe(robot: Robot | number | string, topic?: string): void;
+  readonly inbox: { readonly count: number; readonly dropped: number };
+};
 ```
 
 ```ts

@@ -91,9 +91,11 @@ export const BLOCKING_HOST_METHODS: Record<string, Record<string, boolean>> = {
   tasks: { next: true },
   // Действия своей машины (19.4).
   me: { move: true, canReach: true, follow: true, goHome: true, mine: true, pickup: true, drop: true, build: true },
+  // Связь (19.5).
+  radio: { receive: true, request: true },
 }
 
-const HOST_OBJECTS = ["me", "console", "scan", "map", "board", "tasks", "signals", "time", "world", "inbox"]
+const HOST_OBJECTS = ["me", "console", "scan", "map", "radio", "board", "tasks", "signals", "time", "world", "inbox"]
 const LIBRARY_OBJECTS = ["Math", "Object", "Array", "JSON", "Number", "String"]
 // Классы объектов игры (19.2) — тоже встроенные классы: значения для instanceof и поиска по классу.
 const LIBRARY_CLASSES = ["Map", "Set", "Error", "TypeError", "RangeError", "SyntaxError", "ActionError", ...HOST_CLASSES.map(([name]) => name)]

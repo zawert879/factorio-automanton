@@ -155,4 +155,37 @@ print(weapon.ammo!.name, weapon.ammo!.count)`,
       robot.entity.destroy()
     })
   })
+
+  test("radio: запрос и ответ, публикация подписчику, inbox", (t) => {
+    const { surface, robot } = site(-480, 900)
+    const techs = game.forces.player.technologies
+    const before = techs[TECH.radio].researched
+    techs[TECH.radio].researched = true
+    surface.create_entity({ name: WORKER_MK1_PLACER, position: { x: -470.5, y: 910.5 }, force: "player", raise_built: true })
+    const other = findRobot(surface.find_entities_filtered({ name: WORKER_MK1, position: { x: -470.5, y: 910.5 }, radius: 0.5 })[0])!
+    const answering = run(
+      other,
+      "test-radio-b",
+      `radio.subscribe(${robot.id}, "склад")
+const m = radio.receive<number>("сколько", 10)!
+m.reply(m.data * 2)
+const news = radio.receive<string>("склад", 10)
+print(news?.data, news?.from.id === ${robot.id})`,
+    )
+    const asking = run(
+      robot,
+      "test-radio-a",
+      `wait(0.5)
+const r = radio.request<number>(${other.id}, "сколько", 21, 10)
+radio.publish("склад", "полон")
+print(r, radio.inbox.count, radio.inbox.dropped)`,
+    )
+    waitUntil(t, "конца программ", () => finished(answering)() && finished(asking)(), 600, () => {
+      expect(asking.console.filter((line) => !line.startsWith("—")).join("|")).toBe("42 0 0")
+      expect(answering.console.filter((line) => !line.startsWith("—")).join("|")).toBe("полон true")
+      techs[TECH.radio].researched = before
+      other.entity.destroy()
+      robot.entity.destroy()
+    })
+  })
 })

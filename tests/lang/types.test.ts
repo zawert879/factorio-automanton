@@ -46,6 +46,8 @@ const BAD: [string, string, string][] = [
   ["у me нет insert (это у другой машины)", `me.insert("coal")`, "type-no-property@1"],
   ["me.mine: предмет — строка", `me.mine(5)`, "type-not-assignable@1"],
   ["у бака нет fill (это у здания)", `me.tank?.fill()`, "type-no-property@1"],
+  ["radio.receive<T>: data", `const m = radio.receive<{ n: number }>("t")!\nprint(m.data.x)`, "type-no-property@2"],
+  ["radio.send: тема — строка", `radio.send(1, 2)`, "type-not-assignable@1"],
 ]
 
 const GOOD: [string, string][] = [

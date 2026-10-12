@@ -368,6 +368,9 @@
     `me.say`; `me.energy` (`level`, `refuel()`, `charge()`), `me.tank` (`pump()`, у рабочих), `me.weapon` (`reload()`,
     `attack()`, `guard()`, `patrol()`, у боевых). **Я ошибся** в чате: `me.weapon` работал и раньше — заглушка в
     me.ts, которую заменяет combat.ts. В `print` — `Energy(0.5)`, `Tank(water 100/1000)`, `Weapon(gun, firearm-magazine × 2)`.
+    **19.5 `radio`:** `radio.send`, `radio.request`, `radio.receive`, `radio.tryReceive`, `radio.publish`,
+    `radio.subscribe`, `radio.unsubscribe`, `radio.inbox`. Проверь пример «оркестратор и рабочие» после 19.6 — он
+    будет на `radio`.
 
 ## Решения, принятые без тебя
 
@@ -627,3 +630,4 @@
 | 19.4 | Методы `me` в API.md — по разделам (`interface Me { move … }` в «Движении», `{ mine … }` в «Предметах»): в справке они рядом с прежними функциями; проверка типов в игре научилась сливать одноимённые интерфейсы, как TypeScript | |
 | 19.4 | `me.tank` и `me.weapon` — живые объекты (поля читаются при обращении), а не снимок, как раньше `me.tank` | Иначе `const t = me.tank` после `t.pump()` показывал бы старое |
 | 19.4 | У другой машины `robot.energy.level` (как `me.energy.level`); `robot.fuel` и `me.fuel` остаются до 19.6 | |
+| 19.5 | `robot(id)` и `display(имя)` остались глобальными (поиск по имени, как `marker` и `zone`); `inbox` пока есть и сам по себе (до 19.6) | |

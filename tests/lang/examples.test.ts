@@ -52,4 +52,16 @@ if (weapon !== null) { weapon.reload(); print(weapon.attack(zone("a").find(Furna
 print(n, pumped, me.energy.level, me.tank?.capacity, me.pickup(), me.drop("coal"))`
     expect(outputOf(source, { copy: true, quantum: 3 })).toBe("ok|true 30|3 1000 0.5 1000 2 1")
   })
+
+  test("radio: запрос и приём ждут, остальное — сразу", () => {
+    const source = `type Order = { furnace: Furnace; ore: Item }
+const answer = radio.request<number>("кладовщик", "сколько", "coal", 10)
+const msg = radio.receive<Order>("задание")
+radio.send(msg!.from, "готово", { id: msg!.data.furnace.id })
+radio.publish("склад", answer)
+radio.subscribe("Оркестратор", "план")
+radio.tryReceive("нет")
+print(answer, msg!.data.furnace instanceof Furnace, radio.inbox !== undefined)`
+    expect(outputOf(source, { copy: true, quantum: 3 })).toBe("10 true true")
+  })
 })
