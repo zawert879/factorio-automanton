@@ -13,6 +13,7 @@ import { distanceToEntity } from "../automaton/actions"
 import { entityFluid, entityFuel, entityInput, entityItemCount, entityOutput, entityProgress, entityRecipe, entityStatus } from "../automaton/inspect"
 import { fuelLevel } from "../automaton/energy"
 import { isRock, isTree, naturalProducts } from "../automaton/mining"
+import { entityRequests, moduleSlots, requestedItems } from "../automaton/modules"
 import { robotPosition } from "../automaton/flight"
 import { modelOfRecord, robotVision } from "../automaton/models"
 import { isMoving } from "../automaton/movement"
@@ -52,6 +53,7 @@ const CLASS_BY_TYPE: Record<string, string> = {
   "assembling-machine": "Assembler",
   "rocket-silo": "RocketSilo",
   lab: "Lab",
+  beacon: "Beacon",
   boiler: "Boiler",
   generator: "Generator",
   reactor: "Reactor",
@@ -287,6 +289,19 @@ members(hostMethods, FLUID_CLASSES, "fluid", (o: Val, _k: Val, name: Val) => {
   requireSight(o.__e)
   return entityFluid(o.__e, name === undefined ? undefined : tostring(name))
 })
+// Модули (21.4): какие стоят и что просит чертёж; поставить и снять — действия (src/program/api/actions.ts).
+export const MODULE_CLASSES = ["Furnace", "Assembler", "RocketSilo", "Lab", "Beacon"]
+members(hostMethods, MODULE_CLASSES, "modules", (o: Val) => {
+  requireSight(o.__e)
+  const slots = moduleSlots(o.__e)
+  const items: Val[] = []
+  for (const content of slots?.get_contents() ?? []) items.push({ name: content.name, count: content.count })
+  return programArray(items)
+})
+members(hostMethods, MODULE_CLASSES, "requests", (o: Val) => {
+  requireSight(o.__e)
+  return programArray(entityRequests(o.__e))
+})
 const entityMethods = hostMethods.Building
 rawset(entityMethods, "toString", (o: Val) => `${o.__name}#${tostring(o.__id ?? "?")}`)
 
@@ -309,6 +324,12 @@ hostGetters.Ghost.direction = (o: Val) => {
   const entity = o.__e as LuaEntity
   if (!entity.valid) actionError("invalid-target")
   return directionName(entity.direction)
+}
+// Что чертёж просит доставить в здание этого призрака (модули): неизменно, пока призрак не построен.
+hostMethods.Ghost.requests = (o: Val) => {
+  const entity = o.__e as LuaEntity
+  if (!entity.valid) actionError("invalid-target")
+  return programArray(requestedItems(entity.insert_plan))
 }
 rawset(hostMethods.Ghost, "toString", (o: Val) => `ghost:${o.__name}#${tostring(o.__id ?? "?")}`)
 

@@ -12,7 +12,7 @@ import { onEvent } from "../../events"
 import { Fn, host, hostBlocking, hostMethods, program, Val } from "../../lang/runtime/core"
 import { truthy } from "../../lang/runtime/values"
 import { actionError, currentMachine, currentRobot } from "../context"
-import { entityHandle, handleEntity, handleRobot, inSight, resolveTarget } from "../handles"
+import { entityHandle, handleEntity, handleRobot, inSight, MODULE_CLASSES, resolveTarget } from "../handles"
 import { readPosition } from "../values"
 import { registerPoll, resume, sleepUntil } from "../scheduler"
 import { actionCall, count, finishWaiting, fluid, fluidAmount, item, optionalItem, startWaiting, ticks } from "./common"
@@ -210,6 +210,13 @@ methods(FILL_CLASSES, "fill", (o: Val, k: Val, amount: Val) =>
 )
 methods(DRAIN_CLASSES, "drain", (o: Val, k: Val, what: Val, amount: Val) =>
   actionCall(k, "drain", k !== undefined ? {} : { target: handleEntity(o), item: fluid(what), count: fluidAmount(amount) }),
+)
+// Модули (21.4): поставить из груза (сначала в слоты, которые просит чертёж) и снять в груз.
+methods(MODULE_CLASSES, "installModule", (o: Val, k: Val, what: Val, amount: Val) =>
+  actionCall(k, "put", k !== undefined ? {} : { target: handleEntity(o), item: item(what), count: count(amount), modules: true }),
+)
+methods(MODULE_CLASSES, "removeModule", (o: Val, k: Val, what: Val, amount: Val) =>
+  actionCall(k, "take", k !== undefined ? {} : { target: handleEntity(o), item: optionalItem(what), count: count(amount), modules: true }),
 )
 hostMethods.Building.repair = (o: Val, k: Val) => actionCall(k, "repair", k !== undefined ? {} : { target: handleEntity(o) })
 hostMethods.Building.rotate = (o: Val, k: Val, reverse: Val) =>

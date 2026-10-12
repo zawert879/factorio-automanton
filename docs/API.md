@@ -442,6 +442,11 @@ declare class Ghost {
   readonly position: Position;
   readonly direction: Direction;
   /**
+   * Что чертёж просит доставить в это здание после постройки: модули.
+   * @en What the blueprint asks to deliver to this building once built: modules.
+   */
+  requests(): ItemStack[];
+  /**
    * [Строительство] Построить из груза, как me.build: здание встаёт таким, как в чертеже.
    * @en [Construction] Build it from the cargo, like me.build: the building comes out as in the blueprint.
    */
@@ -461,7 +466,7 @@ for (const ghost of scan.ghosts()) {
 - `ghost.build()`: призрака уже нет — `invalid-target`; предмета нет в грузе — `not-enough-items`; место занято
   (дерево, камень, машина, персонаж) — `target-full`. Всё — в радиусе `me.reach`, около полсекунды.
 - Строительные дроны игрока строят те же призраки — кто первый. Модули, которые просит чертёж, сами не встают:
-  запрос остаётся у здания.
+  запрос остаётся у здания (`building.requests()`), его выполняет `installModule` — см. «Модули».
 - Готовая программа — пример «Строитель»: берёт предметы на складе и строит призраки у метки.
 
 ### Классы зданий
@@ -558,6 +563,26 @@ declare class Furnace extends Building {
    * @en Take from the output (or from the input, if the item is there). Was take.
    */
   extract(item: Item, count?: number): number;
+  /**
+   * Модули в слотах.
+   * @en Modules in the slots.
+   */
+  modules(): ItemStack[];
+  /**
+   * Что просит доставить чертёж: модули, которых ещё нет в слотах.
+   * @en What the blueprint asks to deliver: modules not in the slots yet.
+   */
+  requests(): ItemStack[];
+  /**
+   * Поставить модули из груза — сначала в слоты, которые просит чертёж (запрос вычёркивается). Возвращает, сколько поставлено.
+   * @en Install modules from the cargo — first into the slots the blueprint asks for (the request is crossed out). Returns how many were installed.
+   */
+  installModule(item: Item, count?: number): number;
+  /**
+   * Снять модули в груз, без item — все. Возвращает, сколько снято.
+   * @en Remove modules into the cargo, without item — all of them. Returns how many were removed.
+   */
+  removeModule(item?: Item, count?: number): number;
 }
 
 /**
@@ -601,6 +626,26 @@ declare class Assembler extends Building {
    * @en [Fluids] Drain into the machine's tank. Was drain.
    */
   drain(fluid: Fluid, amount?: number): number;
+  /**
+   * Модули в слотах.
+   * @en Modules in the slots.
+   */
+  modules(): ItemStack[];
+  /**
+   * Что просит доставить чертёж: модули, которых ещё нет в слотах.
+   * @en What the blueprint asks to deliver: modules not in the slots yet.
+   */
+  requests(): ItemStack[];
+  /**
+   * Поставить модули из груза — сначала в слоты, которые просит чертёж (запрос вычёркивается). Возвращает, сколько поставлено.
+   * @en Install modules from the cargo — first into the slots the blueprint asks for (the request is crossed out). Returns how many were installed.
+   */
+  installModule(item: Item, count?: number): number;
+  /**
+   * Снять модули в груз, без item — все. Возвращает, сколько снято.
+   * @en Remove modules into the cargo, without item — all of them. Returns how many were removed.
+   */
+  removeModule(item?: Item, count?: number): number;
 }
 
 /**
@@ -624,6 +669,26 @@ declare class RocketSilo extends Building {
    * @en Take into the cargo. Returns how many were taken. Was take.
    */
   extract(item: Item, count?: number): number;
+  /**
+   * Модули в слотах.
+   * @en Modules in the slots.
+   */
+  modules(): ItemStack[];
+  /**
+   * Что просит доставить чертёж: модули, которых ещё нет в слотах.
+   * @en What the blueprint asks to deliver: modules not in the slots yet.
+   */
+  requests(): ItemStack[];
+  /**
+   * Поставить модули из груза — сначала в слоты, которые просит чертёж (запрос вычёркивается). Возвращает, сколько поставлено.
+   * @en Install modules from the cargo — first into the slots the blueprint asks for (the request is crossed out). Returns how many were installed.
+   */
+  installModule(item: Item, count?: number): number;
+  /**
+   * Снять модули в груз, без item — все. Возвращает, сколько снято.
+   * @en Remove modules into the cargo, without item — all of them. Returns how many were removed.
+   */
+  removeModule(item?: Item, count?: number): number;
 }
 
 /**
@@ -644,6 +709,54 @@ declare class Lab extends Building {
    * @en Take into the cargo. Returns how many were taken. Was take.
    */
   extract(item: Item, count?: number): number;
+  /**
+   * Модули в слотах.
+   * @en Modules in the slots.
+   */
+  modules(): ItemStack[];
+  /**
+   * Что просит доставить чертёж: модули, которых ещё нет в слотах.
+   * @en What the blueprint asks to deliver: modules not in the slots yet.
+   */
+  requests(): ItemStack[];
+  /**
+   * Поставить модули из груза — сначала в слоты, которые просит чертёж (запрос вычёркивается). Возвращает, сколько поставлено.
+   * @en Install modules from the cargo — first into the slots the blueprint asks for (the request is crossed out). Returns how many were installed.
+   */
+  installModule(item: Item, count?: number): number;
+  /**
+   * Снять модули в груз, без item — все. Возвращает, сколько снято.
+   * @en Remove modules into the cargo, without item — all of them. Returns how many were removed.
+   */
+  removeModule(item?: Item, count?: number): number;
+}
+
+/**
+ * Маяк: только слоты модулей, их действие — на здания вокруг.
+ * @en A beacon: only module slots, their effect goes to the buildings around it.
+ */
+declare class Beacon extends Building {
+  private constructor();
+  /**
+   * Модули в слотах.
+   * @en Modules in the slots.
+   */
+  modules(): ItemStack[];
+  /**
+   * Что просит доставить чертёж: модули, которых ещё нет в слотах.
+   * @en What the blueprint asks to deliver: modules not in the slots yet.
+   */
+  requests(): ItemStack[];
+  /**
+   * Поставить модули из груза — сначала в слоты, которые просит чертёж (запрос вычёркивается). Возвращает, сколько поставлено.
+   * @en Install modules from the cargo — first into the slots the blueprint asks for (the request is crossed out). Returns how many were installed.
+   */
+  installModule(item: Item, count?: number): number;
+  /**
+   * Снять модули в груз, без item — все. Возвращает, сколько снято.
+   * @en Remove modules into the cargo, without item — all of them. Returns how many were removed.
+   */
+  removeModule(item?: Item, count?: number): number;
 }
 
 /**
@@ -875,6 +988,28 @@ for (const furnace of zone("плавильня").find(Furnace)) {
   if (furnace.status === "no-fuel") furnace.insert("coal", 5);
 }
 ```
+
+### Модули
+
+Слоты модулей есть у сборщиков, электрических печей, лабораторий, ракетной шахты и маяков (`Beacon`). Машина ставит
+модули из груза (`installModule`) и снимает в груз (`removeModule`) — как `insert` и `extract`: в радиусе `me.reach`,
+около полсекунды. Чертёж, в котором здания с модулями, просит их доставить: `requests()` у здания (и у призрака)
+показывает, чего не хватает; модуль от `installModule` встаёт в тот слот, который просит чертёж, и запрос
+вычёркивается — строительные дроны второй раз его не понесут.
+
+```ts
+// Довезти модули, которые просит чертёж, всем сборщикам зоны «схемы»
+for (const assembler of zone("схемы").find(Assembler)) {
+  me.move(assembler, { radius: 3 });
+  for (const request of assembler.requests()) {
+    if (me.cargo.count(request.name) > 0) assembler.installModule(request.name, request.count);
+  }
+}
+```
+
+- `installModule`: не модуль или у здания нет слотов (каменная печь) — `invalid-target`; модуля нет в грузе —
+  `not-enough-items`; слоты заняты — поставлено меньше (`target-full` в причине, не ошибка).
+- `removeModule`: груз полон — `cargo-full`.
 
 ## Жидкости
 

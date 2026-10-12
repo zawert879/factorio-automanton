@@ -172,6 +172,13 @@ hostMethods.scan.resources = () =>
 hostMethods.scan.items = () => arr()
 hostMethods.scan.ghosts = () => arr(hostObject("entity", { __c: "Ghost", __id: 900, __name: "stone-furnace", __x: 6, __y: 6 }))
 hostGetters.Ghost.item = () => "stone-furnace"
+hostMethods.Ghost.requests = () => arr()
+for (const cls of ["Furnace", "Assembler", "RocketSilo", "Lab", "Beacon"]) {
+  hostMethods[cls].modules = () => arr()
+  hostMethods[cls].requests = () => arr({ name: "speed-module", count: 2 })
+  hostMethods[cls].installModule = () => 2
+  hostMethods[cls].removeModule = () => 0
+}
 hostMethods.scan.trees = () => arr(hostObject("entity", { __c: "Tree", __name: "tree-01", __x: 3, __y: 4 }))
 hostMethods.scan.rocks = () => arr(hostObject("entity", { __c: "Rock", __name: "huge-rock", __x: 9, __y: 4 }))
 hostMethods.scan.water = () => arr()

@@ -19,6 +19,7 @@ export const HOST_CLASSES: [name: string, parent: string | undefined][] = [
   ["Assembler", "Building"],
   ["RocketSilo", "Building"],
   ["Lab", "Building"],
+  ["Beacon", "Building"],
   ["Boiler", "Building"],
   ["Generator", "Building"],
   ["Reactor", "Building"],

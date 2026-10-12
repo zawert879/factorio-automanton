@@ -125,6 +125,11 @@ for (const ghost of scan.ghosts()) {
 }
 ```
 
+Machines carry and install **modules** themselves: `assembler.installModule("speed-module", 2)` puts them from the cargo
+into the slots, `removeModule()` takes them back, `modules()` lists what is installed. If a blueprint asks for modules,
+`requests()` on the building shows what is missing, and a module installed by a machine goes into the requested slot,
+so the robots won't bring it again.
+
 Setting up many machines at once:
 
 - **Copy settings** — Shift+right-click a machine (the same keys as for buildings) to copy its program

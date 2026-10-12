@@ -22,7 +22,7 @@ const WAITING = new Set(["wait", "waitUntil"])
  */
 const WAITING_METHODS = new Set([
   "move", "canReach", "follow", "goHome", "mine", "pickup", "drop", "build",
-  "insert", "extract", "repair", "rotate", "deconstruct", "setRecipe", "fill", "drain", "refuel",
+  "insert", "extract", "repair", "rotate", "deconstruct", "setRecipe", "fill", "drain", "refuel", "installModule", "removeModule",
   "charge", "pump", "reload", "attack", "guard", "patrol",
   "receive", "request",
 ])

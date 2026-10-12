@@ -44,6 +44,8 @@ export interface ActionParams {
   reverse?: boolean
   /** Добыть только цель (me.mine(tree)): дерево срублено — действие кончилось. */
   only?: boolean
+  /** Положить в слоты модулей или взять из них (installModule, removeModule). */
+  modules?: boolean
 }
 
 export interface ActionState {

@@ -6,10 +6,12 @@
 // Взять: сначала выход (результат печи, продукция сборщика), потом хранилище, потом остальные слоты —
 // как персонаж, который может взять из любого слота.
 // Частичный результат — успех с причиной (target-full, cargo-full); ошибка — когда нельзя ничего.
+// Модули (21.4) — те же действия с флагом modules: слоты модулей (src/automaton/modules.ts).
 import { LuaEntity, LuaInventory } from "factorio:runtime"
 import { ActionState, distanceToEntity, face, registerActionHandler, StepOutcome } from "./actions"
 import { HANDLING_JOULES, spend } from "./energy"
 import { RobotRecord } from "./registry"
+import { installModules, isModule, moduleSlots, removeModules } from "./modules"
 
 export const REACH = 10
 export const TRANSFER_TICKS = 30
@@ -83,7 +85,34 @@ function checkTarget(record: RobotRecord, action: ActionState): StepOutcome | un
   return undefined
 }
 
+/** Модули — в слоты (21.4): сначала те, что просит чертёж. */
+function putModules(record: RobotRecord, action: ActionState): StepOutcome {
+  const target = action.params.target!
+  const item = action.params.item
+  const slots = moduleSlots(target)
+  if (item === undefined || !isModule(item) || slots === undefined) return { finish: true, error: "invalid-target" }
+  const have = record.cargo.get_item_count(item)
+  if (have === 0) return { finish: true, error: "not-enough-items" }
+  const wanted = math.min(action.params.count ?? have, have)
+  const moved = installModules(target, slots, item, wanted)
+  if (moved > 0) record.cargo.remove({ name: item, count: moved })
+  action.done = moved
+  return moved < wanted ? { finish: true, reason: "target-full" } : { finish: true }
+}
+
+/** Модули из слотов — в груз (21.4). */
+function takeModules(record: RobotRecord, action: ActionState): StepOutcome {
+  const slots = moduleSlots(action.params.target!)
+  if (slots === undefined) return { finish: true, error: "invalid-target" }
+  const moved = removeModules(record, slots, action.params.item, action.params.count)
+  action.done = moved
+  const left = action.params.item === undefined ? slots.get_item_count() : slots.get_item_count(action.params.item)
+  if (moved === 0 && left > 0) return { finish: true, error: "cargo-full" }
+  return left > 0 && (action.params.count === undefined || moved < action.params.count) ? { finish: true, reason: "cargo-full" } : { finish: true }
+}
+
 function put(record: RobotRecord, action: ActionState): StepOutcome {
+  if (action.params.modules) return putModules(record, action)
   const target = action.params.target!
   const item = action.params.item
   if (item === undefined) return { finish: true, error: "invalid-target" }
@@ -100,6 +129,7 @@ function put(record: RobotRecord, action: ActionState): StepOutcome {
 }
 
 function take(record: RobotRecord, action: ActionState): StepOutcome {
+  if (action.params.modules) return takeModules(record, action)
   const target = action.params.target!
   const item = action.params.item
   if (item === undefined) return { finish: true, error: "invalid-target" }
