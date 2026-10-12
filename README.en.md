@@ -34,7 +34,10 @@ while (true) {
 - **Assigning programs**: a picker window with search, copying machine settings (Shift+right-click / Shift+left-click),
   a "Programmer" selection box for a dozen machines at once.
 - **Machines**: workers Mk1–Mk3, combat machines (machine gun, rockets), flying cargo machines; a charging station.
-- **A world for programs**: markers, zones, vision, fluids in the tank, construction, assembler setup.
+- **A world for programs**: markers, zones (drag their edges with the Programmer), vision, fluids in the tank,
+  construction, assembler setup and modules.
+- **Building blueprints**: machines build building and tile ghosts from their cargo, deconstruct what is marked,
+  chop trees and break rocks; the only robots left are construction robots, with a personal roboport.
 - **Machines working together**: messages, requests with replies, a shared board, task queues, displays,
   circuit signals.
 - **Multiplayer**: everything is deterministic; 300 machines running programs take about 0.6 ms per tick.

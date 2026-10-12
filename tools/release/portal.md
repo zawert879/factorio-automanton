@@ -21,6 +21,7 @@ while (true) {
 - **Sharing**: programs as a string (like blueprint strings); blueprints keep the machines' programs and parameters.
 - **Modules**: `import` / `export` between team programs, your own libraries, folders.
 - **Everything automatons do**: mining, smelting, crafting, fluids (pumping, crude oil, uranium), building and deconstructing, messaging by subscription, a shared board and task queues, pixel displays, circuit network signals.
+- **Blueprints are built by machines**: building and tile ghosts from the cargo, modules the blueprint asks for, deconstruction of marked buildings, trees and rocks. Construction robots stay, with a personal roboport.
 - **Combat automatons** (machine gun, rocket launcher) — biters attack your machines and routes — and **flying haulers**.
 - **Progression**: worker models Mk1–Mk3, charging stations, research that unlocks API features and more processor time.
 - **You write the programs**: freeplay starts with two automatons and markers and an empty team library; the player guide walks you through your first program, and the repository has examples (miner, smelter, hauler, water carrier…).

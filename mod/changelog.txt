@@ -1,7 +1,9 @@
 ---------------------------------------------------------------------------------------------------
 Version: 0.8.0
-Date: 2026-10-12
+Date: 2026-10-13
   Major Features:
+    - Machines build blueprints: scan.ghosts() lists building and tile ghosts nearby, ghost.build() places one from the cargo exactly as in the blueprint (rotation, recipe, settings, wires). New example program Builder (Строитель): takes the items from a depot and builds the ghosts at a marker.
+    - Only construction robots remain: roboports, storage chests and combat robot capsules (defender, distractor, destroyer) are removed. Construction robots work from a personal roboport in your armor; machines build everywhere else.
     - Object API for machine programs: an action is a method of what it acts on (furnace.insert("coal", 5), chest.extract("iron-plate"), assembler.setRecipe("iron-gear-wheel"), boiler.fill()); your own machine's actions and systems are on me (me.move, me.mine, me.say, me.energy, me.tank, me.weapon); messaging is on radio. Only 11 global functions remain: print, chat, alert, wait, waitUntil, exit, restart, marker, zone, robot, display.
     - Building classes: Chest, Furnace, Assembler, Boiler, StorageTank and 12 more, each with only the methods it supports. zone("smelter").find(Furnace) and scan.buildings({ kind: Chest }) return buildings of that class; x instanceof Furnace works for values received in messages too.
   Changes:
@@ -11,15 +13,22 @@ Date: 2026-10-12
     - Was → now: attack, guard, patrol, reload(…) → me.weapon.attack(…) and so on (me.weapon is null on non-combat models); send, publish, subscribe, unsubscribe, receive, tryReceive, request(…) and inbox → radio.send(…) and so on, radio.inbox; find("name", zone(z)) → zone(z).find("name") or zone(z).find(Furnace); scan.entities(…) → scan.buildings(…); Entity → Building.
     - fill, drain and pump on a machine without a tank fail with the new error code no-tank.
     - New graph asks for a name in its own window (a free "Graph N" is suggested); Edit on a graph program opens its workshop.
+    - Roboports already in a save are removed on update: their robots (and the robots flying in their network) and their contents go into a steel chest in their place. A roboport placed from a leftover item is mined back.
+    - me.mine(item) prefers ore: a tree or a rock is used only when no ore tile is within reach.
   Features:
     - Graph libraries: a graph without Start is a library — its functions are exported and can be called from other graphs and imported by code programs.
     - The Call node picks a function from a list: the functions of this graph and of the team's libraries (graphs, and code functions with parameters of simple types). Its pins follow the chosen function; the graph's code gets an import.
     - Function parameters are edited as a table: name and type, "+ parameter" and "✕".
     - New example program Refueler (Заправщик): brings coal to whoever asks and checks with instanceof whether that is a machine or a building.
+    - Trees and rocks: scan.trees(), scan.rocks(); me.mine("wood") chops the nearest tree, me.mine(tree) chops this tree or breaks this rock whole.
+    - Modules: installModule, removeModule, modules() and requests() on assemblers, furnaces, labs, the rocket silo and beacons (new class Beacon). A module installed by a machine goes into the slot the blueprint asks for, and the request is crossed out.
+    - scan.marked(): buildings, trees and rocks marked for deconstruction nearby.
+    - Zone edges: with the Programmer in hand zones show handles; a drag started at an edge or a corner moves it, a drag started at the center handle moves the whole zone.
     - Graphs keep their nodes; their code is rebuilt with the new API.
   Info:
     - Player guide, README, in-game help (F1) and VS Code types use the new API (Russian and English).
   Bugfixes:
+    - zone(…).find() without a class also returned ghosts as if they were buildings.
     - A green wire could be connected to the red flow pins (and a red one to data pins) and was read as a valid wire: such a wire is now removed right away, and a wrong-colour wire from a blueprint is an error on the node.
     - Gates did not open for machines, and the pathfinder treated a closed gate as a wall: a machine could not get into an area walled off with gates. Machines now path through gates, and gates open in front of them.
 ---------------------------------------------------------------------------------------------------
