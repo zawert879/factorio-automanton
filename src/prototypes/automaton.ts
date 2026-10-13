@@ -210,7 +210,8 @@ function attackParameters(model: ModelSpec): UnitPrototype["attack_parameters"] 
       animation: INVISIBLE,
     }
   }
-  const hit = weapon.category === "rocket" ? "big-explosion" : "explosion-hit"
+  // У огнемёта (22.3) вспышки попадания нет: огонь — струя, которую пускает скрипт.
+  const hit = weapon.category === "rocket" ? "big-explosion" : weapon.category === "flamethrower" ? undefined : "explosion-hit"
   return {
     type: "projectile",
     range: weapon.range,
@@ -222,7 +223,7 @@ function attackParameters(model: ModelSpec): UnitPrototype["attack_parameters"] 
         type: "direct",
         action_delivery: {
           type: "instant",
-          target_effects: [
+          target_effects: hit === undefined ? [{ type: "script", effect_id: SHOT_EFFECT }] : [
             { type: "script", effect_id: SHOT_EFFECT },
             { type: "create-entity", entity_name: hit },
           ],
@@ -244,6 +245,12 @@ function gunAttack(model: ModelSpec, weapon: string): UnitPrototype["attack_para
   const category = (source.ammo_category ?? source.ammo_categories?.[0]) as string
   const attack = attackParameters({ ...model, weapon: { type: "gun", category: category as never, range: source.range, cooldown: source.cooldown } }) as Record<string, any>
   if (source.sound !== undefined) attack.sound = source.sound
+  // Огнемёт: не ближе своей мёртвой зоны (иначе машина подожжёт себя), звук — непрерывный.
+  if (source.min_range !== undefined) attack.min_range = source.min_range
+  if (source.cyclic_sound !== undefined) {
+    attack.cyclic_sound = source.cyclic_sound
+    attack.sound = undefined
+  }
   return attack as UnitPrototype["attack_parameters"]
 }
 

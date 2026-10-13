@@ -240,7 +240,9 @@ export const MODELS: readonly ModelSpec[] = [
  * Снаряжение солдат (этап 22): оружие игрока, которое ставится боевым моделям, и броня наземных моделей. Оружие
  * и сопротивления юнита заданы прототипом, поэтому у моделей есть варианты-прототипы (src/prototypes/automaton.ts).
  */
-export const GEAR_WEAPONS: readonly string[] = ["pistol", "submachine-gun", "shotgun", "combat-shotgun", "rocket-launcher"]
+export const GEAR_WEAPONS: readonly string[] = ["pistol", "submachine-gun", "shotgun", "combat-shotgun", "rocket-launcher", "flamethrower"]
+/** Струя огнемёта игры: её пускает скрипт на каждый выстрел машины с огнемётом, пока заряжено топливо (22.3). */
+export const FLAME_STREAM = "handheld-flamethrower-fire-stream"
 export const GEAR_ARMORS: readonly string[] = ["light-armor", "heavy-armor", "modular-armor", "power-armor", "power-armor-mk2"]
 
 /** Вариант модели: сама модель, поставленное оружие и броня (нет — встроенное оружие, без брони). */

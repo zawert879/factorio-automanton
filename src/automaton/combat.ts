@@ -1,13 +1,13 @@
 // Бой (этап 10). Боевая модель — юнит с оружием: стреляет движок игры (подъезд, прицел, перезарядка
 // оружия), а каждый выстрел вызывает событие скрипта (SHOT_EFFECT): мод тратит один заряд патрона из
 // оружейного слота машины и наносит урон по виду патрона с учётом исследований урона команды.
-// Без патронов выстрелы холостые.
+// Без патронов выстрелы холостые. Огнемёт (22.3) вместо урона пускает струю огнемёта игры.
 //
 // Действия: reload — патроны из груза в оружейный слот; attack — бой с целью до её гибели, потери из
 // виду или конца патронов (сам подъезд и стрельба — команда attack движку).
 import { LuaEntity, LuaForce, OnScriptTriggerEffectEvent } from "factorio:runtime"
 import { onEvent } from "../events"
-import { modelOf, SHOT_EFFECT, variantOf, WeaponSpec } from "../names"
+import { FLAME_STREAM, modelOf, SHOT_EFFECT, variantOf, WeaponSpec } from "../names"
 import { ActionState, registerActionHandler, StepOutcome } from "./actions"
 import { directionOf, setActivity } from "./appearance"
 import { HANDLING_JOULES, spend } from "./energy"
@@ -70,8 +70,14 @@ function onShot(e: OnScriptTriggerEffectEvent): void {
   const record = findRobot(shooter)
   const stack = record?.weapon?.[0]
   if (record === undefined || stack === undefined || !stack.valid_for_read) return
-  const ammo = AMMO_DAMAGE[stack.name] ?? { damage: 5, type: "physical" as const }
   const category = weaponOf(record)?.category ?? "bullet"
+  // Огнемёт (22.3): заряд топлива — струя огнемёта игры (огонь на земле, поджигает цель; урон — её).
+  if (category === "flamethrower") {
+    stack.drain_ammo(1)
+    shooter.surface.create_entity({ name: FLAME_STREAM, position: shooter.position, force: shooter.force, source: shooter, target })
+    return
+  }
+  const ammo = AMMO_DAMAGE[stack.name] ?? { damage: 5, type: "physical" as const }
   const bonus = (shooter.force as LuaForce).get_ammo_damage_modifier(category)
   stack.drain_ammo(1)
   if (target.health !== undefined && target.destructible) target.damage(ammo.damage * (1 + bonus), shooter.force, ammo.type, shooter)

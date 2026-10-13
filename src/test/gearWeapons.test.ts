@@ -120,4 +120,33 @@ print(w.item, w.type, me.cargo.count("shotgun"), me.cargo.count("shotgun-shell")
       expect(dropped.includes("submachine-gun")).toBe(true)
     })
   })
+
+  test("огнемёт (22.3): струя поджигает кусаку, топливо огнемёта тратится, на земле огонь", (t) => {
+    const [x0, y0] = [1770, -1250]
+    const surface = site(x0, y0)
+    const robot = placeCombat(surface, x0 + 2.5, y0 + 2.5)
+    robot.cargo.insert({ name: "flamethrower", count: 1 })
+    robot.cargo.insert({ name: "flamethrower-ammo", count: 5 })
+    const sensors = game.forces.player.technologies[TECH.sensors2]
+    sensors.researched = true
+    const biter = surface.create_entity({ name: "small-biter", position: { x: x0 + 10.5, y: y0 + 2.5 }, force: "enemy" })!
+    biter.commandable!.set_command({ type: defines.command.stop, distraction: defines.distraction.none })
+    const m = run(
+      robot,
+      "test-gear-flamethrower",
+      `const w = me.weapon!
+w.equip("flamethrower")
+w.reload()
+print(w.type, w.range, w.ammo!.name, w.attack(scan.enemies()[0]))`,
+    )
+    waitUntil(t, "конца программы", finished(m), 1200, () => {
+      sensors.researched = false
+      expect(output(m)).toBe("flamethrower 15 flamethrower-ammo true")
+      const left = robot.weapon![0]
+      // Потрачено хоть немного топлива: 5 баков по 100 зарядов.
+      expect(left.valid_for_read && left.count * 100 - (100 - left.ammo) < 500).toBe(true)
+      expect(surface.count_entities_filtered({ type: "fire", area: [[x0, y0 - 5], [x0 + 20, y0 + 10]] }) > 0).toBe(true)
+      robot.entity.destroy()
+    })
+  })
 })

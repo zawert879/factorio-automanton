@@ -515,7 +515,7 @@ Combat machines fight back on their own — the engine handles the fighting, the
 ![A guard (guard) and biters](../media/combat.gif)
 
 With the **Automaton gear** research a combat machine can use a player weapon — pistol, submachine gun, shotgun,
-combat shotgun or rocket launcher: in the machine window (the Weapon slot, click with the weapon in hand) or by a program
+combat shotgun, rocket launcher or flamethrower: in the machine window (the Weapon slot, click with the weapon in hand) or by a program
 from the cargo. Range and rate of fire are those of that weapon, ammo is what fits it; remove it and the built-in
 weapon comes back.
 

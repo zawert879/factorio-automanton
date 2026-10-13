@@ -1519,8 +1519,8 @@ interface Weapon {
   readonly range: number;                // дальность, клеток @en range, in tiles
   /**
    * [Снаряжение] Поставить оружие игрока из груза: пистолет, пистолет-пулемёт, дробовик, боевой дробовик,
-   * ракетомёт. Прежнее оружие и патроны, которые к новому не подходят, — в груз. Около секунды.
-   * @en [Gear] Equip a player weapon from the cargo: pistol, submachine gun, shotgun, combat shotgun, rocket launcher. The previous weapon and ammo that does not fit the new one go to the cargo. About a second.
+   * ракетомёт, огнемёт. Прежнее оружие и патроны, которые к новому не подходят, — в груз. Около секунды.
+   * @en [Gear] Equip a player weapon from the cargo: pistol, submachine gun, shotgun, combat shotgun, rocket launcher, flamethrower. The previous weapon and ammo that does not fit the new one go to the cargo. About a second.
    */
   equip(weapon: Item): void;
   /**
@@ -1564,8 +1564,10 @@ weapon.guard(marker("пост"), { radius: 15, until: () => time.isNight() });
   дальность 24, 700 здоровья. Исследования урона игры действуют. Выстрел тратит один заряд из оружейного
   слота; без патронов машина стреляет вхолостую, а `attack` не начинается (`no-ammo`).
 - `[Снаряжение автоматонов]` — сменное оружие (`equip`): дальность и темп — как у оружия игрока (пистолет 15 клеток,
-  пистолет-пулемёт 18 и выстрел раз в 6 тиков, дробовики 15, ракетомёт 36), патроны — к нему: магазины, дробь
-  (`shotgun-shell` — 12 дробинок по 8 урона, `piercing-shotgun-shell` — 16; все дробинки — в цель), ракеты.
+  пистолет-пулемёт 18 и выстрел раз в 6 тиков, дробовики 15, ракетомёт 36, огнемёт 15, но не ближе 3), патроны —
+  к нему: магазины, дробь (`shotgun-shell` — 12 дробинок по 8 урона, `piercing-shotgun-shell` — 16; все дробинки —
+  в цель), ракеты, топливо огнемёта (`flamethrower-ammo`: струя огнемёта игры — поджигает цель и землю, бак — на
+  100 выстрелов, это меньше двух секунд огня).
   Поставить и снять можно и в окне машины. Подобрали машину — оружие вернётся предметом.
 - `me.weapon.ammo.count` — сколько магазинов в слоте (в каждом 10 зарядов).
 - `attack` — `false`, если цель ушла из виду или кончились патроны; `guard` по умолчанию охраняет радиус
