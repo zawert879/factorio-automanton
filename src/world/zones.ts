@@ -5,7 +5,7 @@
 // начатая на центральной ручке — переносит зону. Начало рамки — нажатие (своя клавиша ZONE_PRESS, связанная
 // с выделением), конец — угол выделенной области напротив начала. Ручки видит только игрок с «Программатором» в руке.
 import { BoundingBox, LuaPlayer, LuaRenderObject, LuaSurface, MapPosition, PlayerIndex } from "factorio:runtime"
-import { onEvent } from "../events"
+import { onCustomInput, onEvent } from "../events"
 import { PROGRAMMER, ZONE_PRESS } from "../names"
 import { askName, registerRenamer } from "./naming"
 
@@ -237,7 +237,7 @@ export function registerZones(): void {
     createZone(name, e.surface, area)
     askName(e.player_index, { kind: "zone", name }, name)
   })
-  script.on_event(ZONE_PRESS, (e) => onZonePress(e.player_index, e.cursor_position))
+  onCustomInput(ZONE_PRESS, (e) => onZonePress(e.player_index, e.cursor_position))
   onEvent(defines.events.on_player_cursor_stack_changed, (e) => drawHandles(game.get_player(e.player_index)!))
   onEvent(defines.events.on_player_changed_surface, (e) => drawHandles(game.get_player(e.player_index)!))
   onEvent(defines.events.on_player_alt_selected_area, (e) => {

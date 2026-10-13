@@ -257,8 +257,10 @@ Graph rules:
   node: a name, parameters in a table (name and type; "+ parameter", "✕") and what it returns. A Call node calls it —
   pick the function from the list in its window, and its pins follow the function's parameters.
 - Machine parameters — a Parameter node (name, type, default value): one graph, different settings on different machines.
-- To move nodes, cut and paste them (Ctrl+X, Ctrl+V): their wires move with them. Ctrl+C copies without the wires
-  to the rest of the graph.
+- To move a node, use the Move button in the palette: press on the node, drag a box and release — the node moves to
+  where you released, with its wires and settings. To move a group of nodes, cut and paste them (Ctrl+X, Ctrl+V):
+  their wires move with them. Ctrl+C copies without the wires to the rest of the graph.
+- To delete a node, press Delete over it or use Delete node in its window (or right-click); its wires go with it.
 
 A **graph library** is a graph without Start, with only functions. Its functions are visible to the other team
 programs, like `export function` in code:

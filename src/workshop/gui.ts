@@ -5,12 +5,12 @@ import { onCustomInput, onEvent } from "../events"
 import { callLibrary, formatParams, GraphParam, parseParams } from "../graph/codegen"
 import { GraphValue, PinType } from "../graph/model"
 import { CATEGORIES, NODES, SettingSpec } from "../graph/nodes"
-import { NODE_BODY_PREFIX } from "../names"
+import { NODE_BODY_PREFIX, NODE_MOVER } from "../names"
 import { addCode } from "../gui/codeView"
 import { onGuiChange, onGuiChecked, onGuiClick, onGuiElemChanged, onGuiSelection, titlebar } from "../gui/common"
 import { findProgram, onProgramPublished, onProgramRemoved, onProgramRenamed, ProgramRecord } from "../program/store"
 import { trim } from "../lang/runtime/strings"
-import { buildGraph, checkWiresLater, deleteWorkshop, drawNode, isNodeBody, isPin, NODE_TAG, nodeOfEntity, readGraph, refreshNode, slotsOf, workshopOf } from "./entities"
+import { buildGraph, checkWiresLater, deleteWorkshop, drawNode, isNodeBody, isPin, NODE_TAG, nodeOfEntity, readGraph, refreshNode, removeNode, slotsOf, workshopOf } from "./entities"
 import { applyCall, callChoices, refreshLibraryCalls, renameLibraryCalls } from "./libraries"
 import { newGraphProgram } from "./programs"
 import { buildWorkshop, publishing, publishWorkshop, showErrors } from "./publish"
@@ -87,6 +87,9 @@ function openPalette(player: LuaPlayer): void {
     const button = wires.add({ type: "button", caption: [`automaton-workshop.${wire}`], tooltip: [`automaton-workshop.${wire}-tooltip`], tags: { action: "workshop-wire", wire } })
     button.style.width = 113
   }
+  // Перенос узлов (23.1): инструмент в руку — рамка от узла переносит его.
+  const mover = frame.add({ type: "button", caption: ["automaton-workshop.mover"], tooltip: ["automaton-workshop.mover-tooltip"], tags: { action: "workshop-mover" } })
+  mover.style.width = 230
   const index = math.max(1, CATEGORIES.indexOf(category as never) + 1)
   frame.add({
     type: "drop-down",
@@ -231,6 +234,8 @@ export function openNodeWindow(player: LuaPlayer, ws: Workshop, node: WorkshopNo
     error.style.single_line = false
     error.style.maximal_width = 400
   }
+  // Удалить узел (23.1): провода к нему снимаются вместе с разъёмами.
+  frame.add({ type: "button", caption: ["automaton-workshop.delete-node"], tooltip: ["automaton-workshop.delete-node-tooltip"], style: "red_button", tags: { action: "workshop-node-delete" } })
   frame.auto_center = true
 }
 
@@ -442,6 +447,18 @@ export function registerWorkshopGui(): void {
   })
   onGuiClick("workshop-code-close", (player) => player.gui.screen[CODE_WINDOW]?.destroy())
   onGuiClick("workshop-node-close", (player) => closeNodeWindow(player))
+  onGuiClick("workshop-mover", (player) => {
+    const hand = player.cursor_stack
+    if (hand === undefined || currentWorkshop(player) === undefined) return
+    hand.clear()
+    hand.set_stack({ name: NODE_MOVER })
+  })
+  onGuiClick("workshop-node-delete", (player) => {
+    const ws = currentWorkshop(player)
+    const nodeId = visitorOf(player)?.editing
+    closeNodeWindow(player)
+    if (ws !== undefined && nodeId !== undefined) removeNode(ws, nodeId)
+  })
   onGuiClick("workshop-wire", (player, element) => {
     const wire = (element.tags as unknown as { wire?: string }).wire
     if (wire === "red-wire" || wire === "green-wire") giveWire(player, wire)

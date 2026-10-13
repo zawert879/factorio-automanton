@@ -19,8 +19,15 @@ export const SIGNAL_MARKER = "automaton-signal-marker"
 export const MARKER_ENTITIES: readonly string[] = [MARKER, SIGNAL_MARKER]
 /** «Программатор» — инструмент выделения зон: zone("имя"). */
 export const PROGRAMMER = "automaton-programmer"
-/** Нажатие выделения (связано с select-for-blueprint): начало рамки «Программатора» у края зоны (21.7). */
+/**
+ * Нажатие выделения (связано с select-for-blueprint): где начали рамку — у края зоны (21.7, «Программатор»)
+ * или на узле мастерской (23.1, «Перенос»).
+ */
 export const ZONE_PRESS = "automaton-zone-press"
+/** Инструмент мастерской «Перенос» (23.1): рамка, начатая на узле, переносит его туда, где её отпустили. */
+export const NODE_MOVER = "automaton-node-mover"
+/** Клавиша удаления узла под курсором в мастерской (23.1), по умолчанию Delete. */
+export const NODE_DELETE = "automaton-node-delete"
 /** Справка в игре (18.5): ярлык на панели быстрого доступа и клавиша (F1). */
 export const HELP_SHORTCUT = "automaton-help"
 export const HELP_INPUT = "automaton-help"

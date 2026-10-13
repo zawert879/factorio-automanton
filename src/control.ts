@@ -47,6 +47,7 @@ import { registerNaming } from "./world/naming"
 import { registerRoboports, removeRoboports } from "./world/roboports"
 import { initZones, registerZones } from "./world/zones"
 import { registerWorkshopEntities } from "./workshop/entities"
+import { registerNodeMoves } from "./workshop/move"
 import { registerWorkshopDebug } from "./workshop/debug"
 import { registerWorkshopGui, restoreWorkshopWindows } from "./workshop/gui"
 import { initWorkshop } from "./workshop/state"
@@ -123,6 +124,7 @@ registerComms()
 registerBoard()
 registerCache()
 registerWorkshopEntities()
+registerNodeMoves()
 registerWorkshopGui()
 registerWorkshopDebug()
 // Здание исчезло — его обёртка у программ остаётся (valid === false), но из общего списка уходит.

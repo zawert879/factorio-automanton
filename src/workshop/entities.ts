@@ -1,7 +1,7 @@
 // Мастерская схем (этап 15): поверхность программы, здания узлов и разъёмов, вид узла (rendering), чтение схемы
 // с поверхности (узлы и провода) и постройка поверхности из схемы. Узлы из палитры и вставка (Ctrl+V) приходят
 // призраками — они сразу оживают; разъёмы узла ищутся по месту, недостающие ставятся заново.
-import { Color, LocalisedString, LuaEntity, LuaPlayer, LuaSurface, MapGenSettingsWrite, MapPosition, Tags } from "factorio:runtime"
+import { BoundingBox, Color, LocalisedString, LuaEntity, LuaPlayer, LuaSurface, MapGenSettingsWrite, MapPosition, Tags } from "factorio:runtime"
 import { blueprintOf } from "../automaton/blueprints"
 import { onEvent, onTick } from "../events"
 import { resolvePins } from "../graph/codegen"
@@ -408,6 +408,42 @@ export function removeNode(ws: Workshop, nodeId: number): void {
   forgetNode(node)
   if (node.body.valid) node.body.destroy()
   ws.nodes[nodeId] = undefined
+}
+
+/**
+ * Перенести узел на dx, dy клеток (23.1): тело и разъёмы переезжают (teleport) вместе с проводами и подписями —
+ * сущности те же. false — место занято другим узлом (узел остаётся где был).
+ */
+export function moveNode(ws: Workshop, nodeId: number, dx: number, dy: number): boolean {
+  const node = ws.nodes[nodeId]
+  if (node === undefined || !node.body.valid) return false
+  if (dx === 0 && dy === 0) return true
+  const own = new LuaSet<number>()
+  const entities: LuaEntity[] = [node.body]
+  own.add(node.body.unit_number!)
+  for (const [, pin] of pairs(node.pins)) {
+    if (!pin.valid) continue
+    entities.push(pin)
+    own.add(pin.unit_number!)
+  }
+  const corner = nodeCorner(node.body)
+  const h = bodyHeight(node.body)
+  const area: BoundingBox = {
+    left_top: { x: corner.x + dx + 0.1, y: corner.y + dy + 0.1 },
+    right_bottom: { x: corner.x + dx + NODE_WIDTH - 0.1, y: corner.y + dy + h - 0.1 },
+  }
+  for (const other of ws.surface.find_entities_filtered({ area })) {
+    if (isWorkshopEntity(other.name) && !own.has(other.unit_number ?? -1)) return false
+  }
+  const moved: LuaEntity[] = []
+  for (const entity of entities) {
+    if (entity.teleport({ x: entity.position.x + dx, y: entity.position.y + dy })) moved.push(entity)
+    else {
+      for (const back of moved) back.teleport({ x: back.position.x - dx, y: back.position.y - dy })
+      return false
+    }
+  }
+  return true
 }
 
 /** Узел по зданию (телу или разъёму). */

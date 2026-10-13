@@ -51,6 +51,8 @@ export interface WorkshopState {
   wireChecks?: { pin: LuaEntity; player: PlayerIndex }[]
   /** Подсветка отладки (машины на узлах) по программам. */
   debugRenders?: Record<number, LuaRenderObject[] | undefined>
+  /** Нажатие инструментом «Перенос» на узле (23.1): ждёт конца рамки. */
+  moves?: Record<number, { programId: number; node: number; start: MapPosition } | undefined>
 }
 
 export function initWorkshop(): void {

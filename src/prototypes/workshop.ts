@@ -3,7 +3,7 @@
 // квадрат рисует rendering. Предметы — только для чертежей (вырезать и вставить, палитра); в игре их не сделать.
 import { PrototypeData } from "factorio:common"
 import { ItemPrototype, SimpleEntityWithOwnerPrototype, Sprite } from "factorio:prototype"
-import { NODE_BODY_PREFIX, NODE_MAX_HEIGHT, NODE_MIN_HEIGHT, NODE_WIDTH, PIN_DATA, PIN_EXEC } from "../names"
+import { NODE_BODY_PREFIX, NODE_DELETE, NODE_MAX_HEIGHT, NODE_MIN_HEIGHT, NODE_MOVER, NODE_WIDTH, PIN_DATA, PIN_EXEC } from "../names"
 
 declare const data: PrototypeData
 
@@ -106,5 +106,23 @@ for (const name of [PIN_EXEC, PIN_DATA]) {
   const item: ItemPrototype = { type: "item", name, icon: pin.icon as string, icon_size: 64, hidden: true, flags: ["only-in-cursor"], place_result: name, stack_size: 50 }
   prototypes.push(pin, item)
 }
+
+// Перенос и удаление узлов (23.1): инструмент «Перенос» (рамка от узла) и клавиша Delete над узлом.
+prototypes.push(
+  {
+    type: "selection-tool",
+    name: NODE_MOVER,
+    icon: "__base__/graphics/icons/cut-paste-tool.png",
+    icon_size: 64,
+    flags: ["only-in-cursor", "not-stackable", "spawnable"],
+    hidden: true,
+    subgroup: "tool",
+    order: "z[automaton]-m[node-mover]",
+    stack_size: 1,
+    select: { border_color: { r: 0.95, g: 0.67, b: 0.24 }, cursor_box_type: "copy", mode: ["nothing"] },
+    alt_select: { border_color: { r: 0.95, g: 0.67, b: 0.24 }, cursor_box_type: "copy", mode: ["nothing"] },
+  } as never,
+  { type: "custom-input", name: NODE_DELETE, key_sequence: "DELETE", consuming: "none" } as never,
+)
 
 data.extend(prototypes as never)

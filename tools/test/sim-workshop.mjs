@@ -137,8 +137,35 @@ elseif step == 29 and wait > 10 then
   R.sameWindow = window ~= nil and window.index == windowIndex
   R.afterType = nodeValues(fnNode).params
   if window then window.destroy() end
+  step, wait = 30, 0
+-- 6. Перенос и удаление узлов (23.1): инструмент «Перенос» — рамка от узла «Ждать» на (2, 8); Delete над узлом.
+elseif step == 30 and wait > 10 then
+  for _, n in ipairs(graph().nodes) do if n.kind == "wait" then moveNode, moveFrom = n.id, { x = n.x, y = n.y } end end
+  moveBody = moveNode and remote.call(W, "body", "sim/схема", moveNode)
+  R.nodesBefore = {}
+  for _, n in ipairs(graph().nodes) do R.nodesBefore[#R.nodesBefore + 1] = n.kind .. "@" .. n.x .. "," .. n.y end
+  player.cursor_stack.set_stack{name = "automaton-node-mover"}
+  step, wait = 31, 0
+elseif step == 31 and moveBody and at({moveBody.x, moveBody.y - 0.6}) then sim.control_down{control = "select-for-blueprint", notify = true}; step, wait = 32, 0
+elseif step == 32 and at({moveBody.x + 2, moveBody.y + 7.4}) then sim.control_up{control = "select-for-blueprint"}; step, wait = 33, 0
+-- Рамка завершается со следующим вводом — чуть сдвинуть курсор.
+elseif step == 33 and at({moveBody.x + 2.04, moveBody.y + 7.4}) and wait > 15 then
+  local g = graph()
+  for _, n in ipairs(g.nodes) do if n.id == moveNode then R.moved = { dx = n.x - moveFrom.x, dy = n.y - moveFrom.y } end end
+  R.afterMove = { nodes = #g.nodes, wires = #g.wires, problems = g.problems }
+  player.clear_cursor()
+  moveBody = remote.call(W, "body", "sim/схема", moveNode)
+  step, wait = 34, 0
+elseif step == 34 and wait > 5 and at({moveBody.x, moveBody.y - 0.6}) then
+  R.deleteSelected = player.selected ~= nil
+  local ok, err = pcall(sim.control_press, {control = "automaton-node-delete", notify = true})
+  R.deletePress = ok or tostring(err)
+  step, wait = 35, 0
+elseif step == 35 and wait > 10 then
+  local g = graph()
+  R.afterDelete = { nodes = #g.nodes, wires = #g.wires }
   step, wait = 15, 0
--- 6. Выйти: снова персонаж на обычной карте.
+-- 7. Выйти: снова персонаж на обычной карте.
 elseif step == 15 and wait > 10 then
   remote.call(W, "exit", player.index)
   R.exitController = player.controller_type
@@ -195,5 +222,7 @@ check(r.afterPaste?.nodes === 2 && arr(r.afterPaste?.wires).length === 1 && r.af
 check(r.publish?.errors === 0 && r.publish?.version === 2, "публикация из мастерской: новая версия")
 check(r.addButton === true && r.afterAdd === "p1: number", "окно «Функции»: «+ параметр» — параметр p1 (число)")
 check(r.field === true && /^(p1)?dest: number$/.test(r.afterType ?? "") && r.sameWindow === true, "имя параметра печатается в таблице, окно не перерисовывается")
+check(r.moved?.dx === 2 && r.moved?.dy === 8 && r.afterMove?.wires === 1 && r.afterMove?.problems === 0, "«Перенос»: рамка от узла переносит его, провод цел")
+check(r.deletePress === true && r.afterDelete?.nodes === r.afterMove?.nodes - 1 && r.afterDelete?.wires === 0, "Delete над узлом: узел и его провод удалены")
 check(r.exitController === 1 && r.exitSurface === "nauvis" && r.exitCharacter, "выход: снова персонаж на карте")
 if (failures.length > 0) process.exit(1)
