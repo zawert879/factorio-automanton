@@ -270,6 +270,7 @@ interface Me extends Machine {
   readonly energy: Energy;             // уровень, заправка, зарядка @en level, refueling, charging
   readonly tank: Tank | null;          // бак — только у рабочих моделей @en the tank — only on worker models
   readonly weapon: Weapon | null;      // оружие — только у боевых моделей @en the weapon — only on combat models
+  readonly armor: Armor | null;        // броня — у наземных моделей (22.4) @en armor — on ground models
   readonly reach: number;              // досягаемость до зданий, клеток (как у персонажа) @en reach to buildings, in tiles (like a character's)
   readonly mineReach: number;          // досягаемость до месторождения, клеток @en reach to resource patches, in tiles
   readonly vision: number;             // радиус зрения, клеток @en vision radius, in tiles
@@ -1575,6 +1576,34 @@ weapon.guard(marker("пост"), { radius: 15, until: () => time.isNight() });
 - У рабочих и летающих моделей оружия нет: `me.weapon === null`. Программа для боевой машины проверяет это
   в начале (`if (me.weapon === null) exit()`) или пишет `me.weapon!`.
 
+### Броня
+
+Наземные машины — рабочие и боевые — носят броню игрока: лёгкую, тяжёлую, модульную, силовую Mk1–Mk2. Её
+сопротивления добавляются к собственным у машины (у боевых свои есть); впервые есть защита от кислоты — так бьют
+плеваки и черви. Надеть можно и в окне машины (слот «Броня»). У летающих брони нет: `me.armor === null`.
+
+```ts
+interface Armor {
+  readonly item: Item | null;            // надетая броня или null @en the armor worn, or null
+  /**
+   * [Снаряжение] Надеть броню из груза (сетка снаряжения — вместе с ней). Прежняя броня — в груз. Около секунды.
+   * @en [Gear] Put on armor from the cargo (its equipment grid comes along). The previous armor goes to the cargo. About a second.
+   */
+  equip(armor: Item): void;
+  /**
+   * [Снаряжение] Снять броню в груз.
+   * @en [Gear] Take the armor off into the cargo.
+   */
+  unequip(): void;
+}
+```
+
+```ts
+// Перед дальним маршрутом надеть лучшую броню из груза
+const best = ["power-armor-mk2", "power-armor", "modular-armor", "heavy-armor", "light-armor"].find((a) => me.cargo.count(a) > 0);
+if (best !== undefined && me.armor!.item !== best) me.armor!.equip(best);
+```
+
 ## Сигналы
 
 `[Цепи]`. «Сигнальная метка» (открывается «Цепями») — метка, которую можно подключить проводами:
@@ -1723,7 +1752,7 @@ try {
 | Сенсоры 1–3 | радиус зрения 16 / 24 / 32 клетки, `scan.enemies` (со 2-го уровня) |
 | Автоматон Mk2 / Mk3 | новые рабочие модели, `me.energy.charge`, зарядная станция |
 | Боевые автоматоны 1–2 | боевые модели, `me.weapon`: `attack`, `guard`, `patrol`, `reload` |
-| Снаряжение автоматонов | слот оружия, `me.weapon.equip`, `unequip` |
+| Снаряжение автоматонов | слоты оружия и брони, `me.weapon.equip`, `me.armor.equip`, `unequip` |
 | Летающие автоматоны 1–2 | летающие модели |
 | Скорость, груз, добыча, процессор, память, баки 1–3 | +15% скорости, +50% слотов груза, +25% скорости добычи, +50% инструкций за тик, +50% памяти, +50% бака — за уровень |
 

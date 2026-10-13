@@ -492,7 +492,7 @@ a scout, a patrol.
 | Automaton sensors 1–3 | vision of 16 / 24 / 32 tiles, `scan.enemies` |
 | Automaton Mk2, Mk3 | electric models, the charging station |
 | Combat automatons 1–2 | machine gun and rocket launcher, `me.weapon`: `attack`, `guard`, `patrol`, `reload` |
-| Automaton gear | player weapons in the machine window, `me.weapon.equip`, `unequip` |
+| Automaton gear | player weapons and armor in the machine window, `me.weapon.equip`, `me.armor.equip`, `unequip` |
 | Flying automatons 1–2 | haulers that fly in a straight line over everything |
 | Automaton speed, cargo, mining, processor, memory, tanks 1–3 | upgrades for all machines |
 
@@ -518,6 +518,10 @@ With the **Automaton gear** research a combat machine can use a player weapon �
 combat shotgun, rocket launcher or flamethrower: in the machine window (the Weapon slot, click with the weapon in hand) or by a program
 from the cargo. Range and rate of fire are those of that weapon, ammo is what fits it; remove it and the built-in
 weapon comes back.
+
+All ground machines, workers included, can wear player armor (light, heavy, modular, power): the Armor slot in the
+machine window or `me.armor.equip(…)` from the cargo. Its resistances add to the machine's own — acid from spitters
+and worms included.
 
 ```ts
 const weapon = me.weapon!

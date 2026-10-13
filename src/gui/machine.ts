@@ -32,7 +32,7 @@ import { pausedLine } from "../lang/runtime"
 import { lib } from "../lang/runtime/library"
 import { modelOf, TECH } from "../names"
 import { ammoFits, weaponOf } from "../automaton/combat"
-import { fitsWeaponSlot, Give, setWeapon } from "../automaton/gear"
+import { armorSlot, fitsArmorSlot, fitsWeaponSlot, Give, setArmor, setWeapon } from "../automaton/gear"
 import { gearOf } from "../automaton/variants"
 import { robotState } from "../program/handles"
 import { machineOf, restartMachine, stopMachine, wake } from "../program/machines"
@@ -70,6 +70,7 @@ export interface MachineWindow {
   /** Снаряжение (22): оружие и патроны — у боевых моделей. */
   weaponSlot?: SpriteButtonGuiElement
   ammoSlot?: SpriteButtonGuiElement
+  armorSlot?: SpriteButtonGuiElement
   tank: ProgressBarGuiElement
   name: TextFieldGuiElement
   home: LabelGuiElement
@@ -141,14 +142,17 @@ export function openMachine(player: LuaPlayer, robot: RobotRecord): void {
   const tank = cargoRow.add({ type: "progressbar", value: 0 })
   tank.style.width = 100
 
-  // Снаряжение (22.2): оружие и патроны у боевых моделей.
+  // Снаряжение (22.2, 22.4): оружие и патроны — у боевых моделей, броня — у наземных.
   const gearRow = body.add({ type: "flow", direction: "horizontal" })
   gearRow.style.vertical_align = "center"
-  gearRow.visible = weaponOf(robot) !== undefined
-  label(gearRow, "weapon")
-  const weaponSlot = gearRow.add({ type: "sprite-button", style: "slot_button", tags: { action: "machine-weapon" }, tooltip: ["automaton-gui.weapon-slot-tooltip"] })
-  label(gearRow, "ammo")
-  const ammoSlot = gearRow.add({ type: "sprite-button", style: "slot_button", tags: { action: "machine-ammo" }, tooltip: ["automaton-gui.ammo-slot-tooltip"] })
+  gearRow.visible = armorSlot(robot) !== undefined
+  const combat = weaponOf(robot) !== undefined
+  if (combat) label(gearRow, "weapon")
+  const weaponSlot = combat ? gearRow.add({ type: "sprite-button", style: "slot_button", tags: { action: "machine-weapon" }, tooltip: ["automaton-gui.weapon-slot-tooltip"] }) : undefined
+  if (combat) label(gearRow, "ammo")
+  const ammoSlot = combat ? gearRow.add({ type: "sprite-button", style: "slot_button", tags: { action: "machine-ammo" }, tooltip: ["automaton-gui.ammo-slot-tooltip"] }) : undefined
+  label(gearRow, "armor")
+  const armorButton = gearRow.add({ type: "sprite-button", style: "slot_button", tags: { action: "machine-armor" }, tooltip: ["automaton-gui.armor-slot-tooltip"] })
 
   // Настройки машины.
   const settings = body.add({ type: "table", column_count: 2 })
@@ -188,6 +192,7 @@ export function openMachine(player: LuaPlayer, robot: RobotRecord): void {
     fuel,
     weaponSlot,
     ammoSlot,
+    armorSlot: armorButton,
     tank,
     name,
     home,
@@ -230,12 +235,27 @@ export function fuelFromHand(hand: LuaItemStack, robot: RobotRecord): LocalisedS
   return undefined
 }
 
-/** Отдать предметы игроку, что не влезло — на землю у него. */
+/** Отдать предметы игроку, что не влезло — на землю у него (броня — стопкой, с сеткой снаряжения). */
 function giveToPlayer(player: LuaPlayer): Give {
   return (stack) => {
+    const count = stack.count
     const moved = player.insert(stack)
-    if (moved < stack.count) player.surface.spill_item_stack({ position: player.position, stack: { name: stack.name, count: stack.count - moved }, enable_looted: true })
+    if (moved >= count) return
+    if (moved === 0) player.surface.spill_item_stack({ position: player.position, stack, enable_looted: true })
+    else player.surface.spill_item_stack({ position: player.position, stack: { name: stack.name, count: count - moved }, enable_looted: true })
   }
+}
+
+/** Слот брони (22.4): броня в руке — надеть (прежняя — игроку), пустая рука — снять. Нужно «Снаряжение автоматонов». */
+export function armorFromHand(hand: LuaItemStack, robot: RobotRecord, give: Give, force: LuaForce): LocalisedString | undefined {
+  if (!force.technologies[TECH.gear].researched) return ["automaton-gui.needs-gear"]
+  if (!hand.valid_for_read) {
+    setArmor(robot, undefined, give)
+    return undefined
+  }
+  if (!fitsArmorSlot(robot, hand.name)) return ["automaton-gui.not-armor"]
+  setArmor(robot, hand, give)
+  return undefined
 }
 
 /**
@@ -389,6 +409,10 @@ export function refreshMachine(window: MachineWindow): void {
     window.ammoSlot!.sprite = ammo?.valid_for_read ? `item/${ammo.name}` : ""
     window.ammoSlot!.number = ammo?.valid_for_read ? ammo.count : undefined
   }
+  if (window.armorSlot?.valid) {
+    const armor = gearOf(robot).armor
+    window.armorSlot.sprite = armor === undefined ? "" : `item/${armor}`
+  }
   const tank = tankOf(robot)
   window.tank.value = math.min(1, tank.amount / tankCapacity(robot))
   window.tank.caption = tank.fluid === undefined ? "" : `${math.floor(tank.amount)}`
@@ -447,6 +471,14 @@ export function registerMachineWindow(): void {
     if (found === undefined || !nearby(player, found.robot)) return
     const hand = player.cursor_stack
     const message = hand === undefined ? undefined : weaponFromHand(hand, found.robot, giveToPlayer(player), player.force as LuaForce)
+    if (message !== undefined) notify(player, message)
+    refreshMachine(found.window)
+  })
+  onGuiClick("machine-armor", (player) => {
+    const found = windowRobot(player)
+    if (found === undefined || !nearby(player, found.robot)) return
+    const hand = player.cursor_stack
+    const message = hand === undefined ? undefined : armorFromHand(hand, found.robot, giveToPlayer(player), player.force as LuaForce)
     if (message !== undefined) notify(player, message)
     refreshMachine(found.window)
   })

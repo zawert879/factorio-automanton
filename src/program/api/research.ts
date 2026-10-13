@@ -30,6 +30,7 @@ export const REQUIRED_RESEARCH: Record<string, string> = {
 const REQUIRED_METHODS: Record<string, Record<string, string>> = {
   scan: { enemies: TECH.sensors2 },
   weapon: { equip: TECH.gear, unequip: TECH.gear },
+  armor: { equip: TECH.gear, unequip: TECH.gear },
   board: {
     get: TECH.radio,
     set: TECH.radio,

@@ -26,6 +26,8 @@ export interface RobotRecord {
   fuel: LuaInventory
   /** Оружейный слот (патроны) — у боевых моделей. */
   weapon?: LuaInventory
+  /** Слот брони (22.4) — у наземных моделей: предмет брони целиком, с сеткой снаряжения. */
+  armor?: LuaInventory
   /** Значок оружия у плеча (боевые модели; в сохранениях до 22.1 — не запомнен). */
   gun?: LuaRenderObject
   /** Запас энергии, Дж: тратится на путь и действия, пополняется сжиганием топлива. */
@@ -100,6 +102,7 @@ export function registerRobot(entity: LuaEntity, tag?: RobotTag): RobotRecord {
     cargo: game.create_inventory(model.cargoSlots),
     fuel: game.create_inventory(1),
     weapon: model.weapon === undefined ? undefined : game.create_inventory(1),
+    armor: model.flying ? undefined : game.create_inventory(1),
     energy: tag?.energy ?? model.battery ?? START_ENERGY,
     tank: tag?.tank ?? { amount: 0, temperature: 15 },
   }
@@ -145,6 +148,7 @@ function forgetUnit(unitNumber: number, reason: "mined" | "destroyed"): void {
     if (record.cargo?.valid) record.cargo.destroy()
     if (record.fuel?.valid) record.fuel.destroy()
     if (record.weapon?.valid) record.weapon.destroy()
+    if (record.armor?.valid) record.armor.destroy()
     delete registry.byId[id]
   }
 }
@@ -169,6 +173,7 @@ function releaseItems(record: RobotRecord, to: LuaInventory | undefined): void {
   moveAll(record.cargo, to, surface, position)
   moveAll(record.fuel, to, surface, position)
   if (record.weapon !== undefined) moveAll(record.weapon, to, surface, position)
+  if (record.armor?.valid) moveAll(record.armor, to, surface, position)
   // Поставленное оружие (22.2) — предметом: подобрали — игроку, погибла — на землю.
   const gun = variantOf(record.entity.name)?.weapon
   if (gun !== undefined) {
@@ -241,6 +246,7 @@ export function adoptUnregisteredRobots(): void {
     if (!record.cargo?.valid) record.cargo = game.create_inventory(CARGO_SLOTS)
     if (!record.fuel?.valid) record.fuel = game.create_inventory(1)
     if (modelOf(record.model)?.weapon !== undefined && !record.weapon?.valid) record.weapon = game.create_inventory(1)
+    if (!modelOf(record.model)?.flying && !record.armor?.valid) record.armor = game.create_inventory(1)
     record.energy ??= START_ENERGY
     record.tank ??= { amount: 0, temperature: 15 }
     applyUpgrades(record)

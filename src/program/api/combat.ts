@@ -12,6 +12,7 @@ import { onMachineReset } from "../machines"
 import { registerPoll, resume, sleepUntil } from "../scheduler"
 import { actionCall, finishWaiting, item, optionalItem, startWaiting } from "./common"
 import { gearOf } from "../../automaton/variants"
+import { modelOf } from "../../names"
 
 const COMBAT_POLL_TICKS = 30
 /** Пост считается достигнутым ближе этого (клеток). */
@@ -198,6 +199,13 @@ for (const name of ["reload", "attack", "guard", "patrol"]) {
 hostGetters.weapon.item = () => gearOf(currentRobot()).weapon
 hostMethods.weapon.equip = (_o: Val, k: Val, what: Val) => actionCall(k, "equip", k !== undefined ? {} : { slot: "weapon", item: item(what) })
 hostMethods.weapon.unequip = (_o: Val, k: Val) => actionCall(k, "equip", k !== undefined ? {} : { slot: "weapon" })
+
+// me.armor (22.4): броня наземных машин — что надето, надеть из груза, снять в груз; у летающих — null.
+const armorObject = defineHostObject("armor")
+hostGetters.me.armor = () => (modelOf(currentRobot().model)?.flying ? undefined : armorObject)
+hostGetters.armor.item = () => gearOf(currentRobot()).armor
+hostMethods.armor.equip = (_o: Val, k: Val, what: Val) => actionCall(k, "equip", k !== undefined ? {} : { slot: "armor", item: item(what) })
+hostMethods.armor.unequip = (_o: Val, k: Val) => actionCall(k, "equip", k !== undefined ? {} : { slot: "armor" })
 
 // Программу остановили или перезапустили посреди боя — команда движку снимается.
 onMachineReset((robotId) => {
