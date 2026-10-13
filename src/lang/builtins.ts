@@ -53,6 +53,8 @@ export const BLOCKING_OBJECT_METHODS = [
   "insert", "extract", "repair", "rotate", "deconstruct", "setRecipe", "fill", "drain", "refuel",
   // Постройка по призраку (21.3): ghost.build(); модули (21.4).
   "build", "installModule", "removeModule",
+  // Снаряжение (22.2, 22.4): me.weapon.equip(…), me.armor.equip(…).
+  "equip", "unequip",
   // Системы своей машины (19.4): me.energy.charge(), me.tank.pump(…), me.weapon.attack(…) и т. д.
   "charge", "pump", "reload", "attack", "guard", "patrol",
 ]

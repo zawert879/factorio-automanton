@@ -91,8 +91,8 @@ export interface ModelSpec {
 
 /** Оружие модели: вид (для программ), категория патронов, дальность (клеток), перезарядка (тиков). */
 export interface WeaponSpec {
-  type: "gun" | "rocket"
-  category: "bullet" | "rocket"
+  type: "gun" | "shotgun" | "rocket" | "flamethrower"
+  category: "bullet" | "shotgun-shell" | "rocket" | "flamethrower"
   range: number
   cooldown: number
 }

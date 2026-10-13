@@ -10,7 +10,7 @@ import { cancelMove } from "./movement"
 import { RobotRecord } from "./registry"
 import { problemFor, showProblem } from "./status"
 
-export type ActionKind = "wait" | "mine" | "take" | "put" | "pickup" | "drop" | "give" | "repair" | "refuel" | "pump" | "fill" | "drain" | "charge" | "set-recipe" | "build" | "deconstruct" | "rotate" | "reload" | "attack"
+export type ActionKind = "wait" | "mine" | "take" | "put" | "pickup" | "drop" | "give" | "repair" | "refuel" | "pump" | "fill" | "drain" | "charge" | "set-recipe" | "build" | "deconstruct" | "rotate" | "reload" | "attack" | "equip"
 
 export type ActionError =
   | "out-of-reach"
@@ -46,6 +46,8 @@ export interface ActionParams {
   only?: boolean
   /** Положить в слоты модулей или взять из них (installModule, removeModule). */
   modules?: boolean
+  /** Снаряжение (equip): какой слот — оружие или броня; item — что надеть, без него — снять. */
+  slot?: "weapon" | "armor"
 }
 
 export interface ActionState {

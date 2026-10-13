@@ -10,6 +10,7 @@ import {
   FrameGuiElement,
   LabelGuiElement,
   LocalisedString,
+  LuaForce,
   LuaGuiElement,
   LuaInventory,
   LuaItemStack,
@@ -29,7 +30,10 @@ import { RobotRecord } from "../automaton/registry"
 import { onCustomInput, onEvent, onTick } from "../events"
 import { pausedLine } from "../lang/runtime"
 import { lib } from "../lang/runtime/library"
-import { modelOf } from "../names"
+import { modelOf, TECH } from "../names"
+import { ammoFits, weaponOf } from "../automaton/combat"
+import { fitsWeaponSlot, Give, setWeapon } from "../automaton/gear"
+import { gearOf } from "../automaton/variants"
 import { robotState } from "../program/handles"
 import { machineOf, restartMachine, stopMachine, wake } from "../program/machines"
 import { stepMachine } from "../program/scheduler"
@@ -63,6 +67,9 @@ export interface MachineWindow {
   /** Нет у окон, открытых до 0.6.0. */
   fuelSlot?: SpriteButtonGuiElement
   fuel: ProgressBarGuiElement
+  /** Снаряжение (22): оружие и патроны — у боевых моделей. */
+  weaponSlot?: SpriteButtonGuiElement
+  ammoSlot?: SpriteButtonGuiElement
   tank: ProgressBarGuiElement
   name: TextFieldGuiElement
   home: LabelGuiElement
@@ -134,6 +141,15 @@ export function openMachine(player: LuaPlayer, robot: RobotRecord): void {
   const tank = cargoRow.add({ type: "progressbar", value: 0 })
   tank.style.width = 100
 
+  // Снаряжение (22.2): оружие и патроны у боевых моделей.
+  const gearRow = body.add({ type: "flow", direction: "horizontal" })
+  gearRow.style.vertical_align = "center"
+  gearRow.visible = weaponOf(robot) !== undefined
+  label(gearRow, "weapon")
+  const weaponSlot = gearRow.add({ type: "sprite-button", style: "slot_button", tags: { action: "machine-weapon" }, tooltip: ["automaton-gui.weapon-slot-tooltip"] })
+  label(gearRow, "ammo")
+  const ammoSlot = gearRow.add({ type: "sprite-button", style: "slot_button", tags: { action: "machine-ammo" }, tooltip: ["automaton-gui.ammo-slot-tooltip"] })
+
   // Настройки машины.
   const settings = body.add({ type: "table", column_count: 2 })
   settings.style.vertical_spacing = 6
@@ -170,6 +186,8 @@ export function openMachine(player: LuaPlayer, robot: RobotRecord): void {
     cargo,
     fuelSlot,
     fuel,
+    weaponSlot,
+    ammoSlot,
     tank,
     name,
     home,
@@ -207,6 +225,52 @@ export function fuelFromHand(hand: LuaItemStack, robot: RobotRecord): LocalisedS
   if (fuelValue(hand.name) <= 0) return ["automaton-gui.not-fuel"]
   if (slot.valid_for_read && slot.name !== hand.name) return ["automaton-gui.fuel-other"]
   const moved = robot.fuel.insert({ name: hand.name, count: hand.count })
+  if (moved >= hand.count) hand.clear()
+  else hand.count -= moved
+  return undefined
+}
+
+/** Отдать предметы игроку, что не влезло — на землю у него. */
+function giveToPlayer(player: LuaPlayer): Give {
+  return (stack) => {
+    const moved = player.insert(stack)
+    if (moved < stack.count) player.surface.spill_item_stack({ position: player.position, stack: { name: stack.name, count: stack.count - moved }, enable_looted: true })
+  }
+}
+
+/**
+ * Слот оружия (22.2): оружие игрока в руке — поставить (прежнее и неподходящие патроны — игроку), пустая рука —
+ * снять, вернётся встроенное. Нужно исследование «Снаряжение автоматонов».
+ */
+export function weaponFromHand(hand: LuaItemStack, robot: RobotRecord, give: Give, force: LuaForce): LocalisedString | undefined {
+  if (!force.technologies[TECH.gear].researched) return ["automaton-gui.needs-gear"]
+  if (!hand.valid_for_read) {
+    setWeapon(robot, undefined, give)
+    return undefined
+  }
+  if (!fitsWeaponSlot(robot, hand.name)) return ["automaton-gui.not-weapon"]
+  const item = hand.name
+  if (gearOf(robot).weapon === item) return undefined
+  hand.count -= 1
+  if (!setWeapon(robot, item, give)) give({ name: item, count: 1 })
+  return undefined
+}
+
+/** Слот патронов: подходящие к оружию патроны в руке — зарядить (другие из слота — игроку), пустая рука — забрать. */
+export function ammoFromHand(hand: LuaItemStack, robot: RobotRecord, give: Give): LocalisedString | undefined {
+  const slot = robot.weapon?.[0]
+  const weapon = weaponOf(robot)
+  if (slot === undefined || weapon === undefined) return undefined
+  if (!hand.valid_for_read) {
+    if (slot.valid_for_read && hand.set_stack(slot)) slot.clear()
+    return undefined
+  }
+  if (!ammoFits(weapon, hand.name)) return ["automaton-gui.not-ammo"]
+  if (slot.valid_for_read && slot.name !== hand.name) {
+    give({ name: slot.name, count: slot.count })
+    slot.clear()
+  }
+  const moved = robot.weapon!.insert({ name: hand.name, count: hand.count })
   if (moved >= hand.count) hand.clear()
   else hand.count -= moved
   return undefined
@@ -317,6 +381,14 @@ export function refreshMachine(window: MachineWindow): void {
     window.fuelSlot.number = stack.valid_for_read ? stack.count : undefined
   }
   window.fuel.value = fuelLevel(robot)
+  const weapon = weaponOf(robot)
+  if (window.weaponSlot?.valid && weapon !== undefined) {
+    // Поставленное оружие — его значок; встроенное — значок оружия модели.
+    window.weaponSlot.sprite = `item/${gearOf(robot).weapon ?? (weapon.type === "rocket" ? "rocket-launcher" : "submachine-gun")}`
+    const ammo = robot.weapon?.[0]
+    window.ammoSlot!.sprite = ammo?.valid_for_read ? `item/${ammo.name}` : ""
+    window.ammoSlot!.number = ammo?.valid_for_read ? ammo.count : undefined
+  }
   const tank = tankOf(robot)
   window.tank.value = math.min(1, tank.amount / tankCapacity(robot))
   window.tank.caption = tank.fluid === undefined ? "" : `${math.floor(tank.amount)}`
@@ -367,6 +439,22 @@ export function registerMachineWindow(): void {
     if (found === undefined || !nearby(player, found.robot)) return
     const hand = player.cursor_stack
     const message = hand === undefined ? undefined : fuelFromHand(hand, found.robot)
+    if (message !== undefined) notify(player, message)
+    refreshMachine(found.window)
+  })
+  onGuiClick("machine-weapon", (player) => {
+    const found = windowRobot(player)
+    if (found === undefined || !nearby(player, found.robot)) return
+    const hand = player.cursor_stack
+    const message = hand === undefined ? undefined : weaponFromHand(hand, found.robot, giveToPlayer(player), player.force as LuaForce)
+    if (message !== undefined) notify(player, message)
+    refreshMachine(found.window)
+  })
+  onGuiClick("machine-ammo", (player) => {
+    const found = windowRobot(player)
+    if (found === undefined || !nearby(player, found.robot)) return
+    const hand = player.cursor_stack
+    const message = hand === undefined ? undefined : ammoFromHand(hand, found.robot, giveToPlayer(player))
     if (message !== undefined) notify(player, message)
     refreshMachine(found.window)
   })

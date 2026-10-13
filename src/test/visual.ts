@@ -10,6 +10,7 @@ import { Activity, BODY_DIRECTIONS, CHARGING_STATION, DISPLAYS, MODELS, TECH, WO
 import { renameDisplay } from "../world/displays"
 import { guiOf } from "../gui/common"
 import { openMachine } from "../gui/machine"
+import { setWeapon } from "../automaton/gear"
 import { askGraphName, checkFromWindow, closePrograms, createGraph, editViewLine, openPrograms, publishFromWindow, showTypes } from "../gui/programs"
 import { openExport, openImport, pasteImport } from "../gui/exchange"
 import { openDebugger } from "../gui/debugger"
@@ -199,6 +200,17 @@ for (let x = 10; x < 86; x++) c.pixel(x, 54, x % 2 === 0 ? "green" : "red")`,
   }
   if (tick === 199) shot("display", { x: CENTER.x + 17, y: CENTER.y - 14 }, 3)
   if (tick === 205) guiShot("machine-window")
+  // Снаряжение (22.2): окно боевой машины — дробовик в слоте оружия, дробь в слоте патронов.
+  if (tick === 206) {
+    const player = game.get_player(1 as PlayerIndex)
+    const combat = Object.values(storage.robots.byId).find((r) => r !== undefined && r.model === MODELS[3].entity)
+    if (player !== undefined && combat !== undefined) {
+      setWeapon(combat, "combat-shotgun", () => undefined)
+      combat.weapon!.insert({ name: "piercing-shotgun-shell", count: 15 })
+      openMachine(player, combat)
+    }
+  }
+  if (tick === 208) guiShot("machine-gear")
   if (tick === 210) {
     const player = game.get_player(1 as PlayerIndex)
     if (player !== undefined) {

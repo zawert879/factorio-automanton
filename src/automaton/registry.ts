@@ -169,6 +169,12 @@ function releaseItems(record: RobotRecord, to: LuaInventory | undefined): void {
   moveAll(record.cargo, to, surface, position)
   moveAll(record.fuel, to, surface, position)
   if (record.weapon !== undefined) moveAll(record.weapon, to, surface, position)
+  // Поставленное оружие (22.2) — предметом: подобрали — игроку, погибла — на землю.
+  const gun = variantOf(record.entity.name)?.weapon
+  if (gun !== undefined) {
+    const stack = { name: gun, count: 1 }
+    if (to === undefined || to.insert(stack) === 0) surface.spill_item_stack({ position, stack, enable_looted: true })
+  }
 }
 
 export function robotTag(record: RobotRecord): RobotTag {

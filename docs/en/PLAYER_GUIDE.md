@@ -490,6 +490,7 @@ a scout, a patrol.
 | Automaton sensors 1–3 | vision of 16 / 24 / 32 tiles, `scan.enemies` |
 | Automaton Mk2, Mk3 | electric models, the charging station |
 | Combat automatons 1–2 | machine gun and rocket launcher, `me.weapon`: `attack`, `guard`, `patrol`, `reload` |
+| Automaton gear | player weapons in the machine window, `me.weapon.equip`, `unequip` |
 | Flying automatons 1–2 | haulers that fly in a straight line over everything |
 | Automaton speed, cargo, mining, processor, memory, tanks 1–3 | upgrades for all machines |
 
@@ -510,6 +511,17 @@ a scout, a patrol.
 Combat machines fight back on their own — the engine handles the fighting, the program only decides where to stand or where to go:
 
 ![A guard (guard) and biters](../media/combat.gif)
+
+With the **Automaton gear** research a combat machine can use a player weapon — pistol, submachine gun, shotgun,
+combat shotgun or rocket launcher: in the machine window (the Weapon slot, click with the weapon in hand) or by a program
+from the cargo. Range and rate of fire are those of that weapon, ammo is what fits it; remove it and the built-in
+weapon comes back.
+
+```ts
+const weapon = me.weapon!
+if (weapon.item !== "combat-shotgun" && me.cargo.count("combat-shotgun") > 0) weapon.equip("combat-shotgun")
+weapon.reload()
+```
 
 Flying haulers fly in a straight line over everything — for long routes and large scales:
 

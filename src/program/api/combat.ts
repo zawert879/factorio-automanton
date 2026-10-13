@@ -10,7 +10,8 @@ import { actionError, currentRobot } from "../context"
 import { handleEntity, resolveTarget } from "../handles"
 import { onMachineReset } from "../machines"
 import { registerPoll, resume, sleepUntil } from "../scheduler"
-import { actionCall, finishWaiting, optionalItem, startWaiting } from "./common"
+import { actionCall, finishWaiting, item, optionalItem, startWaiting } from "./common"
+import { gearOf } from "../../automaton/variants"
 
 const COMBAT_POLL_TICKS = 30
 /** Пост считается достигнутым ближе этого (клеток). */
@@ -193,6 +194,10 @@ hostGetters.weapon.ammo = () => {
 for (const name of ["reload", "attack", "guard", "patrol"]) {
   hostMethods.weapon[name] = (_o: Val, k: Val, ...args: Val[]) => host[name](k, ...args)
 }
+// Сменное оружие (22.2): поставленное оружие игрока (null — встроенное), поставить из груза и снять в груз.
+hostGetters.weapon.item = () => gearOf(currentRobot()).weapon
+hostMethods.weapon.equip = (_o: Val, k: Val, what: Val) => actionCall(k, "equip", k !== undefined ? {} : { slot: "weapon", item: item(what) })
+hostMethods.weapon.unequip = (_o: Val, k: Val) => actionCall(k, "equip", k !== undefined ? {} : { slot: "weapon" })
 
 // Программу остановили или перезапустили посреди боя — команда движку снимается.
 onMachineReset((robotId) => {

@@ -10,7 +10,7 @@ import "./index"
  * Исследования, которые открывают функции API (8.4): тестам API они нужны. Сенсоры и улучшения не
  * исследуются — они меняют характеристики машин (их тесты исследуют сами и откатывают).
  */
-const TEST_RESEARCH = [TECH.radio, TECH.display, TECH.tuning, TECH.fluids, TECH.construction, TECH.circuits, TECH.combat1]
+const TEST_RESEARCH = [TECH.radio, TECH.display, TECH.tuning, TECH.fluids, TECH.construction, TECH.circuits, TECH.combat1, TECH.gear]
 let prepared = false
 
 const RESULTS_FILE = "automaton-test-results.json"

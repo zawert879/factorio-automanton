@@ -1514,8 +1514,20 @@ screen.frame(() => {
 ```ts
 interface Weapon {
   readonly type: "gun" | "shotgun" | "rocket" | "flamethrower";
+  readonly item: Item | null;            // поставленное оружие игрока; null — встроенное у модели @en the equipped player weapon; null — the model's built-in one
   readonly ammo: ItemStack | null;       // заряжено @en loaded
   readonly range: number;                // дальность, клеток @en range, in tiles
+  /**
+   * [Снаряжение] Поставить оружие игрока из груза: пистолет, пистолет-пулемёт, дробовик, боевой дробовик,
+   * ракетомёт. Прежнее оружие и патроны, которые к новому не подходят, — в груз. Около секунды.
+   * @en [Gear] Equip a player weapon from the cargo: pistol, submachine gun, shotgun, combat shotgun, rocket launcher. The previous weapon and ammo that does not fit the new one go to the cargo. About a second.
+   */
+  equip(weapon: Item): void;
+  /**
+   * [Снаряжение] Снять оружие в груз — вернётся встроенное у модели.
+   * @en [Gear] Remove the weapon into the cargo — the model's built-in weapon comes back.
+   */
+  unequip(): void;
   /**
    * Зарядить патронами из груза. Без ammo — лучшими, что есть. Было reload.
    * @en Load ammo from the cargo. Without ammo — the best available. Was reload.
@@ -1551,6 +1563,10 @@ weapon.guard(marker("пост"), { radius: 15, until: () => time.isNight() });
   `uranium-rounds-magazine` 24), дальность 15, 350 здоровья; Mk2 — ракетомёт (`rocket` 200, `explosive-rocket` 300),
   дальность 24, 700 здоровья. Исследования урона игры действуют. Выстрел тратит один заряд из оружейного
   слота; без патронов машина стреляет вхолостую, а `attack` не начинается (`no-ammo`).
+- `[Снаряжение автоматонов]` — сменное оружие (`equip`): дальность и темп — как у оружия игрока (пистолет 15 клеток,
+  пистолет-пулемёт 18 и выстрел раз в 6 тиков, дробовики 15, ракетомёт 36), патроны — к нему: магазины, дробь
+  (`shotgun-shell` — 12 дробинок по 8 урона, `piercing-shotgun-shell` — 16; все дробинки — в цель), ракеты.
+  Поставить и снять можно и в окне машины. Подобрали машину — оружие вернётся предметом.
 - `me.weapon.ammo.count` — сколько магазинов в слоте (в каждом 10 зарядов).
 - `attack` — `false`, если цель ушла из виду или кончились патроны; `guard` по умолчанию охраняет радиус
   «дальность + 5», `patrol` и `guard` проверяют `until` дважды в секунду.
@@ -1705,6 +1721,7 @@ try {
 | Сенсоры 1–3 | радиус зрения 16 / 24 / 32 клетки, `scan.enemies` (со 2-го уровня) |
 | Автоматон Mk2 / Mk3 | новые рабочие модели, `me.energy.charge`, зарядная станция |
 | Боевые автоматоны 1–2 | боевые модели, `me.weapon`: `attack`, `guard`, `patrol`, `reload` |
+| Снаряжение автоматонов | слот оружия, `me.weapon.equip`, `unequip` |
 | Летающие автоматоны 1–2 | летающие модели |
 | Скорость, груз, добыча, процессор, память, баки 1–3 | +15% скорости, +50% слотов груза, +25% скорости добычи, +50% инструкций за тик, +50% памяти, +50% бака — за уровень |
 

@@ -7,7 +7,7 @@
 // виду или конца патронов (сам подъезд и стрельба — команда attack движку).
 import { LuaEntity, LuaForce, OnScriptTriggerEffectEvent } from "factorio:runtime"
 import { onEvent } from "../events"
-import { modelOf, SHOT_EFFECT, WeaponSpec } from "../names"
+import { modelOf, SHOT_EFFECT, variantOf, WeaponSpec } from "../names"
 import { ActionState, registerActionHandler, StepOutcome } from "./actions"
 import { directionOf, setActivity } from "./appearance"
 import { HANDLING_JOULES, spend } from "./energy"
@@ -21,6 +21,17 @@ export const AMMO_DAMAGE: Record<string, { damage: number; type: "physical" | "e
   "uranium-rounds-magazine": { damage: 24, type: "physical" },
   rocket: { damage: 200, type: "explosion" },
   "explosive-rocket": { damage: 300, type: "explosion" },
+  // Дробь (22.2): все дробинки — в цель (12 и 16 по 8 урона), разброса нет.
+  "shotgun-shell": { damage: 96, type: "physical" },
+  "piercing-shotgun-shell": { damage: 128, type: "physical" },
+}
+
+/** Вид оружия для программ по категории патронов. */
+const WEAPON_TYPE: Record<string, WeaponSpec["type"] | undefined> = {
+  bullet: "gun",
+  "shotgun-shell": "shotgun",
+  rocket: "rocket",
+  flamethrower: "flamethrower",
 }
 
 export const RELOAD_TICKS = 30
@@ -28,8 +39,15 @@ const ATTACK_CHECK_TICKS = 15
 /** Цель дальше этого от машины — потеряна (уехала или убежала). */
 const LOSE_DISTANCE_FACTOR = 2
 
+/** Оружие машины: поставленное (22.2 — дальность и темп как у оружия игрока) или встроенное у модели. */
 export function weaponOf(record: RobotRecord): WeaponSpec | undefined {
-  return modelOf(record.model)?.weapon
+  const builtIn = modelOf(record.model)?.weapon
+  if (builtIn === undefined) return undefined
+  const item = record.entity.valid ? variantOf(record.entity.name)?.weapon : undefined
+  const attack = item === undefined ? undefined : prototypes.item[item]?.attack_parameters
+  if (attack === undefined) return builtIn
+  const category = (attack.ammo_categories?.[0] ?? "bullet") as WeaponSpec["category"]
+  return { type: WEAPON_TYPE[category] ?? "gun", category, range: attack.range, cooldown: attack.cooldown }
 }
 
 /** Подходят ли патроны к оружию машины. */

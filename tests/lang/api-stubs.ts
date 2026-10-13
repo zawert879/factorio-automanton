@@ -157,6 +157,9 @@ defineHostObject("weapon")
 hostGetters.weapon.type = () => "gun"
 hostGetters.weapon.range = () => 15
 hostGetters.weapon.ammo = () => ({ name: "firearm-magazine", count: 30 })
+hostGetters.weapon.item = () => undefined
+hostMethods.weapon.equip = () => undefined
+hostMethods.weapon.unequip = () => undefined
 for (const name of ["reload", "attack", "guard", "patrol"]) hostMethods.weapon[name] = (_o: Val, k: Val, ...args: Val[]) => host[name](k, ...args)
 
 // scan, map
