@@ -1,4 +1,13 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.9.1
+Date: 2026-10-13
+  Features:
+    - Names dictionary: the in-game help (F1) has a Names section — buildings by program class (zone(…).find(Furnace) finds all furnaces), items by group and fluids, with their internal names for code. Search finds names and titles; click a name to copy it (Ctrl+C); what your team has not researched yet is grey. Other mods' names are included.
+    - VS Code suggests building, item and fluid names as you type, and warns about a name that is not in the game with a similar one ("iron-plat" → "iron-plate"). Re-create the VS Code folder to get the new types.
+  Info:
+    - The same names are listed in docs/NAMES.md (Russian) and docs/en/NAMES.md (English).
+
+---------------------------------------------------------------------------------------------------
 Version: 0.9.0
 Date: 2026-10-13
   Major Features:
