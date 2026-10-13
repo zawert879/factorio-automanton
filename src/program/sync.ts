@@ -165,7 +165,8 @@ export function fileName(name: string): string {
  * обработчики событий, одинаковые у всех участников, поэтому запись в storage десинка не даёт.
  */
 export function mapName(): string {
-  storage.mapName ??= `карта-${game.get_surface("nauvis")?.map_gen_settings.seed ?? 0}`
+  // До 25.1 — «карта-<номер>»: в старых сохранениях имя прежнее, иначе их папки в VS Code перестали бы подходить.
+  storage.mapName ??= `map-${game.get_surface("nauvis")?.map_gen_settings.seed ?? 0}`
   return storage.mapName
 }
 
@@ -233,7 +234,7 @@ const VSCODE_SETTINGS = `{
 
 /** Утилита другой версии, чем мод (её запустили до обновления): что сделать — текстом (старая утилита его покажет). */
 const OUTDATED_TOOL =
-  "утилита синхронизации устарела: игра записала новую в папку (или нажмите «Программы…» → «Папка для VS Code») — перезапустите задачу синхронизации в VS Code (Cmd/Ctrl+Shift+P → Tasks: Restart Running Task)"
+  "утилита синхронизации устарела: игра записала новую в папку (или нажмите «Программы…» → «VS Code…» → «Записать папку») — перезапустите задачу синхронизации в VS Code (Cmd/Ctrl+Shift+P → Tasks: Restart Running Task)"
 
 /** Сколько ждать ответа утилиты на «Обновить из папки», тиков. */
 const REFRESH_TIMEOUT = 180

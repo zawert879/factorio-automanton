@@ -24,6 +24,7 @@ import { graphToSource } from "../graph/codegen"
 import { Graph } from "../graph/model"
 import { libraryFunctions, signatureValues } from "../graph/signatures"
 import { openNodeWindow } from "../workshop/gui"
+import { openVsCode, vscodeState } from "../gui/vscode"
 import { refreshLibraryCalls } from "../workshop/libraries"
 import { enterWorkshop, exitWorkshop } from "../workshop/session"
 import { writeVsCodeFolder } from "../program/sync"
@@ -403,9 +404,30 @@ for (let x = 10; x < 86; x++) c.pixel(x, 54, x % 2 === 0 ? "green" : "red")`,
     if (player !== undefined) openHelp(player, "печь")
   }
   if (tick === 316) guiShot("help-names")
+  // VS Code (25.1): предложение в окне программ (один раз), окно с шагами — путь для macOS, папка записана.
+  if (tick === 317) {
+    const player = game.get_player(1 as PlayerIndex)
+    if (player !== undefined) {
+      player.gui.screen.clear()
+      if (storage.vscode !== undefined) storage.vscode[player.index] = undefined
+      openPrograms(player, findProgram("Шахтёр", "player")!.id, undefined)
+    }
+  }
+  if (tick === 318) guiShot("programs-vscode-offer")
+  if (tick === 319) {
+    const player = game.get_player(1 as PlayerIndex)
+    if (player !== undefined) {
+      player.gui.screen.clear()
+      const state = vscodeState(player)
+      state.os = "macos"
+      state.written = game.tick
+      openVsCode(player)
+    }
+  }
+  if (tick === 320) guiShot("vscode")
   // Дерево технологий (этап 6): технологии автоматонов на месте «Логистики». Экран технологий в одиночной
   // игре ставит её на паузу — поэтому снимок последний, в том же тике (shot.mjs ждёт файлы ещё пару секунд).
-  if (tick === 320) {
+  if (tick === 324) {
     const player = game.get_player(1 as PlayerIndex)
     if (player !== undefined) {
       player.opened = undefined

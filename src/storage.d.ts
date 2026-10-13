@@ -4,6 +4,7 @@ import type { CopiedSettings } from "./gui/assignTools"
 import type { GuiState } from "./gui/common"
 import type { Draft } from "./gui/programs"
 import type { SyncBuffer } from "./program/sync"
+import type { VsCodeState } from "./gui/vscode"
 import type { CommsState } from "./program/comms"
 import type { BoardState, TasksState } from "./program/board"
 import type { MovementState } from "./automaton/movement"
@@ -65,6 +66,8 @@ declare global {
     refreshPending?: Record<number, number | undefined>
     /** Папку игрока переписали из-за устаревшей утилиты: игрок → тик (не чаще раза в минуту). */
     syncFolderUpdated?: Record<number, number | undefined>
+    /** Окно «VS Code» (25.1): система для пути, записана ли папка, ответ на предложение — по номеру игрока. */
+    vscode?: Record<number, VsCodeState | undefined>
     /** Сообщения между машинами (src/program/comms.ts). */
     comms: CommsState
     /** Доска команды: по имени команды (src/program/board.ts). */

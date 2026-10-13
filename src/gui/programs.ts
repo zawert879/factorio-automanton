@@ -48,7 +48,8 @@ import {
   publishDenied,
   rightsDenied,
 } from "../program/store"
-import { onRefreshResult, onRefreshTimeout, requestRefresh, writeVsCodeFolder } from "../program/sync"
+import { onRefreshResult, onRefreshTimeout, requestRefresh } from "../program/sync"
+import { openVsCode, vscodeOffered, vscodeState } from "./vscode"
 import { PALETTE } from "./codeView"
 import { guiOf, onGuiChange, onGuiClick, onGuiConfirm, onGuiSelection, titlebar } from "./common"
 import { diagnosticMessage, diagnosticText } from "./diagnostics"
@@ -199,6 +200,14 @@ export function openPrograms(player: LuaPlayer, programId?: number, robotId?: nu
   // Машины с этой программой — окно «Все машины» (18.6; обработчик — gui/fleet.ts).
   const machines = button(header, "", "programs-machines")
   machines.tooltip = ["automaton-fleet.machines-tooltip"]
+  // VS Code (25.1, 4B): один раз само — строка с предложением, пока игрок не ответит.
+  if (!vscodeOffered(player)) {
+    const offer = right.add({ type: "flow", name: "vscode-offer", direction: "horizontal" })
+    offer.style.vertical_align = "center"
+    offer.add({ type: "label", caption: ["automaton-vscode.offer"] })
+    button(offer, ["automaton-vscode.offer-setup"], "programs-vscode-setup", "green_button")
+    button(offer, ["automaton-vscode.offer-later"], "programs-vscode-later")
+  }
   const notes = right.add({ type: "flow", direction: "vertical" })
 
   const pane = right.add({ type: "scroll-pane", vertical_scroll_policy: "auto-and-reserve-space", horizontal_scroll_policy: "never" })
@@ -235,8 +244,7 @@ export function openPrograms(player: LuaPlayer, programId?: number, robotId?: nu
   const assign = button(buttons, "", "programs-assign")
   const versions = buttons.add({ type: "drop-down", items: [], tags: { action: "programs-version" } })
   versions.style.width = 200
-  button(buttons, ["automaton-gui.types"], "programs-types")
-  button(buttons, ["automaton-gui.vscode-folder"], "programs-vscode")
+  button(buttons, ["automaton-vscode.button"], "programs-vscode").tooltip = ["automaton-vscode.button-tooltip"]
   const refresh = button(buttons, ["automaton-gui.refresh"], "programs-refresh")
   refresh.tooltip = ["automaton-gui.refresh-tooltip"]
   button(buttons, ["automaton-gui.export-programs"], "programs-export").tooltip = ["automaton-gui.export-tooltip"]
@@ -789,16 +797,17 @@ export function registerProgramsWindow(): void {
   })
   onGuiClick("programs-publish", (player) => publishFromWindow(player))
   onGuiClick("programs-types", (player) => showTypes(player))
-  onGuiClick("programs-vscode", (player) => {
-    const window = windowOf(player)
-    if (window === undefined) return
-    const dir = writeVsCodeFolder(player)
-    window.errors.clear()
-    const label = window.errors.add({ type: "label", caption: ["automaton-gui.vscode-folder-written", dir] })
-    label.style.single_line = false
-    label.style.maximal_width = 900
-    label.style.font_color = { r: 0.5, g: 1, b: 0.5 }
+  onGuiClick("programs-vscode", (player) => openVsCode(player))
+  // Предложение VS Code: ответ «Настроить» или «Не сейчас» — больше не показывать.
+  const answerOffer = (player: LuaPlayer, element: LuaGuiElement) => {
+    vscodeState(player).offered = true
+    element.parent?.destroy()
+  }
+  onGuiClick("programs-vscode-setup", (player, element) => {
+    answerOffer(player, element)
+    openVsCode(player)
   })
+  onGuiClick("programs-vscode-later", (player, element) => answerOffer(player, element))
 }
 
 /**

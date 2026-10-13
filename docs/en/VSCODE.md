@@ -5,13 +5,18 @@ documentation on hover, errors before you publish. Save the file — the program
 
 ## Once
 
+The easiest way is the **"VS Code…"** window in the programs window (the game offers to open it the first time
+you open the programs window): it has the same steps in order and the full path to the folder for your system —
+click a field to select its text, then press Ctrl+C.
+
 1. Install [Node.js](https://nodejs.org) 18 or newer (the sync tool needs it; on Linux, programs in
    subfolders need 20 or newer).
 2. Game launch option: `--enable-lua-udp 27155`. In Steam: Factorio → Properties → Launch Options.
    This is how the mod receives programs from VS Code (both in single player and in multiplayer).
-3. In the game: machine window → "Programs…" → **"Folder for VS Code"**. The mod writes everything needed
-   to `script-output/automaton/<map>/<team>/` in the game's data folder (each map has its own folder; the map
-   name is `карта-<map number>`, "карта" is Russian for "map"):
+3. In the game: machine window → "Programs…" → "VS Code…" → **"Write the folder"**. The mod writes everything
+   needed to `script-output/automaton/<map>/<team>/` in the game's data folder (each map has its own folder; the
+   map name is `map-<map number>`; maps started before the version with the VS Code window keep
+   `карта-<map number>`, "карта" is Russian for "map"):
    - the team's programs — in the `src` folder (`src/Miner.ts`, `src/lib/Помощники.ts` and so on),
    - `automaton.d.ts` — the API types, `tsconfig.json`,
    - `automaton-sync.mjs` — the sync tool,
@@ -20,9 +25,11 @@ documentation on hover, errors before you publish. Save the file — the program
    - a TypeScript plugin (`.automaton/`) and `.vscode/settings.json`, which enables it.
 
    The game's data folder: Windows — `%APPDATA%\Factorio`, macOS — `~/Library/Application Support/factorio`,
-   Linux — `~/.factorio`.
-4. Open this folder in VS Code (File → Open Folder) and allow the automatic task
-   "Automaton: публиковать при сохранении" ("publish on save").
+   Linux — `~/.factorio` (the zip version of the game keeps its data in its own folder). The full path is in the
+   VS Code window (the Windows / macOS / Linux switch).
+4. Open this folder in VS Code: File → Open Folder and paste the path — on Windows into the address bar at the
+   top, on macOS after Cmd+Shift+G, on Linux after Ctrl+L. VS Code asks whether you trust the authors of the
+   folder — "Yes"; allow the automatic task "Automaton: publish on save".
 
 ## Every day
 
@@ -42,7 +49,7 @@ documentation on hover, errors before you publish. Save the file — the program
 - A folder can hold any number of programs: each file is a separate program (the same
   names in different files do not clash — `moduleDetection: "force"` in `tsconfig.json`).
 - **A folder belongs to one map.** If a different map is open in the game, the tool publishes nothing and says
-  that this folder is for map …, but the game has … open: open that map's folder ("Folder for VS Code" in that map).
+  that this folder is for map …, but the game has … open: open that map's folder ("VS Code…" → "Write the folder" in that map).
 - **Plugin hints and errors** (only for files in `src` of this folder): things the machine language lacks
   (`async`/`await`, `var`, `enum`, regular expressions, `==` …) are underlined as errors before you publish.
   Hover over `for` / `while` to see the cost of one iteration and how many ticks the loop takes (if the number
@@ -52,12 +59,12 @@ documentation on hover, errors before you publish. Save the file — the program
 - **"Refresh from folder"** in the programs window — if you changed files while the sync task was not running:
   the tool publishes new and changed files, and the game lists its programs that have no file and asks
   whether to delete them. On start the tool itself reports how `src` differs from the game.
-- The tool updates itself: when "Folder for VS Code" writes a new version, the task restarts.
+- The tool updates itself: when "Write the folder" writes a new version (or the game, if the tool is outdated), the task restarts.
   A tool of a different version than the mod is refused, with a hint on what to do.
 - A library that is in use cannot be deleted, neither in the game nor by deleting its file: the file goes away, but
   the library stays in the game, and the programs that import it get an error: they import a library whose file
   was deleted.
-- If your folder is of the old kind (programs right in it, no `src`), press "Folder for VS Code" again:
+- If your folder is of the old kind (programs right in it, no `src`), press "VS Code…" → "Write the folder" again:
   the programs appear in `src`; the old program files in the folder root can be deleted, the tool no longer looks at them.
 
 ## Dedicated server

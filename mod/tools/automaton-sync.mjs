@@ -253,7 +253,7 @@ function withoutImportPaths(source) {
   return source.replace(/\b(from|import)(\s*)(["'])[^"']*\3/g, "$1$2$3$3")
 }
 
-/** Имя карты папки (из .automaton-map.json, его пишет «Папка для VS Code»); нет файла — без проверки. */
+/** Имя карты папки (из .automaton-map.json, его пишет «Записать папку» в окне «VS Code»); нет файла — без проверки. */
 function mapOf(root) {
   const file = join(root, ".automaton-map.json")
   if (!existsSync(file)) return undefined
@@ -267,7 +267,7 @@ function mapOf(root) {
 /** Игра открыта на другой карте: понятная ошибка вместо публикации не туда. */
 function wrongMap(reply) {
   return reply.error === "wrong-map"
-    ? `эта папка — для карты «${reply.folderMap}», а в игре открыта «${reply.map}»: откройте в игре «Программы…» → «Папка для VS Code» и работайте в её папке`
+    ? `эта папка — для карты «${reply.folderMap}», а в игре открыта «${reply.map}»: откройте в игре «Программы…» → «VS Code…» → «Записать папку» и работайте в её папке`
     : undefined
 }
 
@@ -487,7 +487,7 @@ async function pull(link) {
 }
 
 /**
- * Слежение — в отдельном процессе: когда игра записывает новую версию утилиты («Папка для VS Code»),
+ * Слежение — в отдельном процессе: когда игра записывает новую версию утилиты («Записать папку» в окне «VS Code»),
  * процесс-сторож перезапускает его, и задача VS Code продолжает работать уже с новой версией.
  */
 function supervise() {

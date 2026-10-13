@@ -28,6 +28,7 @@ import { registerFleetWindow } from "./gui/fleet"
 import { registerHelpWindow } from "./gui/help"
 import { registerMachineWindow } from "./gui/machine"
 import { registerProgramsWindow } from "./gui/programs"
+import { registerVsCodeWindow } from "./gui/vscode"
 import { registerPicker } from "./gui/picker"
 import { registerAssignTools } from "./gui/assignTools"
 import { registerAlerts } from "./program/alerts"
@@ -118,6 +119,7 @@ registerAlerts()
 registerGuiEvents()
 registerMachineWindow()
 registerProgramsWindow()
+registerVsCodeWindow()
 registerHelpWindow()
 registerFleetWindow()
 registerDebugger()
