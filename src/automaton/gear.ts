@@ -9,6 +9,7 @@ import { HANDLING_JOULES, spend } from "./energy"
 import { GEAR_ARMORS, GEAR_WEAPONS, modelOf } from "../names"
 import { RobotRecord } from "./registry"
 import { gearOf, swapGear } from "./variants"
+import { updateShield } from "./shields"
 
 /** Смена снаряжения — около секунды. */
 export const EQUIP_TICKS = 60
@@ -79,6 +80,7 @@ export function setArmor(record: RobotRecord, from: LuaItemStack | undefined, gi
     old.clear()
   }
   if (name !== undefined) slot[0].transfer_stack(from!)
+  updateShield(record, true)
   return true
 }
 

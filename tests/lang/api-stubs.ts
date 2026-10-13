@@ -163,6 +163,8 @@ hostMethods.weapon.unequip = () => undefined
 defineHostObject("armor")
 hostGetters.me.armor = () => hostObject("armor", {})
 hostGetters.armor.item = () => undefined
+hostGetters.armor.shield = () => 0
+hostGetters.armor.maxShield = () => 0
 hostMethods.armor.equip = () => undefined
 hostMethods.armor.unequip = () => undefined
 for (const name of ["reload", "attack", "guard", "patrol"]) hostMethods.weapon[name] = (_o: Val, k: Val, ...args: Val[]) => host[name](k, ...args)

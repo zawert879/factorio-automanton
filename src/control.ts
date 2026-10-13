@@ -10,6 +10,7 @@ import "./automaton/charging"
 import "./automaton/construction"
 import "./automaton/gear"
 import { registerCombat } from "./automaton/combat"
+import { initShields, registerShields } from "./automaton/shields"
 import { initFlight, registerFlight } from "./automaton/flight"
 import { initMovement, registerMovement } from "./automaton/movement"
 import { initGates, registerGates } from "./automaton/gates"
@@ -62,6 +63,7 @@ function initStorage(): void {
   initFlight()
   initActions()
   initMining()
+  initShields()
   initPrograms()
   initMachines()
   initScheduler()
@@ -94,6 +96,7 @@ registerPlacement()
 registerBlueprints()
 registerModels()
 registerCombat()
+registerShields()
 registerFlight()
 registerRegistryEvents()
 registerMovement()

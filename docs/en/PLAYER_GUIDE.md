@@ -521,7 +521,8 @@ weapon comes back.
 
 All ground machines, workers included, can wear player armor (light, heavy, modular, power): the Armor slot in the
 machine window or `me.armor.equip(…)` from the cargo. Its resistances add to the machine's own — acid from spitters
-and worms included.
+and worms included. From the grid of modular and power armor, energy shields work: the shield takes damage before
+health and recharges from the machine's fuel or battery (the Shield bar in the window, `me.armor.shield`).
 
 ```ts
 const weapon = me.weapon!

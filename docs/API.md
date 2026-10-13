@@ -1582,9 +1582,15 @@ weapon.guard(marker("пост"), { radius: 15, until: () => time.isNight() });
 сопротивления добавляются к собственным у машины (у боевых свои есть); впервые есть защита от кислоты — так бьют
 плеваки и черви. Надеть можно и в окне машины (слот «Броня»). У летающих брони нет: `me.armor === null`.
 
+Из сетки модульной и силовой брони у машины работают только **энергощиты**: запас щита (Mk1 — 50, Mk2 — 150)
+гасит урон раньше здоровья и восстанавливается — пятая часть запаса в секунду, 30 кДж энергии машины на единицу
+(топливо или аккумулятор). Остальное в сетке не действует; скорость машины броня не меняет.
+
 ```ts
 interface Armor {
   readonly item: Item | null;            // надетая броня или null @en the armor worn, or null
+  readonly shield: number;               // щит сейчас — энергощиты в сетке брони @en the shield now — energy shields in the armor grid
+  readonly maxShield: number;            // запас щита; 0 — щитов нет @en the shield capacity; 0 — no shields
   /**
    * [Снаряжение] Надеть броню из груза (сетка снаряжения — вместе с ней). Прежняя броня — в груз. Около секунды.
    * @en [Gear] Put on armor from the cargo (its equipment grid comes along). The previous armor goes to the cargo. About a second.

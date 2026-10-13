@@ -20,6 +20,7 @@ import type { NamingTarget } from "./world/naming"
 import type { ZonesState } from "./world/zones"
 import type { WorkshopState } from "./workshop/state"
 import type { LuaRandomGenerator } from "factorio:runtime"
+import type { ShieldsState } from "./automaton/shields"
 
 declare global {
   const storage: {
@@ -30,6 +31,8 @@ declare global {
     movement: MovementState
     /** Ворота по чанкам — открываются перед машинами (src/automaton/gates.ts). */
     gates: GatesState
+    /** Щиты брони машин (22.5): кого обходит восстановление щита. */
+    shields?: ShieldsState
     /** Полёты летающих машин (src/automaton/flight.ts). */
     flight: FlightState
     actions: ActionsState

@@ -204,6 +204,9 @@ hostMethods.weapon.unequip = (_o: Val, k: Val) => actionCall(k, "equip", k !== u
 const armorObject = defineHostObject("armor")
 hostGetters.me.armor = () => (modelOf(currentRobot().model)?.flying ? undefined : armorObject)
 hostGetters.armor.item = () => gearOf(currentRobot()).armor
+// Щит (22.5): энергощиты в сетке брони — сколько сейчас и запас.
+hostGetters.armor.shield = () => math.floor(currentRobot().shield ?? 0)
+hostGetters.armor.maxShield = () => currentRobot().shieldMax ?? 0
 hostMethods.armor.equip = (_o: Val, k: Val, what: Val) => actionCall(k, "equip", k !== undefined ? {} : { slot: "armor", item: item(what) })
 hostMethods.armor.unequip = (_o: Val, k: Val) => actionCall(k, "equip", k !== undefined ? {} : { slot: "armor" })
 

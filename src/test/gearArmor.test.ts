@@ -113,4 +113,30 @@ print(a.item, me.cargo.count("light-armor"))`,
     expect(dropped.includes("heavy-armor")).toBe(true)
     worker.entity.destroy()
   })
+
+  test("щит (22.5): энергощит в сетке заряжается от топлива машины и гасит урон раньше здоровья", (t) => {
+    const [x0, y0] = [1890, -1250]
+    const surface = site(x0, y0)
+    const robot = place(surface, WORKER, x0 + 2.5, y0 + 2.5)
+    const armor = game.create_inventory(1)[0]
+    armor.set_stack({ name: "modular-armor" })
+    armor.grid!.put({ name: "energy-shield-equipment" })
+    setArmor(robot, armor, () => undefined)
+    expect(`${robot.shieldMax} ${robot.shield}`).toBe("50 0")
+    const m = run(robot, "test-armor-shield", `wait(6)\nprint(me.armor!.shield, me.armor!.maxShield)`)
+    waitUntil(t, "заряда щита", finished(m), 600, () => {
+      expect(output(m)).toBe("50 50")
+      const health = robot.entity.health!
+      robot.entity.damage(30, "enemy", "physical")
+      expect(math.floor(robot.entity.health! - health + 0.5)).toBe(0)
+      // Сначала сопротивления модульной брони (−6 и 30%: 30 → 16.8), потом щит: 50 − 16.8.
+      expect(math.floor(robot.shield! + 0.5)).toBe(33)
+      // Удар сильнее здоровья, но слабее здоровья со щитом: машина жива.
+      robot.shield = 50
+      robot.entity.health = 10
+      robot.entity.damage(40, "enemy", "physical")
+      expect(robot.entity.valid).toBe(true)
+      robot.entity.destroy()
+    })
+  })
 })

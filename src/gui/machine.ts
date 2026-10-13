@@ -71,6 +71,8 @@ export interface MachineWindow {
   weaponSlot?: SpriteButtonGuiElement
   ammoSlot?: SpriteButtonGuiElement
   armorSlot?: SpriteButtonGuiElement
+  shieldLabel?: LabelGuiElement
+  shield?: ProgressBarGuiElement
   tank: ProgressBarGuiElement
   name: TextFieldGuiElement
   home: LabelGuiElement
@@ -153,6 +155,10 @@ export function openMachine(player: LuaPlayer, robot: RobotRecord): void {
   const ammoSlot = combat ? gearRow.add({ type: "sprite-button", style: "slot_button", tags: { action: "machine-ammo" }, tooltip: ["automaton-gui.ammo-slot-tooltip"] }) : undefined
   label(gearRow, "armor")
   const armorButton = gearRow.add({ type: "sprite-button", style: "slot_button", tags: { action: "machine-armor" }, tooltip: ["automaton-gui.armor-slot-tooltip"] })
+  // Щит (22.5) — полоса, если в сетке брони есть энергощиты.
+  const shieldLabel = gearRow.add({ type: "label", caption: ["automaton-gui.shield"], style: "bold_label" })
+  const shield = gearRow.add({ type: "progressbar", value: 0 })
+  shield.style.width = 100
 
   // Настройки машины.
   const settings = body.add({ type: "table", column_count: 2 })
@@ -193,6 +199,8 @@ export function openMachine(player: LuaPlayer, robot: RobotRecord): void {
     weaponSlot,
     ammoSlot,
     armorSlot: armorButton,
+    shieldLabel,
+    shield,
     tank,
     name,
     home,
@@ -412,6 +420,13 @@ export function refreshMachine(window: MachineWindow): void {
   if (window.armorSlot?.valid) {
     const armor = gearOf(robot).armor
     window.armorSlot.sprite = armor === undefined ? "" : `item/${armor}`
+  }
+  if (window.shield?.valid) {
+    const max = robot.shieldMax ?? 0
+    window.shield.visible = max > 0
+    window.shieldLabel!.visible = max > 0
+    window.shield.value = max > 0 ? (robot.shield ?? 0) / max : 0
+    window.shield.tooltip = `${math.floor(robot.shield ?? 0)} / ${max}`
   }
   const tank = tankOf(robot)
   window.tank.value = math.min(1, tank.amount / tankCapacity(robot))
