@@ -1,4 +1,13 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.10.1
+Date: 2026-10-13
+  Features:
+    - Zones can be renamed and deleted: with the Programmer in hand, click a zone (inside or on its center handle) — a window with its name opens. Type a new name and confirm, or press Delete. The window reminds you that programs find the zone by name, so zone("…") in them needs the new name too.
+  Changes:
+    - A name taken by another zone is no longer accepted: you get a message and the name window again. Before, naming a zone like another one silently deleted the other zone.
+    - The name window right after selecting a new zone also has Delete — to cancel a box drawn by mistake.
+
+---------------------------------------------------------------------------------------------------
 Version: 0.10.0
 Date: 2026-10-13
   Features:
