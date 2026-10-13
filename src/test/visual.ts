@@ -381,19 +381,31 @@ for (let x = 10; x < 86; x++) c.pixel(x, 54, x % 2 === 0 ? "green" : "red")`,
     }
   }
   if (tick === 309) guiShot("workshop-params")
-  if (tick === 310) {
+  // Переменная «предмет» — выбор предмета и подсказка про параметры машины; «Параметр машины» — откуда значение.
+  if (tick === 310 || tick === 312) {
+    const player = game.get_player(1 as PlayerIndex)
+    if (player !== undefined) {
+      if (tick === 310) graphProgram("Переменные", variablesGraph())
+      const ws = enterWorkshop(player, findProgram("Переменные", "player")!)
+      const kind = tick === 310 ? "variable" : "param"
+      for (const [, node] of pairs(ws.nodes)) if (node.kind === kind && node.values.type === "item") openNodeWindow(player, ws, node)
+    }
+  }
+  if (tick === 311) guiShot("workshop-variable")
+  if (tick === 313) guiShot("workshop-param")
+  if (tick === 314) {
     const player = game.get_player(1 as PlayerIndex)
     if (player !== undefined) exitWorkshop(player)
   }
   // Словарь имён (24.1): поиск «печь» в справке — найденные имена, страница класса Furnace с выбранным именем.
-  if (tick === 311) {
+  if (tick === 315) {
     const player = game.get_player(1 as PlayerIndex)
     if (player !== undefined) openHelp(player, "печь")
   }
-  if (tick === 312) guiShot("help-names")
+  if (tick === 316) guiShot("help-names")
   // Дерево технологий (этап 6): технологии автоматонов на месте «Логистики». Экран технологий в одиночной
   // игре ставит её на паузу — поэтому снимок последний, в том же тике (shot.mjs ждёт файлы ещё пару секунд).
-  if (tick === 316) {
+  if (tick === 320) {
     const player = game.get_player(1 as PlayerIndex)
     if (player !== undefined) {
       player.opened = undefined
@@ -405,6 +417,20 @@ for (let x = 10; x < 86; x++) c.pixel(x, 54, x % 2 === 0 ? "green" : "red")`,
     script.on_nth_tick(1, undefined)
   }
 })
+
+/** Схема с переменными «метка» и «предмет» и параметром машины — для снимков окон узлов. */
+function variablesGraph(): Graph {
+  const b = new GraphBuilder()
+  const start = b.node("start")
+  b.node("variable", { name: "Склад", type: "marker", initial: "Склад" })
+  b.node("variable", { name: "Ресурс", type: "item", initial: "iron-ore" })
+  const ore = b.node("param", { name: "Добыча", type: "item", default: "coal" })
+  const depot = b.node("variable-get", { name: "Склад" })
+  const move = b.node("move")
+  const mine = b.node("mine")
+  b.seq(start, move, mine).data(depot, move, "to").data(ore, mine, "item")
+  return b.layout()
+}
 
 /** Библиотека-схема для снимков: «отвезти(куда, что, сколько)» — к метке и положить в сундук. */
 function libraryGraph(): Graph {

@@ -327,7 +327,10 @@ export function graphToSource(graph: Graph, title = "", english = false): GraphS
         const type = settingType(node.values.type, "number")
         const initial = node.values.initial ?? (type === "number" ? 0 : type === "boolean" ? false : "")
         const value = type === "value" || type === "position" ? initialValue(initial, type) : literal(initial, type)
-        if (value === undefined) fail(node.id, "graph-bad-value", [`${initial}`])
+        // Предмет, жидкость, метка, зона — по имени: без имени или с числом («0» от типа «число») — ошибка схемы, а не программы.
+        if ((type === "item" || type === "fluid" || type === "marker" || type === "zone") && initial === "") fail(node.id, "graph-no-initial", [type])
+        else if (numberAsName(initial, type)) fail(node.id, "graph-bad-initial", [`${initial}`, type])
+        else if (value === undefined) fail(node.id, "graph-bad-value", [`${initial}`])
         variables.push({ node: node.id, text: `let ${name}: ${tsType(type)} = ${value ?? "null"};` })
       }
     }
@@ -336,7 +339,9 @@ export function graphToSource(graph: Graph, title = "", english = false): GraphS
       if (!validName(name, true)) fail(node.id, "graph-bad-name", [`${name ?? ""}`])
       else if (!paramSeen[name]) {
         paramSeen[name] = true
-        params.push({ name, type: settingType(node.values.type, "item"), fallback: node.values.default })
+        const type = settingType(node.values.type, "item")
+        if (node.values.default !== undefined && numberAsName(node.values.default, type)) fail(node.id, "graph-bad-initial", [`${node.values.default}`, type])
+        params.push({ name, type, fallback: node.values.default })
       }
     }
     if (node.kind === "function") {
@@ -762,6 +767,11 @@ function initialValue(value: GraphValue, type: PinType): string | undefined {
   if (value === "" || value === "null") return "null"
   const n = tonumber(value)
   return n !== undefined ? `${n}` : quote(value)
+}
+
+/** Число вместо имени предмета или жидкости: осталось от типа «число» — предмета «0» нет. */
+function numberAsName(value: GraphValue, type: PinType): boolean {
+  return (type === "item" || type === "fluid") && (typeof value !== "string" || tonumber(value) !== undefined)
 }
 
 /** Тип выхода годится для входа (с учётом списков у «для каждого»). */

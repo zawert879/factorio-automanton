@@ -314,7 +314,9 @@ export function drawNode(ws: Workshop, node: WorkshopNode): void {
     }),
   )
   const detail = titleDetail(node)
-  const title: LocalisedString = detail === undefined ? [`automaton-node.${node.kind}`] : ["", [`automaton-node.${node.kind}`], `  ${detail}`]
+  // «Параметр машины Добыча» не влезает в шапку узла: на узле — коротко, полное название — в палитре и окне.
+  const name: LocalisedString = node.kind === "param" ? ["automaton-node.param-short"] : [`automaton-node.${node.kind}`]
+  const title: LocalisedString = detail === undefined ? name : ["", name, `  ${detail}`]
   node.renders.push(
     rendering.draw_text({
       text: title,

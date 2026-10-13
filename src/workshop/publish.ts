@@ -28,7 +28,7 @@ export function graphDiagnosticText(d: GraphDiagnostic): LocalisedString {
   const params: LocalisedString[] = d.params.map((p, i) => {
     const text = tostring(p)
     if (d.code === "graph-unconnected" || d.code === "graph-no-pin") return [`automaton-pin.${text}`]
-    if (d.code === "graph-wire-type") return [`automaton-pin-type.${text}`]
+    if (d.code === "graph-wire-type" || (d.code === "graph-no-initial" && i === 0) || (d.code === "graph-bad-initial" && i === 1)) return [`automaton-pin-type.${text}`]
     if (d.code === "graph-unknown-node" && i === 0) return text
     return text
   })

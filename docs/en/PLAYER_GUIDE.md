@@ -254,10 +254,14 @@ Graph rules:
 - A data node (no red pins) is recalculated every time it is used; an action's result ("result" of Mine) is the value
   after the action has run.
 - Try: an action error in the "body" branch leads to the "error" branch, with the code on the "error code" output.
-- A variable is a Variable node (name, type, initial value) plus Get and Set nodes. Your own function is a Function
-  node: a name, parameters in a table (name and type; "+ parameter", "✕") and what it returns. A Call node calls it —
-  pick the function from the list in its window, and its pins follow the function's parameters.
-- Machine parameters — a Parameter node (name, type, default value): one graph, different settings on different machines.
+- A variable is a Variable node (name, type, initial value) plus Get and Set nodes. The type is a number, text,
+  yes/no, item, fluid, marker, zone, position or value; the initial value follows the type: an item is picked from
+  the item list, a marker is given by its name, a position always starts at (0, 0) and Set writes a new one. Your own
+  function is a Function node: a name, parameters in a table (name and type; "+ parameter", "✕") and what it returns.
+  A Call node calls it — pick the function from the list in its window, and its pins follow the function's parameters.
+- Machine parameters — a Machine parameter node in the Variables section (name, type, default value): the value comes
+  from the Parameters field of the machine window by the node's name (`{"ore": "coal"}`), and if it is not there, the
+  default is used. One graph, different settings on different machines. A Variable node does not read the Parameters field.
 - To move a node, use the Move button in the palette: press on the node, drag a box and release — the node moves to
   where you released, with its wires and settings. To move a group of nodes, cut and paste them (Ctrl+X, Ctrl+V):
   their wires move with them. Ctrl+C copies without the wires to the rest of the graph.

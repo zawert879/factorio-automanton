@@ -336,7 +336,7 @@ data("flag", "values", "", "value:boolean", (_a, ctx) => (ctx.node.values.value 
 data("item", "values", "", "value:item", (_a, ctx) => quote(`${ctx.node.values.value ?? "coal"}`), [{ id: "value", kind: "text", default: "coal" }])
 define({
   kind: "param",
-  category: "values",
+  category: "variables",
   exec: false,
   inputs: [],
   outputs: pins("value:value"),
@@ -395,7 +395,7 @@ define({
   outputs: [],
   settings: [
     { id: "name", kind: "text", default: "счётчик" },
-    { id: "type", kind: "type", options: ["number", "string", "boolean", "item", "position", "value"], default: "number" },
+    { id: "type", kind: "type", options: ["number", "string", "boolean", "item", "fluid", "marker", "zone", "position", "value"], default: "number" },
     { id: "initial", kind: "text", default: "0" },
   ],
 })
@@ -542,6 +542,14 @@ function writeSignal(at: Marker, signal: string, value: number): void {
   values[signal] = value;
   signals.write(at, values);
 }`,
+}
+
+/** Настройка со значением типа узла: начальное у переменной, по умолчанию у параметра машины. */
+export const TYPED_VALUE: Record<string, string | undefined> = { variable: "initial", param: "default" }
+
+/** Значение такой настройки после смены типа: прежнее («0» у числа) другому типу не подходит. */
+export function typedDefault(type: PinType): GraphValue | undefined {
+  return type === "number" ? 0 : type === "boolean" ? false : type === "string" || type === "value" ? "" : undefined
 }
 
 /** Тип параметра или переменной из настройки «тип». */

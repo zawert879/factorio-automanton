@@ -4,7 +4,7 @@ import { LocalisedString, LuaGuiElement, LuaPlayer, PlayerIndex } from "factorio
 import { onCustomInput, onEvent } from "../events"
 import { callLibrary, formatParams, GraphParam, parseParams } from "../graph/codegen"
 import { GraphValue, PinType } from "../graph/model"
-import { CATEGORIES, NODES, SettingSpec } from "../graph/nodes"
+import { CATEGORIES, NODES, SettingSpec, settingType, TYPED_VALUE, typedDefault } from "../graph/nodes"
 import { NODE_BODY_PREFIX, NODE_MOVER } from "../names"
 import { addCode } from "../gui/codeView"
 import { onGuiChange, onGuiChecked, onGuiClick, onGuiElemChanged, onGuiSelection, titlebar } from "../gui/common"
@@ -160,11 +160,14 @@ function addField(parent: LuaGuiElement, key: string, kind: PinType | SettingSpe
   const tags = { action: "workshop-value", key, kind }
   switch (kind) {
     case "item":
-    case "fluid":
-      parent.add({ type: "choose-elem-button", elem_type: kind, [kind]: typeof value === "string" ? value : undefined, tags } as never)
+    case "fluid": {
+      // Имени нет в игре («0» от типа «число», предмет убранного мода) — пустой выбор: с таким именем кнопка не создаётся.
+      const known = typeof value === "string" && (kind === "item" ? prototypes.item[value] : prototypes.fluid[value]) !== undefined
+      parent.add({ type: "choose-elem-button", elem_type: kind, [kind]: known ? value : undefined, tags } as never)
       return
+    }
     case "boolean":
-      parent.add({ type: "checkbox", state: value === true, caption: "", tags })
+      parent.add({ type: "checkbox", state: value === true || value === "true", caption: "", tags })
       return
     case "enum":
     case "type": {
@@ -185,6 +188,14 @@ function addField(parent: LuaGuiElement, key: string, kind: PinType | SettingSpe
   }
 }
 
+/** Начальное значение переменной, значение параметра по умолчанию — полем своего типа: предмет — выбором предмета. */
+function addTypedField(parent: LuaGuiElement, node: WorkshopNode, setting: SettingSpec): void {
+  const type = settingType(node.values.type, node.kind === "param" ? "item" : "number")
+  const value = node.values[setting.id] ?? setting.default
+  if (type === "position") parent.add({ type: "label", caption: ["automaton-workshop.initial-position"] })
+  else addField(parent, setting.id, type === "item" || type === "fluid" || type === "boolean" || type === "number" ? type : "text", value)
+}
+
 export function openNodeWindow(player: LuaPlayer, ws: Workshop, node: WorkshopNode): void {
   player.gui.screen[NODE_WINDOW]?.destroy()
   const visitor = visitorOf(player)
@@ -201,6 +212,7 @@ export function openNodeWindow(player: LuaPlayer, ws: Workshop, node: WorkshopNo
     table.add({ type: "label", caption: [`automaton-pin.${setting.id}`], style: "bold_label" })
     if (setting.kind === "params") addParamsEditor(table, node.values.params)
     else if (setting.kind === "function") addFunctionPicker(table, ws, node)
+    else if (TYPED_VALUE[node.kind] === setting.id) addTypedField(table, node, setting)
     else addField(table, setting.id, setting.kind, node.values[setting.id] ?? setting.default, setting.options)
     fields++
   }
@@ -219,6 +231,12 @@ export function openNodeWindow(player: LuaPlayer, ws: Workshop, node: WorkshopNo
     fields++
   }
   if (fields === 0) frame.add({ type: "label", caption: ["automaton-workshop.no-settings"] })
+  // Переменная и параметр машины: откуда значение (переменную принимали за параметр из окна машины).
+  if (node.kind === "variable" || node.kind === "param") {
+    const hint = frame.add({ type: "label", caption: node.kind === "variable" ? ["automaton-workshop.variable-hint"] : ["automaton-workshop.param-hint"] })
+    hint.style.single_line = false
+    hint.style.maximal_width = 400
+  }
   // Точка остановки у машины, выбранной для отладки.
   const program = programOf(ws)
   const record = visitor.debugRobot === undefined ? undefined : storage.machines[visitor.debugRobot]
@@ -344,9 +362,12 @@ function setValue(player: LuaPlayer, key: string, value: GraphValue | undefined)
   const { ws, node } = edited
   const before = inputsKey(ws, node)
   node.values[key] = value
+  // Новый тип — значение своего типа: «0» от числа предмету не подходит; поле — другое (выбор предмета, галочка).
+  const typed = key === "type" ? TYPED_VALUE[node.kind] : undefined
+  if (typed !== undefined) node.values[typed] = typedDefault(settingType(value, "value"))
   if (SHAPING.includes(key) && (NODES[node.kind]?.settings ?? []).some((s) => s.id === key)) {
     for (const [, other] of pairs(ws.nodes)) if (other.body.valid) refreshNode(ws, other)
-    if (inputsKey(ws, node) !== before) openNodeWindow(player, ws, node)
+    if (typed !== undefined || inputsKey(ws, node) !== before) openNodeWindow(player, ws, node)
   } else {
     drawNode(ws, node)
   }

@@ -238,4 +238,42 @@ describe("библиотеки из схем", () => {
     b.seq(start, call)
     expect(codes(b.graph)).toEqual([`graph-no-function@${call.id}`])
   })
+
+  test("переменные «метка» и «предмет»: метка по имени, предмет — строкой", () => {
+    const b = new GraphBuilder()
+    const start = b.node("start")
+    b.node("variable", { name: "Склад", type: "marker", initial: "Склад" })
+    b.node("variable", { name: "Ресурс", type: "item", initial: "coal" })
+    const depotVar = b.node("variable-get", { name: "Склад" })
+    const ore = b.node("variable-get", { name: "Ресурс" })
+    const move = b.node("move")
+    const mine = b.node("mine")
+    const depot = b.node("chest-at")
+    const put = b.node("put")
+    b.seq(start, move, mine, depot, put)
+    b.data(depotVar, move, "to").data(ore, mine, "item").data(depotVar, depot, "marker").data(depot, put, "into").data(ore, put, "item")
+    const text = compiles(b.layout())
+    expect(contains(text, 'let Склад: Marker = marker("Склад");')).toBe(true)
+    expect(contains(text, 'let Ресурс: Item = "coal";')).toBe(true)
+  })
+
+  test("начальное значение не своего типа — ошибка схемы на узле, а не программы", () => {
+    const withVariable = (values: Record<string, GraphValue | undefined>) => {
+      const b = new GraphBuilder()
+      b.node("start")
+      const variable = b.node("variable", { name: "x", ...values })
+      return { graph: b.graph, id: variable.id }
+    }
+    // «0» от типа «число» у предмета: раньше — let x: Item = "0" и «unknown item 0» при запуске.
+    const zero = withVariable({ type: "item" })
+    expect(codes(zero.graph)).toEqual([`graph-bad-initial@${zero.id}`])
+    const empty = withVariable({ type: "item", initial: "" })
+    expect(codes(empty.graph)).toEqual([`graph-no-initial@${empty.id}`])
+    const marker = withVariable({ type: "marker", initial: "" })
+    expect(codes(marker.graph)).toEqual([`graph-no-initial@${marker.id}`])
+    const b = new GraphBuilder()
+    b.node("start")
+    const param = b.node("param", { name: "ore", type: "item", default: "0" })
+    expect(codes(b.graph)).toEqual([`graph-bad-initial@${param.id}`])
+  })
 })
