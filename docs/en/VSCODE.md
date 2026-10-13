@@ -7,7 +7,9 @@ documentation on hover, errors before you publish. Save the file — the program
 
 The easiest way is the **"VS Code…"** window in the programs window (the game offers to open it the first time
 you open the programs window): it has the same steps in order and the full path to the folder for your system —
-click a field to select its text, then press Ctrl+C.
+click a field to select its text, then press Ctrl+C. The sync tool checks in with the game every 10 seconds, and the
+window shows whether VS Code is connected; if the folder was written but there is no connection for a minute, it
+says what to check.
 
 1. Install [Node.js](https://nodejs.org) 18 or newer (the sync tool needs it; on Linux, programs in
    subfolders need 20 or newer).

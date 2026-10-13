@@ -20,6 +20,7 @@ import { CustomCommandData, LuaPlayer, PlayerIndex } from "factorio:runtime"
 import { onEvent, onTick } from "../events"
 import { Diagnostic } from "../lang/lexer"
 import { publishing } from "../workshop/publish"
+import { VsCodeState } from "./vscodeState"
 import { DTS, DTS_EN, SYNC_TOOL, SYNC_TOOL_HASH, TS_PLUGIN, TSCONFIG } from "../gui/dts.generated"
 import {
   deleteProgram,
@@ -170,6 +171,17 @@ export function mapName(): string {
   return storage.mapName
 }
 
+/** Настройка VS Code игрока (окно «VS Code», связь с утилитой). */
+export function vscodeState(playerIndex: number): VsCodeState {
+  storage.vscode ??= {}
+  let state = storage.vscode[playerIndex]
+  if (state === undefined) {
+    state = {}
+    storage.vscode[playerIndex] = state
+  }
+  return state
+}
+
 export function initSync(): void {
   mapName()
 }
@@ -261,6 +273,12 @@ export function checksum(text: string): number {
 
 /** Обработать запрос утилиты; sender — ключ передачи (кто шлёт), player — игрок (нет — сервер). */
 function handle(request: Request, sender: string, player: LuaPlayer | undefined): Record<string, unknown> {
+  // Связь для окна «VS Code» (25.2): запрос от игрока — утилита на связи; карта — та, чья папка открыта в VS Code.
+  if (player !== undefined) {
+    const state = vscodeState(player.index)
+    state.contact = game.tick
+    state.contactMap = request.map
+  }
   if (request.tool !== SYNC_TOOL_HASH) {
     if (player !== undefined) updateOutdatedFolder(player)
     return { ok: false, error: OUTDATED_TOOL, outdated: true }
@@ -280,6 +298,8 @@ function handle(request: Request, sender: string, player: LuaPlayer | undefined)
     if (denied !== undefined) return { ok: false, errors: [{ line: 0, column: 0, code: denied, params: [] }] }
   }
   switch (request.cmd) {
+    case "ping":
+      return { ok: true }
     case "begin":
       if (typeof request.name !== "string") return { ok: false, error: "bad request" }
       buffers()[sender] = { name: request.name, force, parts: {} }

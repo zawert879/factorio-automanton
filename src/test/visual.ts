@@ -24,10 +24,10 @@ import { graphToSource } from "../graph/codegen"
 import { Graph } from "../graph/model"
 import { libraryFunctions, signatureValues } from "../graph/signatures"
 import { openNodeWindow } from "../workshop/gui"
-import { openVsCode, vscodeState } from "../gui/vscode"
+import { openVsCode } from "../gui/vscode"
 import { refreshLibraryCalls } from "../workshop/libraries"
 import { enterWorkshop, exitWorkshop } from "../workshop/session"
-import { writeVsCodeFolder } from "../program/sync"
+import { mapName, vscodeState, writeVsCodeFolder } from "../program/sync"
 
 const CENTER = { x: 300, y: 300 }
 
@@ -418,13 +418,27 @@ for (let x = 10; x < 86; x++) c.pixel(x, 54, x % 2 === 0 ? "green" : "red")`,
     const player = game.get_player(1 as PlayerIndex)
     if (player !== undefined) {
       player.gui.screen.clear()
-      const state = vscodeState(player)
+      const state = vscodeState(player.index)
       state.os = "macos"
       state.written = game.tick
+      state.contact = game.tick
+      state.contactMap = mapName()
       openVsCode(player)
     }
   }
   if (tick === 320) guiShot("vscode")
+  // Папку записали минуту назад, а утилита так и не ответила — что проверить.
+  if (tick === 321) {
+    const player = game.get_player(1 as PlayerIndex)
+    if (player !== undefined) {
+      const state = vscodeState(player.index)
+      state.os = "windows"
+      state.contact = undefined
+      state.written = game.tick - 3600
+      openVsCode(player)
+    }
+  }
+  if (tick === 322) guiShot("vscode-silent")
   // Дерево технологий (этап 6): технологии автоматонов на месте «Логистики». Экран технологий в одиночной
   // игре ставит её на паузу — поэтому снимок последний, в том же тике (shot.mjs ждёт файлы ещё пару секунд).
   if (tick === 324) {

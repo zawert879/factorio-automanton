@@ -48,8 +48,8 @@ import {
   publishDenied,
   rightsDenied,
 } from "../program/store"
-import { onRefreshResult, onRefreshTimeout, requestRefresh } from "../program/sync"
-import { openVsCode, vscodeOffered, vscodeState } from "./vscode"
+import { onRefreshResult, onRefreshTimeout, requestRefresh, vscodeState } from "../program/sync"
+import { openVsCode, vscodeOffered } from "./vscode"
 import { PALETTE } from "./codeView"
 import { guiOf, onGuiChange, onGuiClick, onGuiConfirm, onGuiSelection, titlebar } from "./common"
 import { diagnosticMessage, diagnosticText } from "./diagnostics"
@@ -800,7 +800,7 @@ export function registerProgramsWindow(): void {
   onGuiClick("programs-vscode", (player) => openVsCode(player))
   // Предложение VS Code: ответ «Настроить» или «Не сейчас» — больше не показывать.
   const answerOffer = (player: LuaPlayer, element: LuaGuiElement) => {
-    vscodeState(player).offered = true
+    vscodeState(player.index).offered = true
     element.parent?.destroy()
   }
   onGuiClick("programs-vscode-setup", (player, element) => {

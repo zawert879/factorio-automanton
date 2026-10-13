@@ -31,6 +31,8 @@ const HERE = dirname(SELF)
 /** Версия утилиты — хеш её файла: игра отклоняет утилиту другой версии, чем мод. */
 const TOOL = createHash("sha1").update(readFileSync(SELF)).digest("hex").slice(0, 12)
 const PART = 1500
+/** Как часто утилита отмечается в игре (окно «VS Code» показывает, на связи ли она). */
+const PING_MS = 10000
 
 // ---------- Параметры ----------
 
@@ -571,6 +573,20 @@ async function main() {
     })
   }
   listen(rcon, (job) => run(job))
+  // Раз в 10 с — отметиться в игре: окно «VS Code» показывает, что утилита на связи. Пропала связь — сказать один раз.
+  let answering = true
+  setInterval(() => {
+    rcon.request({ cmd: "ping", map: mapOf(folder) }).then(
+      () => {
+        if (!answering) console.log("automaton: связь с игрой есть")
+        answering = true
+      },
+      (error) => {
+        if (answering) console.log(`automaton: ${error.message}`)
+        answering = false
+      },
+    )
+  }, PING_MS)
   /** Файл исчез, а его текст (без путей импорта) совпадает с новым — перенос. */
   const movedFrom = (source) => {
     const key = withoutImportPaths(source)

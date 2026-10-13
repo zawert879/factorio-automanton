@@ -4,6 +4,7 @@
 // 2) Игра с окном (одиночная, на несколько секунд) с --enable-lua-udp: публикация и pull по UDP.
 import { spawn, spawnSync } from "node:child_process"
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs"
+import { createHash } from "node:crypto"
 import { createSocket } from "node:dgram"
 import { createConnection } from "node:net"
 import { join } from "node:path"
@@ -95,9 +96,9 @@ if (!existsSync(pulledFile)) fail(`pull не скачал программу:\n$
 if (readFileSync(pulledFile, "utf8") !== longProgram) fail("pull скачал другой текст")
 if (!existsSync(join(pulled, "automaton.d.ts"))) fail("pull не положил automaton.d.ts")
 
-// Своя папка у каждой карты: script-output/automaton/карта-<seed>/player.
+// Своя папка у каждой карты: script-output/automaton/map-<seed>/player (до 25.1 — карта-<seed>).
 const maps = existsSync(join(env.data, "script-output", "automaton")) ? readdirSync(join(env.data, "script-output", "automaton")) : []
-if (maps.length !== 1 || !maps[0].startsWith("карта-")) fail(`папка карты: ${maps.join(", ")}`)
+if (maps.length !== 1 || !maps[0].startsWith("map-")) fail(`папка карты: ${maps.join(", ")}`)
 const mapName = maps[0]
 const mapFolder = join(env.data, "script-output", "automaton", mapName, "player")
 const exported = join(mapFolder, "src", "Привет.ts")
@@ -217,6 +218,21 @@ while (!udpOut.includes("«Привет» опубликована, v1")) {
   udpOut = udpPush.stdout + udpPush.stderr
 }
 const udpPull = spawnSync("node", [tool, "pull", udpPulled, ...udpArgs], { encoding: "utf8" })
+// ping (25.2): утилита в режиме слежения отмечается в игре раз в 10 с — игра отвечает «ok».
+const pingReply = await new Promise((resolve) => {
+  const socket = createSocket("udp4")
+  const timer = setTimeout(() => {
+    socket.close()
+    resolve(undefined)
+  }, 5000)
+  socket.on("message", (data) => {
+    clearTimeout(timer)
+    socket.close()
+    resolve(JSON.parse(data.toString("utf8")))
+  })
+  const hash = createHash("sha1").update(readFileSync(tool)).digest("hex").slice(0, 12)
+  socket.bind(0, "127.0.0.1", () => socket.send(JSON.stringify({ cmd: "ping", id: 1, tool: hash }), UDP_PORT, "127.0.0.1"))
+})
 // Устаревшая утилита стучится от игрока: игра сама пишет ему в папку новую утилиту (и плагин).
 const udpOld = spawnSync("node", [oldTool, "push", join(programs, "Привет.ts"), ...udpArgs], { encoding: "utf8" })
 const guiMaps = join(gui.data, "script-output", "automaton")
@@ -224,10 +240,11 @@ const guiFolder = existsSync(guiMaps) ? join(guiMaps, readdirSync(guiMaps)[0] ??
 const started2 = Date.now()
 while (!existsSync(join(guiFolder, "automaton-sync.mjs")) && Date.now() - started2 < 10000) await new Promise((r) => setTimeout(r, 200))
 game.kill()
+if (pingReply?.ok !== true) fail(`ping по UDP: ${JSON.stringify(pingReply)}`)
 if (!(udpOld.stdout + udpOld.stderr).includes("утилита синхронизации устарела")) fail(`устаревшая утилита по UDP:\n${udpOld.stdout}${udpOld.stderr}`)
 if (!existsSync(join(guiFolder, "automaton-sync.mjs")) || readFileSync(join(guiFolder, "automaton-sync.mjs"), "utf8") !== readFileSync(tool, "utf8")) fail(`игра не обновила утилиту в папке игрока ${guiFolder}`)
 if (!existsSync(join(guiFolder, ".automaton", "node_modules", "automaton-ts-plugin", "index.js"))) fail("игра не положила плагин в папку игрока")
 if (!existsSync(join(udpPulled, "src", "Привет.ts")) || readFileSync(join(udpPulled, "src", "Привет.ts"), "utf8") !== longProgram) {
   fail(`pull по UDP:\n${udpPull.stdout}${udpPull.stderr}`)
 }
-console.log("UDP (игра с окном): публикация, pull, обновление папки при устаревшей утилите — ок")
+console.log("UDP (игра с окном): публикация, pull, ping, обновление папки при устаревшей утилите — ок")
