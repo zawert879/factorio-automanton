@@ -117,6 +117,14 @@ export function onMoveCancelled(listener: (this: void, record: RobotRecord) => v
   cancelListeners.push(listener)
 }
 
+/** Сущность машины подменили вариантом (22.1): у новой команды нет — поездку отправить заново. */
+export function redispatchMove(record: RobotRecord): void {
+  const order = storage.movement.orders[record.id]
+  if (order === undefined || order.phase === "queued") return
+  order.phase = "queued"
+  storage.movement.queue.push(record.id)
+}
+
 /** Отменить поездку без итога (машина займётся другим). */
 export function cancelMove(record: RobotRecord): void {
   if (flight !== undefined && flight.isFlyer(record)) {

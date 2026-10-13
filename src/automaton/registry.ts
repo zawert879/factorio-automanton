@@ -3,7 +3,7 @@
 // переходят игроку, при гибели высыпаются на землю.
 import { onEvent } from "../events"
 import { LuaEntity, LuaInventory, LuaItemStack, LuaRenderObject, LuaSurface, MapPosition, Tags } from "factorio:runtime"
-import { Activity, modelOf, ROBOT_ENTITIES, ROBOT_TAG } from "../names"
+import { Activity, modelOf, ROBOT_ENTITIES, ROBOT_TAG, variantOf } from "../names"
 import { directionOf, drawBody } from "./appearance"
 import { applyUpgrades } from "./models"
 import type { Tank } from "./tank"
@@ -26,6 +26,8 @@ export interface RobotRecord {
   fuel: LuaInventory
   /** Оружейный слот (патроны) — у боевых моделей. */
   weapon?: LuaInventory
+  /** Значок оружия у плеча (боевые модели; в сохранениях до 22.1 — не запомнен). */
+  gun?: LuaRenderObject
   /** Запас энергии, Дж: тратится на путь и действия, пополняется сжиганием топлива. */
   energy: number
   /** Бак для жидкости (src/automaton/fluids.ts). */
@@ -90,7 +92,7 @@ export function registerRobot(entity: LuaEntity, tag?: RobotTag): RobotRecord {
     id,
     name,
     entity,
-    model: entity.name,
+    model: model.entity,
     label,
     body,
     activity: "idle",
@@ -104,20 +106,30 @@ export function registerRobot(entity: LuaEntity, tag?: RobotTag): RobotRecord {
   registry.byId[id] = record
   registry.idByUnit[entity.unit_number!] = id
   applyUpgrades(record)
-  // Боевые — с оружием на виду (значок пулемёта или ракетомёта у плеча; исчезает вместе с машиной).
-  if (model.weapon !== undefined) {
-    rendering.draw_sprite({
-      sprite: model.weapon.type === "gun" ? "item/submachine-gun" : "item/rocket-launcher",
-      target: { entity, offset: [0.22, -0.5] },
-      surface: entity.surface,
-      x_scale: 0.4,
-      y_scale: 0.4,
-      render_layer: "higher-object-under",
-    })
-  }
+  drawGun(record)
   script.register_on_object_destroyed(entity)
   for (const listener of registeredListeners) listener(record)
   return record
+}
+
+/**
+ * Боевые — с оружием на виду: значок у плеча (поставленное оружие или встроенное: пулемёт, ракетомёт). Прицеплен
+ * к сущности — исчезает вместе с ней; при подмене варианта (22.1) рисуется заново.
+ */
+export function drawGun(record: RobotRecord): void {
+  if (record.gun?.valid) record.gun.destroy()
+  record.gun = undefined
+  const model = modelOf(record.model)
+  if (model?.weapon === undefined) return
+  const equipped = variantOf(record.entity.name)?.weapon
+  record.gun = rendering.draw_sprite({
+    sprite: `item/${equipped ?? (model.weapon.type === "gun" ? "submachine-gun" : "rocket-launcher")}`,
+    target: { entity: record.entity, offset: [0.22, -0.5] },
+    surface: record.entity.surface,
+    x_scale: 0.4,
+    y_scale: 0.4,
+    render_layer: "higher-object-under",
+  })
 }
 
 function forgetUnit(unitNumber: number, reason: "mined" | "destroyed"): void {

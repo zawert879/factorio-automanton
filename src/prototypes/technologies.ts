@@ -89,6 +89,8 @@ const SPECS: Spec[] = [
     packs: GREEN,
     unlocks: [COMBAT_MK1],
   },
+  // Снаряжение солдат (22): слоты оружия и брони у машин, equip из программы.
+  { name: TECH.gear, overlay: ICON + "heavy-armor.png", prerequisites: [TECH.combat1, "heavy-armor"], count: 100, packs: GREEN },
   // Синяя и дальше.
   { name: TECH.sensors3, overlay: ICON + "night-vision-equipment.png", prerequisites: [TECH.sensors2, "chemical-science-pack"], count: 250, packs: BLUE, upgrade: true },
   {

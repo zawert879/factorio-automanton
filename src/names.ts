@@ -229,18 +229,65 @@ export const MODELS: readonly ModelSpec[] = [
   },
 ]
 
-const MODEL_BY_NAME = new LuaMap<string, ModelSpec>()
-for (const model of MODELS) {
-  MODEL_BY_NAME.set(model.entity, model)
-  MODEL_BY_NAME.set(model.placer, model)
+/**
+ * Снаряжение солдат (этап 22): оружие игрока, которое ставится боевым моделям, и броня наземных моделей. Оружие
+ * и сопротивления юнита заданы прототипом, поэтому у моделей есть варианты-прототипы (src/prototypes/automaton.ts).
+ */
+export const GEAR_WEAPONS: readonly string[] = ["pistol", "submachine-gun", "shotgun", "combat-shotgun", "rocket-launcher"]
+export const GEAR_ARMORS: readonly string[] = ["light-armor", "heavy-armor", "modular-armor", "power-armor", "power-armor-mk2"]
+
+/** Вариант модели: сама модель, поставленное оружие и броня (нет — встроенное оружие, без брони). */
+export interface VariantSpec {
+  model: ModelSpec
+  weapon?: string
+  armor?: string
 }
 
-/** Модель по имени сущности юнита, заглушки или предмета (таблицей: зовётся на каждом шагу). */
+/** Имя прототипа варианта; без снаряжения — сама модель. */
+export function variantName(model: string, weapon?: string, armor?: string): string {
+  let name = model
+  if (weapon !== undefined) name += `--${weapon}`
+  if (armor !== undefined) name += `--${armor}`
+  return name
+}
+
+/** Все варианты модели: оружие — у боевых, броня — у наземных; летающим — только сама модель. */
+export function modelVariants(model: ModelSpec): VariantSpec[] {
+  const armors = model.flying ? [] : GEAR_ARMORS
+  const result: VariantSpec[] = [{ model }]
+  for (const armor of armors) result.push({ model, armor })
+  for (const weapon of model.weapon !== undefined ? GEAR_WEAPONS : []) {
+    result.push({ model, weapon })
+    for (const armor of armors) result.push({ model, weapon, armor })
+  }
+  return result
+}
+
+const MODEL_BY_NAME = new LuaMap<string, ModelSpec>()
+const VARIANT_BY_NAME = new LuaMap<string, VariantSpec>()
+const ALL_VARIANTS: string[] = []
+for (const model of MODELS) {
+  MODEL_BY_NAME.set(model.placer, model)
+  for (const variant of modelVariants(model)) {
+    const name = variantName(model.entity, variant.weapon, variant.armor)
+    MODEL_BY_NAME.set(name, model)
+    VARIANT_BY_NAME.set(name, variant)
+    ALL_VARIANTS.push(name)
+  }
+}
+
+/** Модель по имени сущности юнита (и его вариантов), заглушки или предмета (таблицей: зовётся на каждом шагу). */
 export function modelOf(name: string): ModelSpec | undefined {
   return MODEL_BY_NAME.get(name)
 }
 
-export const ROBOT_ENTITIES: readonly string[] = MODELS.map((m) => m.entity)
+/** Вариант по имени сущности машины: модель, оружие, броня. */
+export function variantOf(name: string): VariantSpec | undefined {
+  return VARIANT_BY_NAME.get(name)
+}
+
+/** Имена сущностей всех машин — моделей и их вариантов (поиск машин на карте). */
+export const ROBOT_ENTITIES: readonly string[] = ALL_VARIANTS
 /** Слой столкновений наземных машин: всё, с чем они сталкиваются, кроме ворот (src/prototypes/gates.ts). */
 export const AUTOMATON_COLLISION_LAYER = "automaton-solid"
 export const ROBOT_PLACERS: readonly string[] = MODELS.map((m) => m.placer)
@@ -260,6 +307,7 @@ export const TECH = {
   mk3: "automaton-mk3",
   combat1: "automaton-combat-1",
   combat2: "automaton-combat-2",
+  gear: "automaton-gear",
   flying1: "automaton-flying-1",
   flying2: "automaton-flying-2",
 } as const

@@ -1,4 +1,6 @@
 // Прототипы рабочих автоматонов Mk1–Mk3 (8.1): юнит, анимации тела, предмет, рецепт и заглушка для установки.
+// Варианты юнита (22.1) — та же модель с оружием игрока и бронёй: свои атака и сопротивления, остальное общее
+// (тело — анимации модели поверх прозрачного юнита).
 // Юнит нельзя поставить из инвентаря напрямую, поэтому предмет ставит заглушку
 // (simple-entity-with-owner), которую control заменяет на юнит (src/automaton/placement.ts).
 import { PrototypeData } from "factorio:common"
@@ -21,8 +23,11 @@ import {
   COMBAT_MK2,
   FLYER_MK1,
   MODELS,
+  modelVariants,
   ModelSpec,
   SHOT_EFFECT,
+  variantName,
+  VariantSpec,
   WORKER_MK1,
   WORKER_MK2,
 } from "../names"
@@ -229,6 +234,46 @@ function attackParameters(model: ModelSpec): UnitPrototype["attack_parameters"] 
   }
 }
 
+type Resistance = { type: string; decrease?: number; percent?: number }
+
+/** Атака варианта с оружием игрока: дальность, темп и звук — как у оружия, попадание — эффект скрипта, как у модели. */
+function gunAttack(model: ModelSpec, weapon: string): UnitPrototype["attack_parameters"] {
+  const gun = (data.raw.gun as Record<string, { attack_parameters: Record<string, any> } | undefined>)[weapon]
+  if (gun === undefined) error(`automaton: нет оружия ${weapon}`)
+  const source = gun.attack_parameters
+  const category = (source.ammo_category ?? source.ammo_categories?.[0]) as string
+  const attack = attackParameters({ ...model, weapon: { type: "gun", category: category as never, range: source.range, cooldown: source.cooldown } }) as Record<string, any>
+  if (source.sound !== undefined) attack.sound = source.sound
+  return attack as UnitPrototype["attack_parameters"]
+}
+
+/**
+ * Сопротивления варианта: свои у модели и брони вместе. Вычет за удар складывается, проценты — как два слоя
+ * подряд (1 − (1 − a)(1 − b)); игра хранит одно сопротивление на вид урона, порядок вычетов чуть другой.
+ */
+function variantResistances(model: ModelSpec, armor: string | undefined): Resistance[] | undefined {
+  const own: Resistance[] =
+    model.resistances === undefined
+      ? []
+      : [
+          { type: "physical", percent: model.resistances.physical, decrease: 2 },
+          { type: "explosion", percent: model.resistances.explosion },
+        ]
+  const worn = armor === undefined ? [] : (((data.raw.armor as Record<string, { resistances?: Resistance[] } | undefined>)[armor]?.resistances ?? []) as Resistance[])
+  const merged = new Map<string, Resistance>()
+  for (const r of [...own, ...worn]) {
+    const existing = merged.get(r.type)
+    if (existing === undefined) merged.set(r.type, { type: r.type, decrease: r.decrease ?? 0, percent: r.percent ?? 0 })
+    else {
+      existing.decrease = (existing.decrease ?? 0) + (r.decrease ?? 0)
+      existing.percent = 100 - ((100 - (existing.percent ?? 0)) * (100 - (r.percent ?? 0))) / 100
+    }
+  }
+  const result: Resistance[] = []
+  merged.forEach((r) => result.push(r))
+  return result.length === 0 ? undefined : result
+}
+
 function modelPrototypes(model: ModelSpec, index: number): object[] {
   const icons = modelIcons(model, model.digit)
   if (model.flying) return flyerPrototypes(model, index, icons)
@@ -242,39 +287,44 @@ function modelPrototypes(model: ModelSpec, index: number): object[] {
     }
   }
 
-  const worker: UnitPrototype = {
-    type: "unit",
-    name: model.entity,
-    icons,
-    flags: ["placeable-player", "placeable-off-grid", "player-creation"],
-    minable: { mining_time: 0.5, result: model.entity },
-    max_health: model.health,
-    collision_box: [
-      [-0.2, -0.2],
-      [0.2, 0.2],
-    ],
-    selection_box: [
-      [-0.35, -1.1],
-      [0.35, 0.2],
-    ],
-    movement_speed: model.speed,
-    distance_per_frame: 1,
-    run_animation: INVISIBLE,
-    attack_parameters: attackParameters(model),
-    resistances:
-      model.resistances === undefined
-        ? undefined
-        : [
-            { type: "physical", percent: model.resistances.physical, decrease: 2 },
-            { type: "explosion", percent: model.resistances.explosion },
-          ],
-    vision_distance: model.weapon === undefined ? 10 : model.weapon.range + 5,
-    distraction_cooldown: 300,
-    max_pursue_distance: model.weapon === undefined ? 10 : 30,
-    ai_settings: { destroy_when_commands_fail: false, allow_try_return_to_spawner: false, do_separation: true },
-    has_belt_immunity: true,
-    dying_explosion: "explosion",
+  const unit = (variant: VariantSpec): UnitPrototype => {
+    const range = variant.weapon === undefined ? model.weapon?.range : (data.raw.gun as Record<string, any>)[variant.weapon].attack_parameters.range
+    const prototype: UnitPrototype = {
+      type: "unit",
+      name: variantName(model.entity, variant.weapon, variant.armor),
+      icons,
+      flags: ["placeable-player", "placeable-off-grid", "player-creation"],
+      minable: { mining_time: 0.5, result: model.entity },
+      max_health: model.health,
+      collision_box: [
+        [-0.2, -0.2],
+        [0.2, 0.2],
+      ],
+      selection_box: [
+        [-0.35, -1.1],
+        [0.35, 0.2],
+      ],
+      movement_speed: model.speed,
+      distance_per_frame: 1,
+      run_animation: INVISIBLE,
+      attack_parameters: variant.weapon === undefined ? attackParameters(model) : gunAttack(model, variant.weapon),
+      resistances: variantResistances(model, variant.armor) as UnitPrototype["resistances"],
+      vision_distance: range === undefined ? 10 : range + 5,
+      distraction_cooldown: 300,
+      max_pursue_distance: range === undefined ? 10 : math.max(30, range + 10),
+      ai_settings: { destroy_when_commands_fail: false, allow_try_return_to_spawner: false, do_separation: true },
+      has_belt_immunity: true,
+      dying_explosion: "explosion",
+    }
+    // Вариант — та же машина: имя модели, в Factoriopedia не показывается.
+    if (variant.weapon !== undefined || variant.armor !== undefined) {
+      prototype.localised_name = [`entity-name.${model.entity}`]
+      prototype.hidden_in_factoriopedia = true
+    }
+    return prototype
   }
+  const units = modelVariants(model).map((variant) => unit(variant))
+  const worker = units[0]
 
   const placer: SimpleEntityWithOwnerPrototype = {
     type: "simple-entity-with-owner",
@@ -309,7 +359,7 @@ function modelPrototypes(model: ModelSpec, index: number): object[] {
     results: [{ type: "item", name: model.entity, amount: 1 }],
   }
 
-  return [worker, placer, item, recipe, ...animations]
+  return [...units, placer, item, recipe, ...animations]
 }
 
 /**

@@ -15,7 +15,8 @@ export function directionOf(orientation: number): number {
 
 export function drawBody(entity: LuaEntity, activity: Activity, direction: number): LuaRenderObject {
   return rendering.draw_animation({
-    animation: bodyPose(entity.name, activity, direction),
+    // У варианта со снаряжением (22.1) тело — анимации его модели.
+    animation: bodyPose(modelOf(entity.name)?.entity ?? entity.name, activity, direction),
     target: { entity },
     surface: entity.surface,
     // Летающие — над зданиями.
