@@ -391,7 +391,10 @@ Action errors are an `ActionError` with a code:
 - **Zone** — a rectangle selected with the **Programmer** (left-drag). `zone("smelting")`, and
   `zone("smelting").find(Furnace)` gives the furnaces in it at any distance. With the Programmer in hand, zones show
   handles: a drag started at an edge or a corner moves it to where you release; a drag started at the center handle
-  moves the whole zone. The name stays, and programs see the new border right away.
+  moves the whole zone. The name stays, and programs see the new border right away. Click a zone (inside or on the
+  center handle) to open a window with its name: type a new name and **Confirm**, or **Delete**. Programs find a zone
+  by name, so update `zone("…")` in them after renaming. A name taken by another zone is not accepted. To delete several
+  zones at once, Shift-drag a box over them.
 - **Vision** — `scan.buildings(...)`, `scan.resources()`, `scan.robots()`, `scan.items()`, `scan.trees()`,
   `scan.rocks()`, `scan.water()` and (with **Automaton sensors 2**) `scan.enemies()`: only within the vision radius,
   nearest first. `me.mine(tree)` chops a tree or breaks a rock, and `me.mine("wood")` chops the nearest tree.

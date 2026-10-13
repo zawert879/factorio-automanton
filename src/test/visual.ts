@@ -8,6 +8,8 @@ import { say, showProblem } from "../automaton/status"
 import { findRobot, RobotRecord } from "../automaton/registry"
 import { Activity, BODY_DIRECTIONS, CHARGING_STATION, DISPLAYS, MODELS, TECH, WORKER_MK1, WORKER_MK1_PLACER } from "../names"
 import { renameDisplay } from "../world/displays"
+import { askZoneName, createZone, findZone, removeZone } from "../world/zones"
+import { confirmName } from "../world/naming"
 import { guiOf } from "../gui/common"
 import { openMachine } from "../gui/machine"
 import { setArmor, setWeapon } from "../automaton/gear"
@@ -439,9 +441,30 @@ for (let x = 10; x < 86; x++) c.pixel(x, 54, x % 2 === 0 ? "green" : "red")`,
     }
   }
   if (tick === 322) guiShot("vscode-silent")
+  // Клик «Программатором» по зоне (21.8): имя, «Удалить», подсказка про программы.
+  if (tick === 323) {
+    const player = game.get_player(1 as PlayerIndex)
+    if (player !== undefined) {
+      player.gui.screen.clear()
+      createZone("плавильня", player.surface, { left_top: { x: CENTER.x - 6, y: CENTER.y - 4 }, right_bottom: { x: CENTER.x + 6, y: CENTER.y + 4 } })
+      askZoneName(player.index, "плавильня")
+    }
+  }
+  if (tick === 324) guiShot("zone-name")
+  // Новое имя из поля диалога — как «Подтвердить» (Enter в симуляции не набрать, tools/test/sim-zones.mjs).
+  if (tick === 325) {
+    const player = game.get_player(1 as PlayerIndex)
+    const field = player?.gui.screen["automaton-naming"]?.children[0]["automaton-naming-field"] as TextFieldGuiElement | undefined
+    if (player !== undefined && field !== undefined) {
+      field.text = "печи"
+      confirmName(player)
+      if (findZone("печи") === undefined || findZone("плавильня") !== undefined) error("зона не переименована из диалога")
+      removeZone("печи")
+    }
+  }
   // Дерево технологий (этап 6): технологии автоматонов на месте «Логистики». Экран технологий в одиночной
   // игре ставит её на паузу — поэтому снимок последний, в том же тике (shot.mjs ждёт файлы ещё пару секунд).
-  if (tick === 324) {
+  if (tick === 326) {
     const player = game.get_player(1 as PlayerIndex)
     if (player !== undefined) {
       player.opened = undefined

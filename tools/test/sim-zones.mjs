@@ -1,6 +1,7 @@
 // npm run test:sim (часть) — края зон (21.7) настоящей мышью: игра С ОКНОМ на секунды, тестовый игрок с «Программатором»
 // создаёт зону рамкой, тянет правый край, переносит зону за центральную ручку и тянет угол; ручки видны, пока
-// инструмент в руке. Нажатие выделения идёт с notify = true — так до мода доходит связанная клавиша, как в игре.
+// инструмент в руке. Клик внутри зоны и по центральной ручке (21.8) открывает имя зоны, зона не двигается.
+// Нажатие выделения идёт с notify = true — так до мода доходит связанная клавиша, как в игре.
 import { spawn } from "node:child_process"
 import { existsSync, readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
@@ -22,7 +23,7 @@ wait = 0
 function zones()
   local list = remote.call("automaton", "zones")
   local a = list[1] and list[1].area
-  return { count = #list, area = a and { a.left_top.x, a.left_top.y, a.right_bottom.x, a.right_bottom.y } }
+  return { count = #list, name = list[1] and list[1].name, area = a and { a.left_top.x, a.left_top.y, a.right_bottom.x, a.right_bottom.y } }
 end
 function renders() return #rendering.get_all_objects("automaton") end
 result.events = {}
@@ -46,6 +47,8 @@ local drags = {
   { from = {2.2, 0.5}, to = {5.4, 0.8}, key = "edge" },
   { from = {-0.5, 0.5}, to = {1.5, 2.5}, key = "moved" },
   { from = {-4.2, -0.2}, to = {-6.4, -1.6}, key = "corner" },
+  { from = {-3, 3.2}, to = {-3, 3.2}, key = "clickInside" },
+  { from = {0.5, 1.5}, to = {0.5, 1.5}, key = "clickCenter" },
 }
 local index = math.floor((step - 1) / 4) + 1
 local phase = (step - 1) % 4
@@ -72,8 +75,11 @@ elseif phase == 1 and at(d.to[1], d.to[2]) then
 -- В симуляции рамка завершается со следующим вводом, а не с отпусканием: чуть сдвинуть курсор, как игрок.
 elseif phase == 2 and at(d.to[1] + 0.05, d.to[2]) and wait > 15 then
   result[d.key] = zones()
-  -- Новая зона спрашивает имя (поле ввода в фокусе) — закрыть окно, имя остаётся предложенное.
+  -- Новая зона и клик по зоне спрашивают имя (поле ввода в фокусе): записать, что в поле, и закрыть окно — имя
+  -- остаётся. Набрать новое и Enter симуляция не умеет: ввод до поля мода не доходит.
   local naming = player.gui.screen["automaton-naming"]
+  local field = naming and naming.children[1]["automaton-naming-field"]
+  result[d.key].naming = field and field.text
   if naming then naming.destroy() end
   step, wait = step + 1, 0
 elseif phase == 3 and wait > 15 then
@@ -137,5 +143,7 @@ check(result.created?.count === 1 && area("created") === "-6,-2,2,3", "рамк�
 check(result.edge?.count === 1 && area("edge") === "-6,-2,5,3", "рамка от правого края двигает край, новой зоны нет")
 check(area("moved") === "-4,0,7,5", "рамка от центральной ручки переносит зону")
 check(area("corner") === "-6,-2,7,5", "рамка от угла двигает два края")
+check(result.clickInside?.naming === result.corner?.name && area("clickInside") === "-6,-2,7,5", "клик внутри зоны — окно с её именем, зона на месте")
+check(result.clickCenter?.naming === result.corner?.name && area("clickCenter") === "-6,-2,7,5", "клик по центральной ручке — окно с именем, зона не сдвинулась")
 check(result.rendersHolding > result.rendersEmpty, "ручки видны с «Программатором» в руке и пропадают без него")
 if (failures.length > 0) process.exit(1)

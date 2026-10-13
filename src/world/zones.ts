@@ -4,10 +4,12 @@
 // Края зон (21.7): рамка, начатая у края зоны (в пределах GRAB клетки) или угла, двигает их туда, где её отпустили;
 // начатая на центральной ручке — переносит зону. Начало рамки — нажатие (своя клавиша ZONE_PRESS, связанная
 // с выделением), конец — угол выделенной области напротив начала. Ручки видит только игрок с «Программатором» в руке.
+// Имя и удаление (21.8): клик (рамка без протягивания) внутри зоны или по центральной ручке открывает диалог имени
+// с кнопкой «Удалить». Занятое другой зоной имя не принимается — диалог открывается снова.
 import { BoundingBox, LuaPlayer, LuaRenderObject, LuaSurface, MapPosition, PlayerIndex } from "factorio:runtime"
 import { onCustomInput, onEvent } from "../events"
 import { PROGRAMMER, ZONE_PRESS } from "../names"
-import { askName, registerRenamer } from "./naming"
+import { askName, registerRemover, registerRenamer } from "./naming"
 
 export interface ZoneRecord {
   name: string
@@ -131,14 +133,48 @@ export function grabAt(surface: LuaSurface, position: MapPosition): Omit<ZoneGra
   return best
 }
 
+/** Конец рамки, начатой в start, — угол выделенной области напротив начала. */
+function selectionEnd(start: MapPosition, area: BoundingBox): [number, number] {
+  const endX = math.abs(area.left_top.x - start.x) <= math.abs(area.right_bottom.x - start.x) ? area.right_bottom.x : area.left_top.x
+  const endY = math.abs(area.left_top.y - start.y) <= math.abs(area.right_bottom.y - start.y) ? area.right_bottom.y : area.left_top.y
+  return [endX, endY]
+}
+
+/**
+ * Клик по зоне (21.8): рамка, начатая на центральной ручке и отпущенная на ней же, или рамка меньше клетки внутри
+ * зоны — имя зоны (из нескольких — самая маленькая); рамка от края — не клик, край встаёт по клеткам.
+ */
+export function clickedZone(surface: LuaSurface, area: BoundingBox, grab: ZoneGrab | undefined): string | undefined {
+  if (grab !== undefined) {
+    if (!grab.move) return undefined
+    const [endX, endY] = selectionEnd(grab.start, area)
+    return math.abs(endX - grab.start.x) <= GRAB && math.abs(endY - grab.start.y) <= GRAB ? grab.zone : undefined
+  }
+  if (area.right_bottom.x - area.left_top.x >= 1 || area.right_bottom.y - area.left_top.y >= 1) return undefined
+  const x = (area.left_top.x + area.right_bottom.x) / 2
+  const y = (area.left_top.y + area.right_bottom.y) / 2
+  let best: string | undefined
+  let bestSize = math.huge
+  for (const [name, zone] of pairs(storage.zones.byName)) {
+    const { left_top: a, right_bottom: b } = zone.area
+    if (zone.surface !== surface || x < a.x || x > b.x || y < a.y || y > b.y) continue
+    const size = (b.x - a.x) * (b.y - a.y)
+    if (size < bestSize) [best, bestSize] = [name, size]
+  }
+  return best
+}
+
+/** Диалог имени существующей зоны: новое имя и «Удалить»; программы находят зону по имени. */
+export function askZoneName(playerIndex: number, name: string): void {
+  askName(playerIndex, { kind: "zone", name }, name, ["automaton.zone-rename-note", name])
+}
+
 /** Рамку, начатую нажатием grab, отпустили: area — выделенная область. Край — туда, где отпустили (по клеткам). */
 export function dragZone(grab: ZoneGrab, area: BoundingBox): void {
   const zone = storage.zones.byName[grab.zone]
   if (zone === undefined) return
   const { start } = grab
-  // Конец рамки — угол области напротив начала.
-  const endX = math.abs(area.left_top.x - start.x) <= math.abs(area.right_bottom.x - start.x) ? area.right_bottom.x : area.left_top.x
-  const endY = math.abs(area.left_top.y - start.y) <= math.abs(area.right_bottom.y - start.y) ? area.right_bottom.y : area.left_top.y
+  const [endX, endY] = selectionEnd(start, area)
   const snap = (v: number) => math.floor(v + 0.5)
   let [left, top] = [zone.area.left_top.x, zone.area.left_top.y]
   let [right, bottom] = [zone.area.right_bottom.x, zone.area.right_bottom.y]
@@ -204,14 +240,16 @@ export function onZonePress(playerIndex: PlayerIndex, position: MapPosition): vo
   storage.zones.grabs[playerIndex] = grab === undefined ? undefined : { ...grab, start: position }
 }
 
-export function renameZone(oldName: string, newName: string): void {
+/** Сменить имя; занятое другой зоной имя не принимается (false) — зона остаётся со старым. */
+export function renameZone(oldName: string, newName: string): boolean {
   const zone = storage.zones.byName[oldName]
-  if (zone === undefined || oldName === newName) return
-  removeZone(newName)
+  if (zone === undefined || oldName === newName) return true
+  if (storage.zones.byName[newName] !== undefined) return false
   storage.zones.byName[oldName] = undefined
   zone.name = newName
   if (zone.label.valid) zone.label.text = newName
   storage.zones.byName[newName] = zone
+  return true
 }
 
 function overlaps(a: BoundingBox, b: BoundingBox): boolean {
@@ -219,15 +257,23 @@ function overlaps(a: BoundingBox, b: BoundingBox): boolean {
 }
 
 export function registerZones(): void {
-  registerRenamer("zone", (target, name) => {
-    if (target.kind === "zone") renameZone(target.name, name)
+  registerRenamer("zone", (target, name, player) => {
+    if (target.kind !== "zone" || renameZone(target.name, name)) return
+    player.print(["automaton.zone-name-taken", name])
+    askName(player.index, target, name, ["automaton.zone-rename-note", target.name])
+  })
+  registerRemover("zone", (target) => {
+    if (target.kind === "zone") removeZone(target.name)
   })
   onEvent(defines.events.on_player_selected_area, (e) => {
     if (e.item !== PROGRAMMER) return
-    // Рамка начата у края или центра зоны — это правка зоны, а не новая.
-    const grab = storage.zones.grabs[e.player_index]
+    // Рамка начата у края или центра зоны — это правка зоны, а не новая; клик по зоне — её имя.
+    let grab = storage.zones.grabs[e.player_index]
     storage.zones.grabs[e.player_index] = undefined
-    if (grab !== undefined && storage.zones.byName[grab.zone]?.surface === e.surface) return dragZone(grab, e.area)
+    if (grab !== undefined && storage.zones.byName[grab.zone]?.surface !== e.surface) grab = undefined
+    const clicked = clickedZone(e.surface, e.area, grab)
+    if (clicked !== undefined) return askZoneName(e.player_index, clicked)
+    if (grab !== undefined) return dragZone(grab, e.area)
     const area: BoundingBox = {
       left_top: { x: math.floor(e.area.left_top.x), y: math.floor(e.area.left_top.y) },
       right_bottom: { x: math.ceil(e.area.right_bottom.x), y: math.ceil(e.area.right_bottom.y) },

@@ -1,6 +1,7 @@
 // Края зон (21.7): что схватило нажатие (край, угол, центр), куда двигается край по концу рамки (по клеткам, зона
-// не уже клетки), перенос за центр; find по зоне после правки — по новой рамке. Мышью — npm run test:sim.
-import { createZone, dragZone, findZone, grabAt, removeZone, ZoneGrab } from "../world/zones"
+// не уже клетки), перенос за центр; find по зоне после правки — по новой рамке. Клик по зоне (21.8): какая зона
+// открывается, переименование (занятое имя не принимается). Мышью — npm run test:sim.
+import { clickedZone, createZone, dragZone, findZone, grabAt, removeZone, renameZone, ZoneGrab } from "../world/zones"
 import { describe, expect, test } from "./testing"
 
 const [X, Y] = [1570, -1250]
@@ -57,5 +58,40 @@ describe("края зон", () => {
     expect(box("нести")).toBe("4,-2,14,4")
     expect((findZone("нести")!.box.left_top as { position?: { x: number } }).position?.x).toBe(X + 4)
     removeZone("нести")
+  })
+})
+
+describe("клик по зоне", () => {
+  test("клик внутри — зона (из вложенных — меньшая), по центральной ручке — тоже; рамка и клик у края — нет", () => {
+    const surface = game.get_surface("nauvis")!
+    createZone("большая", surface, area(X, Y, X + 10, Y + 6))
+    createZone("малая", surface, area(X + 1, Y + 1, X + 3, Y + 3))
+    const point = (x: number, y: number) => area(x, y, x, y)
+    expect(clickedZone(surface, point(X + 7.3, Y + 4.2), undefined)).toBe("большая")
+    expect(clickedZone(surface, point(X + 2.1, Y + 1.6), undefined)).toBe("малая")
+    expect(clickedZone(surface, point(X + 12, Y + 2), undefined)).toBe(undefined)
+    expect(clickedZone(surface, area(X + 6, Y + 2, X + 8.5, Y + 4), undefined)).toBe(undefined)
+    const center = grab(X + 5.1, Y + 2.9)!
+    expect(clickedZone(surface, selection(center.start, { x: X + 5.3, y: Y + 3.1 }), center)).toBe("большая")
+    expect(clickedZone(surface, selection(center.start, { x: X + 8, y: Y + 3 }), center)).toBe(undefined)
+    const edge = grab(X + 10.2, Y + 3)!
+    expect(clickedZone(surface, selection(edge.start, edge.start), edge)).toBe(undefined)
+    removeZone("большая")
+    removeZone("малая")
+  })
+
+  test("переименование: зона та же под новым именем, старого нет; имя другой зоны не принимается", () => {
+    const surface = game.get_surface("nauvis")!
+    createZone("имя-печи", surface, area(X, Y, X + 4, Y + 4))
+    createZone("имя-склад", surface, area(X + 6, Y, X + 8, Y + 2))
+    expect(renameZone("имя-печи", "имя-плавильня")).toBe(true)
+    expect(findZone("имя-печи")).toBe(undefined)
+    expect(box("имя-плавильня")).toBe("0,0,4,4")
+    expect(findZone("имя-плавильня")!.label.text).toBe("имя-плавильня")
+    expect(renameZone("имя-плавильня", "имя-склад")).toBe(false)
+    expect(box("имя-плавильня")).toBe("0,0,4,4")
+    expect(box("имя-склад")).toBe("6,0,8,2")
+    removeZone("имя-плавильня")
+    removeZone("имя-склад")
   })
 })
