@@ -1,4 +1,15 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.9.2
+Date: 2026-10-13
+  Bugfixes:
+    - Workshop: a Variable switched to the item type kept "0" from the number type, and the program stopped at start with "unknown item 0". The initial value now follows the type — an item or fluid is picked from the list, yes/no is a checkbox — and resets when the type changes; an item or fluid given as a number, or a missing item, fluid, marker or zone name, is an error on the node.
+  Changes:
+    - Workshop: variables can be markers, zones and fluids (a marker is given by its name).
+    - The Parameter node is now Machine parameter and sits in the Variables section next to Variable. The windows of both nodes say where the value comes from: only Machine parameter reads the Parameters field of the machine window.
+  Info:
+    - Telegram group for questions, ideas and bug reports: https://t.me/+fny1wzyAGN1lNTAy
+
+---------------------------------------------------------------------------------------------------
 Version: 0.9.1
 Date: 2026-10-13
   Features:
