@@ -129,8 +129,9 @@ chest.extract("coal", 10)                               // D
 ## Базовые типы
 
 ```ts
-type Item = string;      // "iron-ore", "iron-plate", ...
-type Fluid = string;     // "water", "crude-oil", ...
+type Item = string;      // "iron-ore", "iron-plate", … — словарь имён: docs/NAMES.md @en "iron-ore", "iron-plate", … — the names: docs/en/NAMES.md
+type Fluid = string;     // "water", "crude-oil", … @en "water", "crude-oil", …
+type BuildingName = string; // имя здания: "stone-furnace", … @en a building name: "stone-furnace", …
 type Position = { x: number; y: number };
 type Area = { from: Position; to: Position };
 type Direction = "north" | "east" | "south" | "west";
@@ -1129,12 +1130,12 @@ declare const scan: {
    * Здания рядом. С kind — только этого класса и сразу с его методами: scan.buildings({ kind: Furnace }) → Furnace[].
    * @en Buildings nearby. With kind — only of that class and right away with its methods: scan.buildings({ kind: Furnace }) → Furnace[].
    */
-  buildings<T extends Building = Building>(filter?: { kind?: BuildingKind<T>; name?: string | string[]; radius?: number }): T[];
+  buildings<T extends Building = Building>(filter?: { kind?: BuildingKind<T>; name?: BuildingName | BuildingName[]; radius?: number }): T[];
   /**
    * Призраки зданий своей команды рядом — чертёж, положенный игроком. С name — только этих зданий.
    * @en Ghosts of your team's buildings nearby — a blueprint placed by a player. With name — only of those buildings.
    */
-  ghosts(filter?: { name?: string | string[]; radius?: number }): Ghost[];
+  ghosts(filter?: { name?: BuildingName | BuildingName[]; radius?: number }): Ghost[];
   /**
    * Помеченное к сносу рядом (планировщиком сноса): здания своей команды — разобрать deconstruct(), деревья и скалы — me.mine.
    * @en Things marked for deconstruction nearby (with a deconstruction planner): your team's buildings — deconstruct() them, trees and rocks — me.mine.
@@ -1258,12 +1259,12 @@ declare class Zone {
    * Здания класса в зоне (и, если задано, с этим именем): zone("плавильня").find(Furnace) → Furnace[].
    * @en Buildings of the class in the zone (and with this name, if given): zone("smelter").find(Furnace) → Furnace[].
    */
-  find<T extends Building>(kind: BuildingKind<T>, name?: string | string[]): T[];
+  find<T extends Building>(kind: BuildingKind<T>, name?: BuildingName | BuildingName[]): T[];
   /**
    * Здания в зоне с этим именем ("stone-furnace") или все.
    * @en Buildings in the zone with this name ("stone-furnace"), or all of them.
    */
-  find(name?: string | string[]): Building[];
+  find(name?: BuildingName | BuildingName[]): Building[];
 }
 
 declare const map: {

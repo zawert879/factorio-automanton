@@ -3,13 +3,15 @@
 // объявление в цвете, описание и пример раздела. «Выделить пример» — текст примера выделен для Ctrl+C (курсор
 // в поле ввода игра не сообщает, вставить «в место курсора» нельзя). Язык — игрока: данные из docs/API.md
 // на русском и английском (tools/dts/generate.mjs → help.generated.ts).
-import { FrameGuiElement, LocalisedString, LuaGuiElement, LuaPlayer, ListBoxGuiElement, ScrollPaneGuiElement, TextBoxGuiElement, TextFieldGuiElement } from "factorio:runtime"
+import { FrameGuiElement, LocalisedString, LuaForce, LuaGuiElement, LuaPlayer, ListBoxGuiElement, ScrollPaneGuiElement, TextBoxGuiElement, TextFieldGuiElement } from "factorio:runtime"
 import { onEvent } from "../events"
 import { mapCase, trim } from "../lang/runtime/strings"
 import { HELP_INPUT, HELP_SHORTCUT } from "../names"
 import { addCode } from "./codeView"
 import { guiOf, onGuiChange, onGuiClick, onGuiSelection, titlebar } from "./common"
 import { FIRST_PROGRAM, HELP, HelpEntry } from "./help.generated"
+import { available, nameCategories } from "./dictionary"
+import { NAME_TITLES } from "./names.generated"
 import { FOLDER_COLOR } from "./tree"
 
 const FRAME = "automaton-help"
@@ -17,7 +19,8 @@ const LIST_WIDTH = 240
 const PAGE_WIDTH = 660
 const HEIGHT = 580
 
-type HelpItem = { page: "first-steps" | "errors" } | { section: number; entry?: number }
+/** Запись списка: страница, раздел API (или его функция), раздел «Имена» и его категория (с именем — найденное поиском). */
+type HelpItem = { page: "first-steps" | "errors" | "names" } | { section: number; entry?: number } | { category: string; name?: string }
 
 export interface HelpWindow {
   frame: FrameGuiElement
@@ -30,7 +33,12 @@ export interface HelpWindow {
   /** Пример открытой страницы: блок в цвете и поле для Ctrl+C. */
   exampleView?: LuaGuiElement
   exampleBox?: TextBoxGuiElement
+  /** Раздел «Имена» (24.1): поле с именем для Ctrl+C. */
+  copyField?: TextFieldGuiElement
 }
+
+/** Найденных имён в списке поиска — не больше. */
+const MAX_NAME_RESULTS = 40
 
 function windowOf(player: LuaPlayer): HelpWindow | undefined {
   const window = guiOf(player).help
@@ -110,6 +118,13 @@ function refreshList(window: HelpWindow): void {
         captions.push(`    ${entry.name}`)
       })
     })
+    // Словарь имён (24.1): классы зданий, группы предметов, жидкости.
+    items.push({ page: "names" })
+    captions.push(header(["automaton-help.names"]))
+    for (const category of nameCategories()) {
+      items.push({ category: category.key })
+      captions.push(["", "    ", category.caption])
+    }
   } else {
     const found: { s: number; e: number; score: number }[] = []
     HELP.forEach((section, s) => section.entries.forEach((entry, e) => {
@@ -120,6 +135,19 @@ function refreshList(window: HelpWindow): void {
     for (const { s, e } of found) {
       items.push({ section: s, entry: e })
       captions.push(["", `${HELP[s].entries[e].name}  [color=#a9a9a9]`, HELP[s].title[window.lang], "[/color]"])
+    }
+    // Имена: по внутреннему имени и по названию (русскому и английскому — для базовой игры).
+    let names = 0
+    for (const category of nameCategories()) {
+      for (const row of category.rows) {
+        if (names >= MAX_NAME_RESULTS) break
+        const titles = NAME_TITLES[row.name]
+        const match = mapCase(row.name, false).includes(query) || (titles !== undefined && titles.some((t) => mapCase(t, false).includes(query)))
+        if (!match) continue
+        items.push({ category: category.key, name: row.name })
+        captions.push(["", row.title, `  [color=#a9a9a9]${row.name}[/color]`])
+        names++
+      }
     }
   }
   window.items = items
@@ -166,6 +194,8 @@ function showItem(window: HelpWindow, index: number): void {
   window.page.clear()
   window.exampleView = undefined
   window.exampleBox = undefined
+  window.copyField = undefined
+  if ("category" in item) return showNames(window, item.category, item.name)
   if ("page" in item) {
     title(window, [`automaton-help.${item.page}`])
     paragraph(window, [`automaton-help.${item.page}-text`])
@@ -182,6 +212,37 @@ function showItem(window: HelpWindow, index: number): void {
       if (entry.doc[window.lang] !== "") paragraph(window, entry.doc[window.lang])
     }
     if (section.example !== undefined) example(window, ["automaton-help.section-example", section.title[window.lang]], section.example)
+  }
+  window.page.scroll_to_top()
+}
+
+/** Страница категории словаря: подсказка, поле для Ctrl+C и строки — значок, название, имя (клик — в поле). */
+function showNames(window: HelpWindow, key: string, selected: string | undefined): void {
+  const category = nameCategories().find((c) => c.key === key)
+  if (category === undefined) return
+  title(window, category.caption)
+  const [cls] = string.match(key, "^class:(.+)$")
+  paragraph(window, cls !== undefined ? ["automaton-help.names-class", cls === "Building" ? "Building" : cls] : key === "fluids" ? ["automaton-help.names-fluids-hint"] : ["automaton-help.names-items-hint"])
+  const copyRow = window.page.add({ type: "flow", direction: "horizontal" })
+  copyRow.style.vertical_align = "center"
+  copyRow.add({ type: "label", caption: ["automaton-help.names-copy"], style: "bold_label" })
+  const field = copyRow.add({ type: "textfield", text: selected ?? "" })
+  field.style.width = 260
+  window.copyField = field
+  const rows = window.page.add({ type: "table", column_count: 3 })
+  rows.style.vertical_spacing = 2
+  rows.style.horizontal_spacing = 10
+  const force = window.frame.gui.player.force as LuaForce
+  for (const row of category.rows) {
+    rows.add({ type: "sprite", sprite: helpers.is_valid_sprite_path(row.sprite) ? row.sprite : "utility/questionmark" })
+    const label = rows.add({ type: "label", caption: row.title, style: row.name === selected ? "bold_label" : "label" })
+    // Ещё не открыто исследованием команды — серым.
+    if (!available(force, row.name)) label.style.font_color = { r: 0.55, g: 0.55, b: 0.55 }
+    rows.add({ type: "button", caption: row.name, style: "list_box_item", tags: { action: "help-name", name: row.name } })
+  }
+  if (selected !== undefined) {
+    field.focus()
+    field.select_all()
   }
   window.page.scroll_to_top()
 }
@@ -207,6 +268,14 @@ export function registerHelpWindow(): void {
     const window = windowOf(player)
     const index = (element as ListBoxGuiElement).selected_index
     if (window !== undefined && index > 0) showItem(window, index - 1)
+  })
+  onGuiClick("help-name", (player, element) => {
+    const window = windowOf(player)
+    const name = (element.tags as { name?: string }).name
+    if (window?.copyField === undefined || !window.copyField.valid || name === undefined) return
+    window.copyField.text = name
+    window.copyField.focus()
+    window.copyField.select_all()
   })
   onGuiClick("help-select-example", (player) => {
     const window = windowOf(player)

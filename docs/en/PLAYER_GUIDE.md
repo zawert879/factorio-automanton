@@ -9,7 +9,8 @@ You build the factory from routes and algorithms instead of belts: "drive to the
 
 References: [API.md](../API.md) — every machine function (in Russian; with the game in English the same descriptions
 are in the in-game help, F1, and in the VS Code types), [LANGUAGE.md](LANGUAGE.md) — the language and how it differs
-from JavaScript, [VSCODE.md](VSCODE.md) — writing programs in VS Code.
+from JavaScript, [VSCODE.md](VSCODE.md) — writing programs in VS Code, [NAMES.md](NAMES.md) — the names of buildings
+(by class), items and fluids for programs (in the game — help F1, section Names; VS Code suggests them as you type).
 
 - [The first 15 minutes](#the-first-15-minutes)
 - [The machine and its window](#the-machine-and-its-window)

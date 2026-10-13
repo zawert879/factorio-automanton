@@ -14,6 +14,7 @@ tests/lang/examples.generated.ts
 # создаются tools/dts/generate.mjs из docs/API.md и examples/
 src/gui/dts.generated.ts
 src/gui/help.generated.ts
+src/gui/names.generated.ts
 mod/automaton.d.ts
 mod/automaton.en.d.ts
 src/program/examples.generated.ts

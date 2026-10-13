@@ -77,8 +77,13 @@ export function buildingClass(entity: LuaEntity): string {
   if (isTree(entity)) return "Tree"
   if (isRock(entity)) return "Rock"
   if (entity.type === "entity-ghost" || entity.type === "tile-ghost") return "Ghost"
-  if (entity.name === CHARGING_STATION) return "ChargingStation"
-  return CLASS_BY_TYPE[entity.type] ?? "Building"
+  return classOfPrototype(entity.type, entity.name)
+}
+
+/** Класс здания по прототипу (тип и имя): станция зарядки — по имени, остальное — по типу (словарь имён, 24.1). */
+export function classOfPrototype(type: string, name: string): string {
+  if (name === CHARGING_STATION) return "ChargingStation"
+  return CLASS_BY_TYPE[type] ?? "Building"
 }
 
 /**

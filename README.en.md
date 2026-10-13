@@ -66,6 +66,7 @@ while (true) {
 | [Player guide](docs/en/PLAYER_GUIDE.md) | Getting started, the language in five minutes, recipes, progression, debugging |
 | [Machine API](docs/API.md) (in Russian) | All functions and objects for programs (with the game in English, the in-game help (F1) and the VS Code types describe them in English) |
 | [Language](docs/en/LANGUAGE.md) | What is supported, differences from JavaScript, type checking |
+| [Names](docs/en/NAMES.md) | Building (by class), item and fluid names for programs |
 | [VS Code](docs/en/VSCODE.md) | Writing programs in VS Code and publishing on save |
 | [Design](docs/DESIGN.md) (in Russian) | Decisions, scale, balance |
 

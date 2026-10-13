@@ -4,6 +4,8 @@
 //   выражения, == …) — те же, что даст игра при публикации (docs/LANGUAGE.md, «Не поддерживается»).
 // - Подсказки о времени (docs/API.md, «Время программы»): наведите на for / while — цена витка и сколько
 //   тиков займёт цикл с известным числом витков; на radio.publish, sort, map, JSON.parse — цена вызова.
+// - Имя не из словаря (24.1): строка там, где ждут предмет, жидкость или здание (Item, Fluid, BuildingName),
+//   которой нет в игре, — предупреждение и похожее имя («iron-plat» → «iron-plate»).
 "use strict"
 
 /** Квант рабочих моделей (src/names.ts, quantum). */
@@ -29,6 +31,7 @@ const WAITING_METHODS = new Set([
 
 const TEXT = {
   ru: {
+    unknownName: (name, near) => `«${name}» — такого имени в игре нет (словарь — docs/NAMES.md, в игре — справка F1, «Имена»)` + (near ? `. Может быть, «${near}»?` : ""),
     unsupported: "Не поддерживается в программах машин: ",
     features: {
       var: "var — используйте let или const",
@@ -77,6 +80,7 @@ const TEXT = {
     },
   },
   en: {
+    unknownName: (name, near) => `"${name}" — there is no such name in the game (the list: docs/en/NAMES.md, in the game — help F1, Names)` + (near ? `. Did you mean "${near}"?` : ""),
     unsupported: "Not supported in robot programs: ",
     features: {
       var: "var — use let or const",
@@ -129,6 +133,63 @@ const TEXT = {
 const EACH = new Set(["forEach", "map", "filter", "find", "findIndex", "findLast", "findLastIndex", "some", "every", "reduce", "reduceRight", "flatMap"])
 const DIAGNOSTIC_CODE = 9400
 const SUGGESTION_CODE = 9401
+const NAME_CODE = 9402
+
+/**
+ * Имена словаря, которые ждёт место строки (24.1): объединение строк с хвостом (string & {}) — так объявлены Item,
+ * Fluid и BuildingName в automaton.d.ts. Закрытые объединения (Direction) проверяет сам TypeScript.
+ */
+function dictionaryNames(ts, type) {
+  if (!type) return undefined
+  const names = new Set()
+  let open = false
+  for (const part of type.isUnion() ? type.types : [type]) {
+    if (part.isStringLiteral()) names.add(part.value)
+    else if (part.isIntersection() && part.types.some((t) => (t.flags & ts.TypeFlags.String) !== 0)) open = true
+  }
+  return open && names.size > 0 ? names : undefined
+}
+
+/** Самое похожее имя (расстояние Левенштейна — не больше трети длины), чтобы подсказать опечатку. */
+function closest(name, names) {
+  let best
+  let bestDistance = Math.max(2, Math.floor(name.length / 3)) + 1
+  for (const candidate of names) {
+    const d = distance(name, candidate, bestDistance)
+    if (d < bestDistance) {
+      best = candidate
+      bestDistance = d
+    }
+  }
+  return best
+}
+
+function distance(a, b, limit) {
+  if (Math.abs(a.length - b.length) >= limit) return limit
+  let prev = Array.from({ length: b.length + 1 }, (_, i) => i)
+  for (let i = 1; i <= a.length; i++) {
+    const row = [i]
+    for (let j = 1; j <= b.length; j++) row.push(Math.min(prev[j] + 1, row[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)))
+    prev = row
+  }
+  return prev[b.length]
+}
+
+/** Строки-имена, которых нет в словаре: где, что и похожее имя. */
+function unknownNames(ts, sourceFile, checker) {
+  const result = []
+  const visit = (node) => {
+    if (ts.isStringLiteral(node)) {
+      const names = dictionaryNames(ts, checker.getContextualType(node))
+      if (names !== undefined && !names.has(node.text)) {
+        result.push({ start: node.getStart(sourceFile), length: node.getWidth(sourceFile), name: node.text, near: closest(node.text, names) })
+      }
+    }
+    ts.forEachChild(node, visit)
+  }
+  visit(sourceFile)
+  return result
+}
 
 function plural(n, one, few, many) {
   const m10 = n % 10
@@ -368,6 +429,7 @@ function init(modules) {
       const sf = ours(fileName) ? source(fileName) : undefined
       if (!sf) return prior
       const t = TEXT[lang]
+      const checker = ls.getProgram()?.getTypeChecker()
       return prior.concat(
         unsupported(ts, sf).map((u) => ({
           file: sf,
@@ -376,6 +438,15 @@ function init(modules) {
           messageText: t.unsupported + (t.features[u.feature] ?? u.feature),
           category: ts.DiagnosticCategory.Error,
           code: DIAGNOSTIC_CODE,
+          source: "automaton",
+        })),
+        (checker === undefined ? [] : unknownNames(ts, sf, checker)).map((u) => ({
+          file: sf,
+          start: u.start,
+          length: u.length,
+          messageText: t.unknownName(u.name, u.near),
+          category: ts.DiagnosticCategory.Warning,
+          code: NAME_CODE,
           source: "automaton",
         })),
       )
@@ -432,4 +503,4 @@ function init(modules) {
 
 module.exports = init
 /** Для тестов (tools/test/tsplugin.mjs). */
-module.exports.internals = { unsupported, iterations, loopHint, callCost, WAITING, WAITING_METHODS, QUANTA }
+module.exports.internals = { unsupported, iterations, loopHint, callCost, unknownNames, WAITING, WAITING_METHODS, QUANTA }

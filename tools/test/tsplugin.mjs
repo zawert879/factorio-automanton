@@ -11,7 +11,7 @@ export function checkTsPlugin(root) {
   const problems = []
   const require = createRequire(import.meta.url)
   const plugin = require(join(root, "mod", "tools", "automaton-ts-plugin.js"))
-  const { unsupported, iterations, loopHint, callCost, WAITING, WAITING_METHODS } = plugin.internals
+  const { unsupported, iterations, loopHint, callCost, unknownNames, WAITING, WAITING_METHODS } = plugin.internals
   const sourceOf = (code) => ts.createSourceFile("x.ts", code, ts.ScriptTarget.ES2020, true)
   const features = (code) => unsupported(ts, sourceOf(code)).map((u) => u.feature).sort().join(",")
   const expect = (what, got, want) => {
@@ -39,6 +39,34 @@ export function checkTsPlugin(root) {
       expect(`${doc} #${i}`, features(m[1]), "")
     }
   }
+
+  // Имена не из словаря (24.1): опечатка — предупреждение и похожее имя; верные имена, имена в массиве и не-имена — нет.
+  const namesDir = mkdtempSync(join(tmpdir(), "automaton-names-"))
+  writeFileSync(join(namesDir, "automaton.d.ts"), readFileSync(join(root, "mod", "automaton.d.ts")))
+  writeFileSync(
+    join(namesDir, "x.ts"),
+    `const chest = scan.buildings({ kind: Chest, name: ["wooden-chest", "iron-chst"] })[0]\n` +
+      `chest.extract("iron-plat")\nchest.extract("copper-plate")\nzone("плавильня").find("stone-furnace")\nprint("iron-plat")\n`,
+  )
+  const program = ts.createProgram([join(namesDir, "x.ts"), join(namesDir, "automaton.d.ts")], { strict: true, target: ts.ScriptTarget.ES2020, noEmit: true, moduleDetection: ts.ModuleDetectionKind.Force })
+  const unknown = unknownNames(ts, program.getSourceFile(join(namesDir, "x.ts")), program.getTypeChecker())
+  expect("имена не из словаря", unknown.map((u) => `${u.name}>${u.near}`).join(","), "iron-chst>iron-chest,iron-plat>iron-plate")
+  // В примерах и документации все имена — из словаря.
+  const samples = []
+  for (const file of readdirSync(join(root, "examples")).filter((f) => f.endsWith(".ts"))) samples.push([`examples/${file}`, readFileSync(join(root, "examples", file), "utf8")])
+  for (const doc of ["docs/API.md", "docs/PLAYER_GUIDE.md", "README.md", "docs/en/PLAYER_GUIDE.md", "README.en.md"]) {
+    let i = 0
+    for (const m of readFileSync(join(root, doc), "utf8").matchAll(/```ts\n([\s\S]*?)```/g)) {
+      i++
+      if (!isDeclarationBlock(m[1])) samples.push([`${doc} #${i}`, m[1]])
+    }
+  }
+  samples.forEach(([name, code], i) => writeFileSync(join(namesDir, `s${i}.ts`), code))
+  const all = ts.createProgram([...samples.map((_, i) => join(namesDir, `s${i}.ts`)), join(namesDir, "automaton.d.ts")], { strict: true, target: ts.ScriptTarget.ES2020, noEmit: true, moduleDetection: ts.ModuleDetectionKind.Force, noResolve: true })
+  samples.forEach(([name], i) => {
+    const found = unknownNames(ts, all.getSourceFile(join(namesDir, `s${i}.ts`)), all.getTypeChecker())
+    expect(`имена в ${name}`, found.map((u) => u.name).join(","), "")
+  })
 
   // Число витков и тики.
   const loopOf = (code) => sourceOf(code).statements[0]

@@ -9,7 +9,7 @@ import { Diagnostic } from "./lexer"
 import { ExportTarget, ModuleUnit } from "./modules"
 import { parse } from "./parser"
 import { STDLIB } from "./stdlib"
-import { DTS } from "../gui/dts.generated"
+import { DTS_CHECK as DTS } from "../gui/dts.generated"
 import {
   ANY,
   BOOLEAN,

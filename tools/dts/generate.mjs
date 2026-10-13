@@ -94,8 +94,41 @@ function localize(text, lang) {
     return `// ${lang === "en" ? comment.slice(at + 5) : comment.slice(0, at)}`
   })
 }
-const dts = header + "\n" + localize(declarations.join("\n"), "ru")
-const dtsEn = headerEn + "\n" + localize(declarations.join("\n"), "en")
+/**
+ * Словарь имён (24.1, tools/names/names.json — npm run names): в типах для VS Code Item, Fluid и BuildingName —
+ * списки имён базовой игры (VS Code подсказывает их при наборе), с хвостом (string & {}) — имена других модов тоже
+ * годятся. Проверке типов в игре — без списков (DTS_CHECK): там они только замедлили бы разбор.
+ */
+const namesFile = join(root, "tools", "names", "names.json")
+const names = existsSync(namesFile) ? JSON.parse(readFileSync(namesFile, "utf8")) : { buildings: [], items: [], fluids: [] }
+function withNames(text, lang) {
+  const union = (type, list, doc) => {
+    if (list.length === 0) return undefined
+    const lines = list.map((n) => `  | ${JSON.stringify(n.name)} // ${n[lang]}`)
+    return [`/** ${doc} */`, `type ${type} =`, ...lines, "  | (string & {});"].join("\n")
+  }
+  const docs = {
+    ru: {
+      Item: "Предмет — внутреннее имя игры. Словарь — docs/NAMES.md, в игре — справка F1, «Имена»; имена других модов тоже можно.",
+      Fluid: "Жидкость — внутреннее имя игры.",
+      BuildingName: "Имя здания (zone(…).find, scan.buildings). Словарь по классам — docs/NAMES.md.",
+    },
+    en: {
+      Item: "An item — the game's internal name. The list is in docs/en/NAMES.md, in the game — help F1, Names; names from other mods work too.",
+      Fluid: "A fluid — the game's internal name.",
+      BuildingName: "A building name (zone(…).find, scan.buildings). The list by class is in docs/en/NAMES.md.",
+    },
+  }[lang]
+  let result = text
+  for (const [type, list] of [["Item", names.items], ["Fluid", names.fluids], ["BuildingName", names.buildings]]) {
+    const replacement = union(type, list, docs[type])
+    if (replacement !== undefined) result = result.replace(new RegExp(`^type ${type} = string;.*$`, "m"), replacement)
+  }
+  return result
+}
+const plainDts = header + "\n" + localize(declarations.join("\n"), "ru")
+const dts = withNames(plainDts, "ru")
+const dtsEn = withNames(headerEn + "\n" + localize(declarations.join("\n"), "en"), "en")
 writeFileSync(join(root, "mod", "automaton.d.ts"), dts)
 writeFileSync(join(root, "mod", "automaton.en.d.ts"), dtsEn)
 // Справка в игре (18.5): разделы docs/API.md с объявлениями → записи (объявление верхнего уровня: имя, текст,
@@ -225,12 +258,23 @@ writeFileSync(
   join(root, "src", "gui", "dts.generated.ts"),
   "// Создаётся tools/dts/generate.mjs из docs/API.md — не править руками.\n" +
     `export const DTS = ${JSON.stringify(dts)}\n` +
+    // Проверке типов в игре — без списков имён (они нужны только подсказкам VS Code).
+    `export const DTS_CHECK = ${JSON.stringify(plainDts)}\n` +
     `export const DTS_EN = ${JSON.stringify(dtsEn)}\n` +
     `export const TSCONFIG = ${JSON.stringify(tsconfig)}\n` +
     `export const SYNC_TOOL = ${JSON.stringify(tool)}\n` +
     `export const TS_PLUGIN = ${JSON.stringify(tsPlugin)}\n` +
     // Версия утилиты: игра отклоняет запросы утилиты другой версии (запущенной до обновления мода).
     `export const SYNC_TOOL_HASH = ${JSON.stringify(createHash("sha1").update(tool).digest("hex").slice(0, 12))}\n`,
+)
+
+// Названия имён для поиска в справке (раздел «Имена»): имя → [русский, английский].
+const titles = {}
+for (const n of [...names.buildings, ...names.items, ...names.fluids]) titles[n.name] ??= [n.ru, n.en]
+writeFileSync(
+  join(root, "src", "gui", "names.generated.ts"),
+  "// Создаётся tools/dts/generate.mjs из tools/names/names.json (npm run names) — не править руками.\n" +
+    `export const NAME_TITLES: Record<string, [string, string] | undefined> = ${JSON.stringify(titles)}\n`,
 )
 
 const programs = readdirSync(join(root, "examples"))

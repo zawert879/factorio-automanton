@@ -144,7 +144,8 @@ onEvent(defines.events.on_object_destroyed, (e) => {
 // automaton-bench-machines — стресс-тест машин с программами (npm run bench:machines),
 // automaton-build-science — сохранение с демо-фабрикой науки (npm run demo:science),
 // automaton-record — анимации для документации (npm run docs:record),
-// automaton-graph-shots — схемы примеров и их работа (npm run shot:graphs).
+// automaton-graph-shots — схемы примеров и их работа (npm run shot:graphs),
+// automaton-names — выгрузка имён зданий, предметов и жидкостей (npm run names).
 // Имя модуля — через переменную: TSTL не ищет его заранее, а в zip мода папки test/ нет (package.ignore).
 const testModule =
   script.active_mods["automaton-test"] !== undefined
@@ -165,7 +166,9 @@ const testModule =
                   ? "test.record"
                   : script.active_mods["automaton-graph-shots"] !== undefined
                     ? "test.graphShots"
-                    : undefined
+                    : script.active_mods["automaton-names"] !== undefined
+                      ? "test.namesDump"
+                      : undefined
 if (testModule !== undefined) {
   require(testModule)
 }

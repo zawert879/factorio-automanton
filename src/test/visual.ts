@@ -385,9 +385,15 @@ for (let x = 10; x < 86; x++) c.pixel(x, 54, x % 2 === 0 ? "green" : "red")`,
     const player = game.get_player(1 as PlayerIndex)
     if (player !== undefined) exitWorkshop(player)
   }
+  // Словарь имён (24.1): поиск «печь» в справке — найденные имена, страница класса Furnace с выбранным именем.
+  if (tick === 311) {
+    const player = game.get_player(1 as PlayerIndex)
+    if (player !== undefined) openHelp(player, "печь")
+  }
+  if (tick === 312) guiShot("help-names")
   // Дерево технологий (этап 6): технологии автоматонов на месте «Логистики». Экран технологий в одиночной
   // игре ставит её на паузу — поэтому снимок последний, в том же тике (shot.mjs ждёт файлы ещё пару секунд).
-  if (tick === 312) {
+  if (tick === 316) {
     const player = game.get_player(1 as PlayerIndex)
     if (player !== undefined) {
       player.opened = undefined

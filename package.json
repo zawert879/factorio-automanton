@@ -23,7 +23,8 @@
     "demo:science": "node tools/demo/science.mjs",
     "docs:record": "node tools/docs/record.mjs",
     "bench:scale": "node tools/bench/scale.mjs",
-    "test:sim": "node tools/test/sim.mjs && node tools/test/sim-workshop.mjs && node tools/test/sim-zones.mjs"
+    "test:sim": "node tools/test/sim.mjs && node tools/test/sim-workshop.mjs && node tools/test/sim-zones.mjs",
+    "names": "node tools/names/generate.mjs"
   },
   "devDependencies": {
     "gifenc": "^1.0.3",

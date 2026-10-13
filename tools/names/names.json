@@ -1,0 +1,1564 @@
+{
+ "version": "0.9.0",
+ "buildings": [
+  {
+   "name": "wooden-chest",
+   "class": "Chest",
+   "ru": "Деревянный сундук",
+   "en": "Wooden chest"
+  },
+  {
+   "name": "iron-chest",
+   "class": "Chest",
+   "ru": "Железный сундук",
+   "en": "Iron chest"
+  },
+  {
+   "name": "steel-chest",
+   "class": "Chest",
+   "ru": "Стальной сундук",
+   "en": "Steel chest"
+  },
+  {
+   "name": "stone-furnace",
+   "class": "Furnace",
+   "ru": "Каменная печь",
+   "en": "Stone furnace"
+  },
+  {
+   "name": "steel-furnace",
+   "class": "Furnace",
+   "ru": "Стальная печь",
+   "en": "Steel furnace"
+  },
+  {
+   "name": "electric-furnace",
+   "class": "Furnace",
+   "ru": "Электрическая печь",
+   "en": "Electric furnace"
+  },
+  {
+   "name": "assembling-machine-1",
+   "class": "Assembler",
+   "ru": "Сборочный автомат 1",
+   "en": "Assembling machine 1"
+  },
+  {
+   "name": "assembling-machine-2",
+   "class": "Assembler",
+   "ru": "Сборочный автомат 2",
+   "en": "Assembling machine 2"
+  },
+  {
+   "name": "assembling-machine-3",
+   "class": "Assembler",
+   "ru": "Сборочный автомат 3",
+   "en": "Assembling machine 3"
+  },
+  {
+   "name": "oil-refinery",
+   "class": "Assembler",
+   "ru": "Нефтеперерабатывающий завод",
+   "en": "Oil refinery"
+  },
+  {
+   "name": "chemical-plant",
+   "class": "Assembler",
+   "ru": "Химический завод",
+   "en": "Chemical plant"
+  },
+  {
+   "name": "centrifuge",
+   "class": "Assembler",
+   "ru": "Центрифуга",
+   "en": "Centrifuge"
+  },
+  {
+   "name": "rocket-silo",
+   "class": "RocketSilo",
+   "ru": "Ракетная шахта",
+   "en": "Rocket silo"
+  },
+  {
+   "name": "lab",
+   "class": "Lab",
+   "ru": "Лаборатория",
+   "en": "Lab"
+  },
+  {
+   "name": "beacon",
+   "class": "Beacon",
+   "ru": "Маяк",
+   "en": "Beacon"
+  },
+  {
+   "name": "boiler",
+   "class": "Boiler",
+   "ru": "Бойлер",
+   "en": "Boiler"
+  },
+  {
+   "name": "heat-exchanger",
+   "class": "Boiler",
+   "ru": "Теплообменник",
+   "en": "Heat exchanger"
+  },
+  {
+   "name": "steam-engine",
+   "class": "Generator",
+   "ru": "Паровой двигатель",
+   "en": "Steam engine"
+  },
+  {
+   "name": "steam-turbine",
+   "class": "Generator",
+   "ru": "Паровая турбина",
+   "en": "Steam turbine"
+  },
+  {
+   "name": "nuclear-reactor",
+   "class": "Reactor",
+   "ru": "Ядерный реактор",
+   "en": "Nuclear reactor"
+  },
+  {
+   "name": "storage-tank",
+   "class": "StorageTank",
+   "ru": "Резервуар",
+   "en": "Storage tank"
+  },
+  {
+   "name": "pipe",
+   "class": "Pipe",
+   "ru": "Труба",
+   "en": "Pipe"
+  },
+  {
+   "name": "pipe-to-ground",
+   "class": "Pipe",
+   "ru": "Подземная труба",
+   "en": "Pipe to ground"
+  },
+  {
+   "name": "pump",
+   "class": "Pipe",
+   "ru": "Помпа",
+   "en": "Pump"
+  },
+  {
+   "name": "gun-turret",
+   "class": "Turret",
+   "ru": "Пулемётная турель",
+   "en": "Gun turret"
+  },
+  {
+   "name": "artillery-turret",
+   "class": "Turret",
+   "ru": "Артиллерийское орудие",
+   "en": "Artillery turret"
+  },
+  {
+   "name": "flamethrower-turret",
+   "class": "FlameTurret",
+   "ru": "Огнемётная турель",
+   "en": "Flamethrower turret"
+  },
+  {
+   "name": "cargo-wagon",
+   "class": "CargoWagon",
+   "ru": "Грузовой вагон",
+   "en": "Cargo wagon"
+  },
+  {
+   "name": "fluid-wagon",
+   "class": "FluidWagon",
+   "ru": "Вагон-цистерна",
+   "en": "Fluid wagon"
+  },
+  {
+   "name": "locomotive",
+   "class": "Locomotive",
+   "ru": "Локомотив",
+   "en": "Locomotive"
+  },
+  {
+   "name": "car",
+   "class": "Vehicle",
+   "ru": "Автомобиль",
+   "en": "Car"
+  },
+  {
+   "name": "tank",
+   "class": "Vehicle",
+   "ru": "Танк",
+   "en": "Tank"
+  },
+  {
+   "name": "spidertron",
+   "class": "Vehicle",
+   "ru": "Паукотрон",
+   "en": "Spidertron"
+  },
+  {
+   "name": "automaton-charging-station",
+   "class": "ChargingStation",
+   "ru": "Зарядная станция автоматонов",
+   "en": "Automaton charging station"
+  },
+  {
+   "name": "small-electric-pole",
+   "class": "Building",
+   "ru": "Деревянная опора ЛЭП",
+   "en": "Small electric pole"
+  },
+  {
+   "name": "medium-electric-pole",
+   "class": "Building",
+   "ru": "Средняя опора ЛЭП",
+   "en": "Medium electric pole"
+  },
+  {
+   "name": "big-electric-pole",
+   "class": "Building",
+   "ru": "Большая опора ЛЭП",
+   "en": "Big electric pole"
+  },
+  {
+   "name": "substation",
+   "class": "Building",
+   "ru": "Подстанция",
+   "en": "Substation"
+  },
+  {
+   "name": "straight-rail",
+   "class": "Building",
+   "ru": "Прямые рельсы",
+   "en": "Straight rail"
+  },
+  {
+   "name": "half-diagonal-rail",
+   "class": "Building",
+   "ru": "Полудиагональные рельсы",
+   "en": "Half diagonal rail"
+  },
+  {
+   "name": "curved-rail-a",
+   "class": "Building",
+   "ru": "Изогнутые рельсы",
+   "en": "Curved rail"
+  },
+  {
+   "name": "curved-rail-b",
+   "class": "Building",
+   "ru": "Изогнутые рельсы",
+   "en": "Curved rail"
+  },
+  {
+   "name": "train-stop",
+   "class": "Building",
+   "ru": "Железнодорожная станция",
+   "en": "Train stop"
+  },
+  {
+   "name": "rail-signal",
+   "class": "Building",
+   "ru": "Ж/д светофор",
+   "en": "Rail signal"
+  },
+  {
+   "name": "rail-chain-signal",
+   "class": "Building",
+   "ru": "Проходной ж/д светофор",
+   "en": "Rail chain signal"
+  },
+  {
+   "name": "artillery-wagon",
+   "class": "Building",
+   "ru": "Артиллерийский вагон",
+   "en": "Artillery wagon"
+  },
+  {
+   "name": "small-lamp",
+   "class": "Building",
+   "ru": "Фонарь",
+   "en": "Lamp"
+  },
+  {
+   "name": "arithmetic-combinator",
+   "class": "Building",
+   "ru": "Арифметический комбинатор",
+   "en": "Arithmetic combinator"
+  },
+  {
+   "name": "decider-combinator",
+   "class": "Building",
+   "ru": "Сравнивающий комбинатор",
+   "en": "Decider combinator"
+  },
+  {
+   "name": "selector-combinator",
+   "class": "Building",
+   "ru": "Выбирающий комбинатор",
+   "en": "Selector combinator"
+  },
+  {
+   "name": "constant-combinator",
+   "class": "Building",
+   "ru": "Постоянный комбинатор",
+   "en": "Constant combinator"
+  },
+  {
+   "name": "power-switch",
+   "class": "Building",
+   "ru": "Выключатель питания",
+   "en": "Power switch"
+  },
+  {
+   "name": "programmable-speaker",
+   "class": "Building",
+   "ru": "Программируемый динамик",
+   "en": "Programmable speaker"
+  },
+  {
+   "name": "display-panel",
+   "class": "Building",
+   "ru": "Дисплей",
+   "en": "Display panel"
+  },
+  {
+   "name": "automaton-display-large",
+   "class": "Building",
+   "ru": "Большое табло",
+   "en": "Large display"
+  },
+  {
+   "name": "automaton-display-small",
+   "class": "Building",
+   "ru": "Малое табло",
+   "en": "Small display"
+  },
+  {
+   "name": "solar-panel",
+   "class": "Building",
+   "ru": "Солнечная панель",
+   "en": "Solar panel"
+  },
+  {
+   "name": "accumulator",
+   "class": "Building",
+   "ru": "Аккумуляторный блок",
+   "en": "Accumulator"
+  },
+  {
+   "name": "heat-pipe",
+   "class": "Building",
+   "ru": "Тепловая труба",
+   "en": "Heat pipe"
+  },
+  {
+   "name": "cargo-landing-pad",
+   "class": "Building",
+   "ru": "Грузовая посадочная площадка",
+   "en": "Cargo landing pad"
+  },
+  {
+   "name": "stone-wall",
+   "class": "Building",
+   "ru": "Стена",
+   "en": "Wall"
+  },
+  {
+   "name": "gate",
+   "class": "Building",
+   "ru": "Ворота",
+   "en": "Gate"
+  },
+  {
+   "name": "radar",
+   "class": "Building",
+   "ru": "Радар",
+   "en": "Radar"
+  },
+  {
+   "name": "land-mine",
+   "class": "Building",
+   "ru": "Мина",
+   "en": "Land mine"
+  },
+  {
+   "name": "laser-turret",
+   "class": "Building",
+   "ru": "Лазерная турель",
+   "en": "Laser turret"
+  }
+ ],
+ "items": [
+  {
+   "name": "wooden-chest",
+   "group": "logistics",
+   "ru": "Деревянный сундук",
+   "en": "Wooden chest"
+  },
+  {
+   "name": "iron-chest",
+   "group": "logistics",
+   "ru": "Железный сундук",
+   "en": "Iron chest"
+  },
+  {
+   "name": "steel-chest",
+   "group": "logistics",
+   "ru": "Стальной сундук",
+   "en": "Steel chest"
+  },
+  {
+   "name": "storage-tank",
+   "group": "logistics",
+   "ru": "Резервуар",
+   "en": "Storage tank"
+  },
+  {
+   "name": "small-electric-pole",
+   "group": "logistics",
+   "ru": "Деревянная опора ЛЭП",
+   "en": "Small electric pole"
+  },
+  {
+   "name": "medium-electric-pole",
+   "group": "logistics",
+   "ru": "Средняя опора ЛЭП",
+   "en": "Medium electric pole"
+  },
+  {
+   "name": "big-electric-pole",
+   "group": "logistics",
+   "ru": "Большая опора ЛЭП",
+   "en": "Big electric pole"
+  },
+  {
+   "name": "substation",
+   "group": "logistics",
+   "ru": "Подстанция",
+   "en": "Substation"
+  },
+  {
+   "name": "pipe",
+   "group": "logistics",
+   "ru": "Труба",
+   "en": "Pipe"
+  },
+  {
+   "name": "pipe-to-ground",
+   "group": "logistics",
+   "ru": "Подземная труба",
+   "en": "Pipe to ground"
+  },
+  {
+   "name": "pump",
+   "group": "logistics",
+   "ru": "Помпа",
+   "en": "Pump"
+  },
+  {
+   "name": "rail",
+   "group": "logistics",
+   "ru": "Рельсы",
+   "en": "Rail"
+  },
+  {
+   "name": "train-stop",
+   "group": "logistics",
+   "ru": "Железнодорожная станция",
+   "en": "Train stop"
+  },
+  {
+   "name": "rail-signal",
+   "group": "logistics",
+   "ru": "Ж/д светофор",
+   "en": "Rail signal"
+  },
+  {
+   "name": "rail-chain-signal",
+   "group": "logistics",
+   "ru": "Проходной ж/д светофор",
+   "en": "Rail chain signal"
+  },
+  {
+   "name": "locomotive",
+   "group": "logistics",
+   "ru": "Локомотив",
+   "en": "Locomotive"
+  },
+  {
+   "name": "cargo-wagon",
+   "group": "logistics",
+   "ru": "Грузовой вагон",
+   "en": "Cargo wagon"
+  },
+  {
+   "name": "fluid-wagon",
+   "group": "logistics",
+   "ru": "Вагон-цистерна",
+   "en": "Fluid wagon"
+  },
+  {
+   "name": "artillery-wagon",
+   "group": "logistics",
+   "ru": "Артиллерийский вагон",
+   "en": "Artillery wagon"
+  },
+  {
+   "name": "car",
+   "group": "logistics",
+   "ru": "Автомобиль",
+   "en": "Car"
+  },
+  {
+   "name": "tank",
+   "group": "logistics",
+   "ru": "Танк",
+   "en": "Tank"
+  },
+  {
+   "name": "spidertron",
+   "group": "logistics",
+   "ru": "Паукотрон",
+   "en": "Spidertron"
+  },
+  {
+   "name": "automaton-combat-mk1",
+   "group": "logistics",
+   "ru": "Пулемёт на шасси автоматона: охраняет посты и маршруты (me.weapon: attack, guard, patrol). Патроны — me.weapon.reload() из груза.",
+   "en": "A machine gun on an automaton chassis: guards posts and routes (me.weapon: attack, guard, patrol). Ammo — me.weapon.reload() from cargo."
+  },
+  {
+   "name": "automaton-combat-mk2",
+   "group": "logistics",
+   "ru": "Ракетомёт на шасси автоматона: для гнёзд и червей. Ракеты — me.weapon.reload() из груза.",
+   "en": "A rocket launcher on an automaton chassis: for nests and worms. Rockets — me.weapon.reload() from cargo."
+  },
+  {
+   "name": "automaton-flyer-mk1",
+   "group": "logistics",
+   "ru": "Летающий автоматон Mk1",
+   "en": "Flying automaton Mk1"
+  },
+  {
+   "name": "automaton-flyer-mk2",
+   "group": "logistics",
+   "ru": "Летающий автоматон Mk2",
+   "en": "Flying automaton Mk2"
+  },
+  {
+   "name": "automaton-worker-mk1",
+   "group": "logistics",
+   "ru": "Рабочий автоматон Mk1",
+   "en": "Worker automaton Mk1"
+  },
+  {
+   "name": "automaton-worker-mk2",
+   "group": "logistics",
+   "ru": "Рабочий автоматон Mk2",
+   "en": "Worker automaton Mk2"
+  },
+  {
+   "name": "automaton-worker-mk3",
+   "group": "logistics",
+   "ru": "Рабочий автоматон Mk3",
+   "en": "Worker automaton Mk3"
+  },
+  {
+   "name": "automaton-marker",
+   "group": "logistics",
+   "ru": "Метка автоматонов",
+   "en": "Automaton marker"
+  },
+  {
+   "name": "automaton-signal-marker",
+   "group": "logistics",
+   "ru": "Сигнальная метка",
+   "en": "Signal marker"
+  },
+  {
+   "name": "construction-robot",
+   "group": "logistics",
+   "ru": "Строительный дрон",
+   "en": "Construction robot"
+  },
+  {
+   "name": "small-lamp",
+   "group": "logistics",
+   "ru": "Фонарь",
+   "en": "Lamp"
+  },
+  {
+   "name": "arithmetic-combinator",
+   "group": "logistics",
+   "ru": "Арифметический комбинатор",
+   "en": "Arithmetic combinator"
+  },
+  {
+   "name": "decider-combinator",
+   "group": "logistics",
+   "ru": "Сравнивающий комбинатор",
+   "en": "Decider combinator"
+  },
+  {
+   "name": "selector-combinator",
+   "group": "logistics",
+   "ru": "Выбирающий комбинатор",
+   "en": "Selector combinator"
+  },
+  {
+   "name": "constant-combinator",
+   "group": "logistics",
+   "ru": "Постоянный комбинатор",
+   "en": "Constant combinator"
+  },
+  {
+   "name": "power-switch",
+   "group": "logistics",
+   "ru": "Выключатель питания",
+   "en": "Power switch"
+  },
+  {
+   "name": "programmable-speaker",
+   "group": "logistics",
+   "ru": "Программируемый динамик",
+   "en": "Programmable speaker"
+  },
+  {
+   "name": "display-panel",
+   "group": "logistics",
+   "ru": "Дисплей",
+   "en": "Display panel"
+  },
+  {
+   "name": "automaton-display-large",
+   "group": "logistics",
+   "ru": "Большое табло (192×128)",
+   "en": "Large display (192×128)"
+  },
+  {
+   "name": "automaton-display-small",
+   "group": "logistics",
+   "ru": "Малое табло (96×64)",
+   "en": "Small display (96×64)"
+  },
+  {
+   "name": "stone-brick",
+   "group": "logistics",
+   "ru": "Каменный блок",
+   "en": "Stone brick"
+  },
+  {
+   "name": "concrete",
+   "group": "logistics",
+   "ru": "Бетон",
+   "en": "Concrete"
+  },
+  {
+   "name": "hazard-concrete",
+   "group": "logistics",
+   "ru": "Бетон с разметкой опасности",
+   "en": "Hazard concrete"
+  },
+  {
+   "name": "refined-concrete",
+   "group": "logistics",
+   "ru": "Железобетон",
+   "en": "Refined concrete"
+  },
+  {
+   "name": "refined-hazard-concrete",
+   "group": "logistics",
+   "ru": "Железобетон с разметкой опасности",
+   "en": "Refined hazard concrete"
+  },
+  {
+   "name": "landfill",
+   "group": "logistics",
+   "ru": "Отсыпка территории",
+   "en": "Landfill"
+  },
+  {
+   "name": "cliff-explosives",
+   "group": "logistics",
+   "ru": "Взрывчатка для скал",
+   "en": "Cliff explosives"
+  },
+  {
+   "name": "repair-pack",
+   "group": "production",
+   "ru": "Ремонтный комплект",
+   "en": "Repair pack"
+  },
+  {
+   "name": "boiler",
+   "group": "production",
+   "ru": "Бойлер",
+   "en": "Boiler"
+  },
+  {
+   "name": "steam-engine",
+   "group": "production",
+   "ru": "Паровой двигатель",
+   "en": "Steam engine"
+  },
+  {
+   "name": "solar-panel",
+   "group": "production",
+   "ru": "Солнечная батарея",
+   "en": "Solar panel"
+  },
+  {
+   "name": "accumulator",
+   "group": "production",
+   "ru": "Аккумуляторный блок",
+   "en": "Accumulator"
+  },
+  {
+   "name": "automaton-charging-station",
+   "group": "production",
+   "ru": "Зарядная станция автоматонов",
+   "en": "Automaton charging station"
+  },
+  {
+   "name": "nuclear-reactor",
+   "group": "production",
+   "ru": "Ядерный реактор",
+   "en": "Nuclear reactor"
+  },
+  {
+   "name": "heat-pipe",
+   "group": "production",
+   "ru": "Тепловая труба",
+   "en": "Heat pipe"
+  },
+  {
+   "name": "heat-exchanger",
+   "group": "production",
+   "ru": "Теплообменник",
+   "en": "Heat exchanger"
+  },
+  {
+   "name": "steam-turbine",
+   "group": "production",
+   "ru": "Паровая турбина",
+   "en": "Steam turbine"
+  },
+  {
+   "name": "stone-furnace",
+   "group": "production",
+   "ru": "Каменная печь",
+   "en": "Stone furnace"
+  },
+  {
+   "name": "steel-furnace",
+   "group": "production",
+   "ru": "Стальная печь",
+   "en": "Steel furnace"
+  },
+  {
+   "name": "electric-furnace",
+   "group": "production",
+   "ru": "Электрическая печь",
+   "en": "Electric furnace"
+  },
+  {
+   "name": "assembling-machine-1",
+   "group": "production",
+   "ru": "Сборочный автомат 1",
+   "en": "Assembling machine 1"
+  },
+  {
+   "name": "assembling-machine-2",
+   "group": "production",
+   "ru": "Сборочный автомат 2",
+   "en": "Assembling machine 2"
+  },
+  {
+   "name": "assembling-machine-3",
+   "group": "production",
+   "ru": "Сборочный автомат 3",
+   "en": "Assembling machine 3"
+  },
+  {
+   "name": "oil-refinery",
+   "group": "production",
+   "ru": "Нефтеперерабатывающий завод",
+   "en": "Oil refinery"
+  },
+  {
+   "name": "chemical-plant",
+   "group": "production",
+   "ru": "Химический завод",
+   "en": "Chemical plant"
+  },
+  {
+   "name": "centrifuge",
+   "group": "production",
+   "ru": "Центрифуга",
+   "en": "Centrifuge"
+  },
+  {
+   "name": "lab",
+   "group": "production",
+   "ru": "Лаборатория",
+   "en": "Lab"
+  },
+  {
+   "name": "beacon",
+   "group": "production",
+   "ru": "Маяк",
+   "en": "Beacon"
+  },
+  {
+   "name": "speed-module",
+   "group": "production",
+   "ru": "Модуль скорости",
+   "en": "Speed module"
+  },
+  {
+   "name": "speed-module-2",
+   "group": "production",
+   "ru": "Модуль скорости 2",
+   "en": "Speed module 2"
+  },
+  {
+   "name": "speed-module-3",
+   "group": "production",
+   "ru": "Модуль скорости 3",
+   "en": "Speed module 3"
+  },
+  {
+   "name": "efficiency-module",
+   "group": "production",
+   "ru": "Модуль эффективности",
+   "en": "Efficiency module"
+  },
+  {
+   "name": "efficiency-module-2",
+   "group": "production",
+   "ru": "Модуль эффективности 2",
+   "en": "Efficiency module 2"
+  },
+  {
+   "name": "efficiency-module-3",
+   "group": "production",
+   "ru": "Модуль эффективности 3",
+   "en": "Efficiency module 3"
+  },
+  {
+   "name": "productivity-module",
+   "group": "production",
+   "ru": "Модуль продуктивности",
+   "en": "Productivity module"
+  },
+  {
+   "name": "productivity-module-2",
+   "group": "production",
+   "ru": "Модуль продуктивности 2",
+   "en": "Productivity module 2"
+  },
+  {
+   "name": "productivity-module-3",
+   "group": "production",
+   "ru": "Модуль продуктивности 3",
+   "en": "Productivity module 3"
+  },
+  {
+   "name": "rocket-silo",
+   "group": "production",
+   "ru": "Ракетная шахта",
+   "en": "Rocket silo"
+  },
+  {
+   "name": "cargo-landing-pad",
+   "group": "production",
+   "ru": "Грузовая посадочная площадка",
+   "en": "Cargo landing pad"
+  },
+  {
+   "name": "satellite",
+   "group": "production",
+   "ru": "Спутник",
+   "en": "Satellite"
+  },
+  {
+   "name": "wood",
+   "group": "intermediate-products",
+   "ru": "Древесина",
+   "en": "Wood"
+  },
+  {
+   "name": "coal",
+   "group": "intermediate-products",
+   "ru": "Уголь",
+   "en": "Coal"
+  },
+  {
+   "name": "stone",
+   "group": "intermediate-products",
+   "ru": "Камень",
+   "en": "Stone"
+  },
+  {
+   "name": "iron-ore",
+   "group": "intermediate-products",
+   "ru": "Железная руда",
+   "en": "Iron ore"
+  },
+  {
+   "name": "copper-ore",
+   "group": "intermediate-products",
+   "ru": "Медная руда",
+   "en": "Copper ore"
+  },
+  {
+   "name": "uranium-ore",
+   "group": "intermediate-products",
+   "ru": "Урановая руда",
+   "en": "Uranium ore"
+  },
+  {
+   "name": "raw-fish",
+   "group": "intermediate-products",
+   "ru": "Сырая рыба",
+   "en": "Raw fish"
+  },
+  {
+   "name": "iron-plate",
+   "group": "intermediate-products",
+   "ru": "Железная плита",
+   "en": "Iron plate"
+  },
+  {
+   "name": "copper-plate",
+   "group": "intermediate-products",
+   "ru": "Медная плита",
+   "en": "Copper plate"
+  },
+  {
+   "name": "steel-plate",
+   "group": "intermediate-products",
+   "ru": "Стальная балка",
+   "en": "Steel plate"
+  },
+  {
+   "name": "solid-fuel",
+   "group": "intermediate-products",
+   "ru": "Твёрдое топливо",
+   "en": "Solid fuel"
+  },
+  {
+   "name": "plastic-bar",
+   "group": "intermediate-products",
+   "ru": "Пластмассовый брусок",
+   "en": "Plastic bar"
+  },
+  {
+   "name": "sulfur",
+   "group": "intermediate-products",
+   "ru": "Сера",
+   "en": "Sulfur"
+  },
+  {
+   "name": "battery",
+   "group": "intermediate-products",
+   "ru": "Аккумулятор",
+   "en": "Battery"
+  },
+  {
+   "name": "explosives",
+   "group": "intermediate-products",
+   "ru": "Взрывчатка",
+   "en": "Explosives"
+  },
+  {
+   "name": "water-barrel",
+   "group": "intermediate-products",
+   "ru": "water-barrel",
+   "en": "water-barrel"
+  },
+  {
+   "name": "crude-oil-barrel",
+   "group": "intermediate-products",
+   "ru": "Бочка нефти",
+   "en": "Crude oil barrel"
+  },
+  {
+   "name": "petroleum-gas-barrel",
+   "group": "intermediate-products",
+   "ru": "petroleum-gas-barrel",
+   "en": "petroleum-gas-barrel"
+  },
+  {
+   "name": "light-oil-barrel",
+   "group": "intermediate-products",
+   "ru": "light-oil-barrel",
+   "en": "light-oil-barrel"
+  },
+  {
+   "name": "heavy-oil-barrel",
+   "group": "intermediate-products",
+   "ru": "heavy-oil-barrel",
+   "en": "heavy-oil-barrel"
+  },
+  {
+   "name": "lubricant-barrel",
+   "group": "intermediate-products",
+   "ru": "lubricant-barrel",
+   "en": "lubricant-barrel"
+  },
+  {
+   "name": "sulfuric-acid-barrel",
+   "group": "intermediate-products",
+   "ru": "sulfuric-acid-barrel",
+   "en": "sulfuric-acid-barrel"
+  },
+  {
+   "name": "iron-gear-wheel",
+   "group": "intermediate-products",
+   "ru": "Железная шестерня",
+   "en": "Iron gear wheel"
+  },
+  {
+   "name": "iron-stick",
+   "group": "intermediate-products",
+   "ru": "Железный прут",
+   "en": "Iron stick"
+  },
+  {
+   "name": "copper-cable",
+   "group": "intermediate-products",
+   "ru": "Медный кабель",
+   "en": "Copper cable"
+  },
+  {
+   "name": "barrel",
+   "group": "intermediate-products",
+   "ru": "Бочка",
+   "en": "Barrel"
+  },
+  {
+   "name": "electronic-circuit",
+   "group": "intermediate-products",
+   "ru": "Электросхема",
+   "en": "Electronic circuit"
+  },
+  {
+   "name": "advanced-circuit",
+   "group": "intermediate-products",
+   "ru": "Продвинутая схема",
+   "en": "Advanced circuit"
+  },
+  {
+   "name": "processing-unit",
+   "group": "intermediate-products",
+   "ru": "Процессор",
+   "en": "Processing unit"
+  },
+  {
+   "name": "engine-unit",
+   "group": "intermediate-products",
+   "ru": "Твердотопливный двигатель",
+   "en": "Engine unit"
+  },
+  {
+   "name": "electric-engine-unit",
+   "group": "intermediate-products",
+   "ru": "Электродвигатель",
+   "en": "Electric engine unit"
+  },
+  {
+   "name": "flying-robot-frame",
+   "group": "intermediate-products",
+   "ru": "Каркас дрона",
+   "en": "Flying robot frame"
+  },
+  {
+   "name": "low-density-structure",
+   "group": "intermediate-products",
+   "ru": "Конструкция малой плотности",
+   "en": "Low density structure"
+  },
+  {
+   "name": "rocket-fuel",
+   "group": "intermediate-products",
+   "ru": "Ракетное топливо",
+   "en": "Rocket fuel"
+  },
+  {
+   "name": "uranium-235",
+   "group": "intermediate-products",
+   "ru": "Уран-235",
+   "en": "Uranium-235"
+  },
+  {
+   "name": "uranium-238",
+   "group": "intermediate-products",
+   "ru": "Уран-238",
+   "en": "Uranium-238"
+  },
+  {
+   "name": "uranium-fuel-cell",
+   "group": "intermediate-products",
+   "ru": "Урановый топливный элемент",
+   "en": "Uranium fuel cell"
+  },
+  {
+   "name": "depleted-uranium-fuel-cell",
+   "group": "intermediate-products",
+   "ru": "Отработанный урановый топливный элемент",
+   "en": "Depleted uranium fuel cell"
+  },
+  {
+   "name": "nuclear-fuel",
+   "group": "intermediate-products",
+   "ru": "Ядерное топливо",
+   "en": "Nuclear fuel"
+  },
+  {
+   "name": "automation-science-pack",
+   "group": "intermediate-products",
+   "ru": "Автоматизационный исследовательский пакет",
+   "en": "Automation science pack"
+  },
+  {
+   "name": "logistic-science-pack",
+   "group": "intermediate-products",
+   "ru": "Логистический исследовательский пакет",
+   "en": "Logistic science pack"
+  },
+  {
+   "name": "military-science-pack",
+   "group": "intermediate-products",
+   "ru": "Военный исследовательский пакет",
+   "en": "Military science pack"
+  },
+  {
+   "name": "chemical-science-pack",
+   "group": "intermediate-products",
+   "ru": "Химический исследовательский пакет",
+   "en": "Chemical science pack"
+  },
+  {
+   "name": "production-science-pack",
+   "group": "intermediate-products",
+   "ru": "Производственный исследовательский пакет",
+   "en": "Production science pack"
+  },
+  {
+   "name": "utility-science-pack",
+   "group": "intermediate-products",
+   "ru": "Вспомогательный исследовательский пакет",
+   "en": "Utility science pack"
+  },
+  {
+   "name": "space-science-pack",
+   "group": "intermediate-products",
+   "ru": "Космический исследовательский пакет",
+   "en": "Space science pack"
+  },
+  {
+   "name": "pistol",
+   "group": "combat",
+   "ru": "Пистолет",
+   "en": "Pistol"
+  },
+  {
+   "name": "submachine-gun",
+   "group": "combat",
+   "ru": "Пистолет-пулемёт",
+   "en": "Submachine gun"
+  },
+  {
+   "name": "shotgun",
+   "group": "combat",
+   "ru": "Дробовик",
+   "en": "Shotgun"
+  },
+  {
+   "name": "combat-shotgun",
+   "group": "combat",
+   "ru": "Боевой дробовик",
+   "en": "Combat shotgun"
+  },
+  {
+   "name": "rocket-launcher",
+   "group": "combat",
+   "ru": "Ракетница",
+   "en": "Rocket launcher"
+  },
+  {
+   "name": "flamethrower",
+   "group": "combat",
+   "ru": "Огнемёт",
+   "en": "Flamethrower"
+  },
+  {
+   "name": "firearm-magazine",
+   "group": "combat",
+   "ru": "Магазин с патронами",
+   "en": "Firearm magazine"
+  },
+  {
+   "name": "piercing-rounds-magazine",
+   "group": "combat",
+   "ru": "Магазин с бронебойными патронами",
+   "en": "Piercing rounds magazine"
+  },
+  {
+   "name": "uranium-rounds-magazine",
+   "group": "combat",
+   "ru": "Магазин с урановыми патронами",
+   "en": "Uranium rounds magazine"
+  },
+  {
+   "name": "shotgun-shell",
+   "group": "combat",
+   "ru": "Патроны для дробовика",
+   "en": "Shotgun shells"
+  },
+  {
+   "name": "piercing-shotgun-shell",
+   "group": "combat",
+   "ru": "Бронебойные патроны для дробовика",
+   "en": "Piercing shotgun shells"
+  },
+  {
+   "name": "cannon-shell",
+   "group": "combat",
+   "ru": "Пушечный снаряд",
+   "en": "Cannon shell"
+  },
+  {
+   "name": "explosive-cannon-shell",
+   "group": "combat",
+   "ru": "Разрывной пушечный снаряд",
+   "en": "Explosive cannon shell"
+  },
+  {
+   "name": "uranium-cannon-shell",
+   "group": "combat",
+   "ru": "Урановый пушечный снаряд",
+   "en": "Uranium cannon shell"
+  },
+  {
+   "name": "explosive-uranium-cannon-shell",
+   "group": "combat",
+   "ru": "Разрывной урановый пушечный снаряд",
+   "en": "Explosive uranium cannon shell"
+  },
+  {
+   "name": "artillery-shell",
+   "group": "combat",
+   "ru": "Артиллерийский снаряд",
+   "en": "Artillery shell"
+  },
+  {
+   "name": "rocket",
+   "group": "combat",
+   "ru": "Ракета",
+   "en": "Rocket"
+  },
+  {
+   "name": "explosive-rocket",
+   "group": "combat",
+   "ru": "Разрывная ракета",
+   "en": "Explosive rocket"
+  },
+  {
+   "name": "atomic-bomb",
+   "group": "combat",
+   "ru": "Атомная бомба",
+   "en": "Atomic bomb"
+  },
+  {
+   "name": "flamethrower-ammo",
+   "group": "combat",
+   "ru": "Топливо для огнемёта",
+   "en": "Flamethrower ammo"
+  },
+  {
+   "name": "grenade",
+   "group": "combat",
+   "ru": "Граната",
+   "en": "Grenade"
+  },
+  {
+   "name": "cluster-grenade",
+   "group": "combat",
+   "ru": "Осколочная граната",
+   "en": "Cluster grenade"
+  },
+  {
+   "name": "poison-capsule",
+   "group": "combat",
+   "ru": "Ядовитая капсула",
+   "en": "Poison capsule"
+  },
+  {
+   "name": "slowdown-capsule",
+   "group": "combat",
+   "ru": "Замедляющая капсула",
+   "en": "Slowdown capsule"
+  },
+  {
+   "name": "light-armor",
+   "group": "combat",
+   "ru": "Лёгкая броня",
+   "en": "Light armor"
+  },
+  {
+   "name": "heavy-armor",
+   "group": "combat",
+   "ru": "Тяжёлая броня",
+   "en": "Heavy armor"
+  },
+  {
+   "name": "modular-armor",
+   "group": "combat",
+   "ru": "Модульная броня",
+   "en": "Modular armor"
+  },
+  {
+   "name": "power-armor",
+   "group": "combat",
+   "ru": "Силовая броня",
+   "en": "Power armor"
+  },
+  {
+   "name": "power-armor-mk2",
+   "group": "combat",
+   "ru": "Силовая броня МК2",
+   "en": "Power armor MK2"
+  },
+  {
+   "name": "solar-panel-equipment",
+   "group": "combat",
+   "ru": "Портативная солнечная панель",
+   "en": "Portable solar panel"
+  },
+  {
+   "name": "fission-reactor-equipment",
+   "group": "combat",
+   "ru": "Портативный реактор деления",
+   "en": "Portable fission reactor"
+  },
+  {
+   "name": "battery-equipment",
+   "group": "combat",
+   "ru": "Личный аккумулятор",
+   "en": "Personal battery"
+  },
+  {
+   "name": "battery-mk2-equipment",
+   "group": "combat",
+   "ru": "Личный аккумулятор МК2",
+   "en": "Personal battery MK2"
+  },
+  {
+   "name": "belt-immunity-equipment",
+   "group": "combat",
+   "ru": "Оборудование для игнорирования конвейеров",
+   "en": "Belt immunity equipment"
+  },
+  {
+   "name": "exoskeleton-equipment",
+   "group": "combat",
+   "ru": "Экзоскелет",
+   "en": "Exoskeleton"
+  },
+  {
+   "name": "personal-roboport-equipment",
+   "group": "combat",
+   "ru": "Персональная дронстанция",
+   "en": "Personal roboport"
+  },
+  {
+   "name": "personal-roboport-mk2-equipment",
+   "group": "combat",
+   "ru": "Персональная дронстанция МК2",
+   "en": "Personal roboport MK2"
+  },
+  {
+   "name": "night-vision-equipment",
+   "group": "combat",
+   "ru": "Прибор ночного видения",
+   "en": "Nightvision"
+  },
+  {
+   "name": "energy-shield-equipment",
+   "group": "combat",
+   "ru": "Энергетический щит",
+   "en": "Energy shield"
+  },
+  {
+   "name": "energy-shield-mk2-equipment",
+   "group": "combat",
+   "ru": "Энергетический щит МК2",
+   "en": "Energy shield MK2"
+  },
+  {
+   "name": "personal-laser-defense-equipment",
+   "group": "combat",
+   "ru": "Персональная лазерная защита",
+   "en": "Personal laser defense"
+  },
+  {
+   "name": "discharge-defense-equipment",
+   "group": "combat",
+   "ru": "Электроразрядная защита",
+   "en": "Discharge defense"
+  },
+  {
+   "name": "stone-wall",
+   "group": "combat",
+   "ru": "Стена",
+   "en": "Wall"
+  },
+  {
+   "name": "gate",
+   "group": "combat",
+   "ru": "Ворота",
+   "en": "Gate"
+  },
+  {
+   "name": "radar",
+   "group": "combat",
+   "ru": "Радар",
+   "en": "Radar"
+  },
+  {
+   "name": "land-mine",
+   "group": "combat",
+   "ru": "Мина",
+   "en": "Land mine"
+  },
+  {
+   "name": "gun-turret",
+   "group": "combat",
+   "ru": "Пулемётная турель",
+   "en": "Gun turret"
+  },
+  {
+   "name": "laser-turret",
+   "group": "combat",
+   "ru": "Лазерная турель",
+   "en": "Laser turret"
+  },
+  {
+   "name": "flamethrower-turret",
+   "group": "combat",
+   "ru": "Огнемётная турель",
+   "en": "Flamethrower turret"
+  },
+  {
+   "name": "artillery-turret",
+   "group": "combat",
+   "ru": "Артиллерийское орудие",
+   "en": "Artillery turret"
+  }
+ ],
+ "fluids": [
+  {
+   "name": "water",
+   "ru": "Вода",
+   "en": "Water"
+  },
+  {
+   "name": "steam",
+   "ru": "Пар",
+   "en": "Steam"
+  },
+  {
+   "name": "crude-oil",
+   "ru": "Сырая нефть",
+   "en": "Crude oil"
+  },
+  {
+   "name": "petroleum-gas",
+   "ru": "Попутный нефтяной газ",
+   "en": "Petroleum gas"
+  },
+  {
+   "name": "light-oil",
+   "ru": "Дизельное топливо",
+   "en": "Light oil"
+  },
+  {
+   "name": "heavy-oil",
+   "ru": "Мазут",
+   "en": "Heavy oil"
+  },
+  {
+   "name": "lubricant",
+   "ru": "Смазочная жидкость",
+   "en": "Lubricant"
+  },
+  {
+   "name": "sulfuric-acid",
+   "ru": "Серная кислота",
+   "en": "Sulfuric acid"
+  }
+ ],
+ "groups": [
+  {
+   "name": "logistics",
+   "ru": "Логистика",
+   "en": "Logistics"
+  },
+  {
+   "name": "production",
+   "ru": "Производство",
+   "en": "Production"
+  },
+  {
+   "name": "intermediate-products",
+   "ru": "Компоненты",
+   "en": "Intermediate products"
+  },
+  {
+   "name": "combat",
+   "ru": "Военная промышленность",
+   "en": "Combat"
+  },
+  {
+   "name": "fluids",
+   "ru": "Жидкости",
+   "en": "Fluids"
+  },
+  {
+   "name": "signals",
+   "ru": "Сигналы",
+   "en": "Signals"
+  },
+  {
+   "name": "enemies",
+   "ru": "Враги",
+   "en": "Enemies"
+  },
+  {
+   "name": "tiles",
+   "ru": "Клетки",
+   "en": "Tiles"
+  },
+  {
+   "name": "environment",
+   "ru": "Окружающая среда",
+   "en": "Environment"
+  },
+  {
+   "name": "effects",
+   "ru": "Эффекты",
+   "en": "Effects"
+  },
+  {
+   "name": "other",
+   "ru": "Остальные",
+   "en": "Unsorted"
+  }
+ ]
+}
