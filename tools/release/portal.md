@@ -37,6 +37,8 @@ Start a new freeplay game: you get two automatons and markers. Click a machine, 
 
 Multiplayer is supported: programs run deterministically, saving and loading in the middle of work is tested.
 
+Questions, ideas, bug reports, sharing programs — [Telegram group](https://t.me/+fny1wzyAGN1lNTAy) (mostly in Russian, English is welcome).
+
 ---
 
-**По-русски.** Оверхол для игры с друзьями: конвейеров, буров, манипуляторов, логистических и боевых дронов и дронстанций нет (строительные дроны — от персональной дронстанции) — их работу делают автоматоны по программам на TypeScript. Программы пишутся в игре (с подсветкой) или в VS Code. Руководство игрока и справка по API — на [GitHub](https://github.com/zawert879/factorio-automanton).
+**По-русски.** Оверхол для игры с друзьями: конвейеров, буров, манипуляторов, логистических и боевых дронов и дронстанций нет (строительные дроны — от персональной дронстанции) — их работу делают автоматоны по программам на TypeScript. Программы пишутся в игре (с подсветкой) или в VS Code. Руководство игрока и справка по API — на [GitHub](https://github.com/zawert879/factorio-automanton). Обсуждение — в [группе в Telegram](https://t.me/+fny1wzyAGN1lNTAy).

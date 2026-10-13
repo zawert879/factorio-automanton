@@ -70,6 +70,10 @@ while (true) {
 | [VS Code](docs/VSCODE.md) | Писать программы в VS Code и публиковать при сохранении |
 | [Дизайн](docs/DESIGN.md) | Решения, масштаб, баланс |
 
+## Обсуждение
+
+Вопросы, идеи, ошибки, обмен программами — [группа в Telegram](https://t.me/+fny1wzyAGN1lNTAy).
+
 ## Разработка
 
 Мод пишется на TypeScript (`src/`), TypeScriptToLua собирает Lua в `mod/` (подключена к игре симлинком).

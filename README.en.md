@@ -70,6 +70,10 @@ while (true) {
 | [VS Code](docs/en/VSCODE.md) | Writing programs in VS Code and publishing on save |
 | [Design](docs/DESIGN.md) (in Russian) | Decisions, scale, balance |
 
+## Community
+
+Questions, ideas, bug reports, sharing programs — [Telegram group](https://t.me/+fny1wzyAGN1lNTAy) (mostly in Russian, English is welcome).
+
 ## Development
 
 The mod is written in TypeScript (`src/`); TypeScriptToLua builds Lua into `mod/` (linked into the game with a symlink).
