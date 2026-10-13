@@ -1,4 +1,16 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.10.0
+Date: 2026-10-13
+  Features:
+    - VS Code window: Programs… → VS Code… walks you through the setup step by step — Node.js, the game launch option, Write the folder with the full path to it for your system (Windows / macOS / Linux switch, remembered per player) and how to paste it into the Open Folder dialog, opening the folder in VS Code. Links, the launch option and the path are fields: click to select, then Ctrl+C.
+    - The window shows whether VS Code is connected: the sync tool checks in with the game every 10 seconds. It also tells you when the folder of another map is open, when the connection was lost, and what to check if the tool has been silent for a minute after the folder was written.
+    - The first time you open the programs window, it offers to set up VS Code (Set up / Not now).
+  Changes:
+    - The program folder of a new map is named map-<map number> (maps started earlier keep their folder name, so folders already open in VS Code still work).
+    - Types for VS Code moved from the programs window to the VS Code window (Types only).
+    - The sync tool is updated: the game rewrites it in your folder by itself, and the VS Code task restarts.
+
+---------------------------------------------------------------------------------------------------
 Version: 0.9.2
 Date: 2026-10-13
   Bugfixes:
