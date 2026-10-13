@@ -1,4 +1,17 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.9.0
+Date: 2026-10-13
+  Major Features:
+    - Soldier gear: combat machines can use player weapons — pistol, submachine gun, shotgun, combat shotgun, rocket launcher and flamethrower — with the range and rate of fire of that weapon; while the slot is empty the model's built-in weapon works as before. The flamethrower shoots the game's flame stream: fire on the ground, burning targets, and no fire without flamethrower ammo.
+    - Armor for all ground machines, workers included: light, heavy, modular and power armor add their resistances to the machine's own (acid from spitters and worms included). Energy shields in the armor grid take damage before health and recharge from the machine's fuel or battery.
+  Features:
+    - New research Automaton gear (after Combat automatons 1 and Heavy armor): weapon, ammo and armor slots in the machine window, me.weapon.equip / unequip and me.armor.equip / unequip from the cargo; me.weapon.item, me.armor.item, shield and maxShield.
+    - Workshop: the Move tool in the palette moves a node with its wires and settings — press on the node, drag a box and release; Delete over a node or the Delete node button in its window removes it.
+  Changes:
+    - Machines with gear are hidden variants of their model; changing gear swaps the machine in place, keeping its program, cargo, health and current trip. A picked-up machine returns its weapon and armor to the player; a destroyed one drops them.
+    - Shotgun shells hit the target with all their pellets (96 damage, piercing 128).
+
+---------------------------------------------------------------------------------------------------
 Version: 0.8.0
 Date: 2026-10-13
   Major Features:

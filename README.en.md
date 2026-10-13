@@ -33,7 +33,8 @@ while (true) {
 - **Graphs**: a program made of nodes and wires, like Unreal blueprints, in its own workshop; the code is built from the graph.
 - **Assigning programs**: a picker window with search, copying machine settings (Shift+right-click / Shift+left-click),
   a "Programmer" selection box for a dozen machines at once.
-- **Machines**: workers Mk1–Mk3, combat machines (machine gun, rockets), flying cargo machines; a charging station.
+- **Machines**: workers Mk1–Mk3, combat machines (machine gun, rockets or any player weapon up to the flamethrower),
+  flying cargo machines; player armor and energy shields for ground machines; a charging station.
 - **A world for programs**: markers, zones (drag their edges with the Programmer), vision, fluids in the tank,
   construction, assembler setup and modules.
 - **Building blueprints**: machines build building and tile ghosts from their cargo, deconstruct what is marked,
