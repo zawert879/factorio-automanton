@@ -63,6 +63,17 @@ describe("схема → код", () => {
     expect(contains(text, "} else {")).toBe(false)
   })
 
+  test("«Заправить» с «Этой машиной» на входе «машина» — своя заправка: me.energy.refuel, а не me.refuel", () => {
+    const b = new GraphBuilder()
+    const start = b.node("start")
+    const refuel = b.node("refuel", { item: "coal" })
+    const self = b.node("me-self")
+    b.exec(start, refuel).data(self, refuel, "robot")
+    const text = compiles(b.layout())
+    expect(contains(text, 'me.energy.refuel("coal")')).toBe(true)
+    expect(contains(text, "as Robot")).toBe(false)
+  })
+
   test("строки кода помнят узлы", () => {
     const graph = miner()
     const result = graphToSource(graph)

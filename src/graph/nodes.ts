@@ -237,8 +237,10 @@ action("drain", "fluids", "from:entity fluid:fluid amount:number?", "result:numb
 
 // ---------- Энергия ----------
 
+// Без машины на входе или с «Этой машиной» — заправиться самой (me.energy.refuel); другую машину — robot.refuel:
+// у me метода refuel нет, (me as Robot).refuel проходил проверку типов и падал при запуске.
 action("refuel", "energy", "item:item? robot:robot?", "", (a) =>
-  a.robot === undefined ? call("me.energy.refuel", a.item) : call(`(${a.robot} as Robot).refuel`, a.item),
+  a.robot === undefined || a.robot === "me" ? call("me.energy.refuel", a.item) : call(`(${a.robot} as Robot).refuel`, a.item),
 )
 action("charge", "energy", "station:entity?", "", (a) => call("me.energy.charge", a.station === undefined ? undefined : `${a.station} as ChargingStation`))
 
