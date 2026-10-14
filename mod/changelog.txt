@@ -1,4 +1,10 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.10.2
+Date: 2026-10-14
+  Bugfixes:
+    - Workshop: the Refuel node with This machine connected to its machine input wrote (me as Robot).refuel(…), which passed the type check but failed when run. It now refuels the machine itself with me.energy.refuel(…). A graph that is already published needs to be published again.
+
+---------------------------------------------------------------------------------------------------
 Version: 0.10.1
 Date: 2026-10-13
   Features:
