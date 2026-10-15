@@ -1,4 +1,11 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.10.3
+Date: 2026-10-15
+  Features:
+    - VS Code: language error highlighting. The VS Code window has a new step: the Turn on highlighting button asks the sync tool to add the plugin path to your VS Code user settings (settings.json; the previous file is kept as settings.json.automaton-backup). VS Code then underlines in red what the machine language does not have: async/await, generators, var, ==, enum… The step gets a check mark once VS Code has loaded the plugin. Without the game: node automaton-sync.mjs plugin.
+  Changes:
+    - VS Code: the programs folder uses the game's own standard library instead of the full JavaScript one, so Promise, setTimeout, Date and string and array methods the game lacks are errors before you publish. Press Write the folder again to get the new tsconfig.json and types.
+---------------------------------------------------------------------------------------------------
 Version: 0.10.2
 Date: 2026-10-14
   Bugfixes:
