@@ -425,6 +425,8 @@ for (let x = 10; x < 86; x++) c.pixel(x, 54, x % 2 === 0 ? "green" : "red")`,
       state.written = game.tick
       state.contact = game.tick
       state.contactMap = mapName()
+      // Подсветка (25.3): утилита дописала путь к плагину, VS Code его ещё не загрузил.
+      state.pluginSetup = { tick: game.tick, result: "added" }
       openVsCode(player)
     }
   }
@@ -437,6 +439,7 @@ for (let x = 10; x < 86; x++) c.pixel(x, 54, x % 2 === 0 ? "green" : "red")`,
       state.os = "windows"
       state.contact = undefined
       state.written = game.tick - 3600
+      state.pluginSetup = undefined
       openVsCode(player)
     }
   }

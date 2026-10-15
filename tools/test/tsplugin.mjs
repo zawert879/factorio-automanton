@@ -1,6 +1,8 @@
 // Плагин TypeScript для VS Code (mod/tools/automaton-ts-plugin.js): ошибки на неподдерживаемом, без ложных
 // срабатываний на программах-примерах и примерах из документации, подсказки о тиках, только файлы src папки программ.
-import { mkdtempSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs"
+// Подсветка (25.3): отметка «плагин загружен» и путь к плагину в settings.json VS Code (node automaton-sync.mjs plugin).
+import { spawnSync } from "node:child_process"
+import { existsSync, mkdtempSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs"
 import { createRequire } from "node:module"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -48,7 +50,7 @@ export function checkTsPlugin(root) {
     `const chest = scan.buildings({ kind: Chest, name: ["wooden-chest", "iron-chst"] })[0]\n` +
       `chest.extract("iron-plat")\nchest.extract("copper-plate")\nzone("плавильня").find("stone-furnace")\nprint("iron-plat")\n`,
   )
-  const program = ts.createProgram([join(namesDir, "x.ts"), join(namesDir, "automaton.d.ts")], { strict: true, target: ts.ScriptTarget.ES2020, noEmit: true, moduleDetection: ts.ModuleDetectionKind.Force })
+  const program = ts.createProgram([join(namesDir, "x.ts"), join(namesDir, "automaton.d.ts")], { strict: true, target: ts.ScriptTarget.ES2020, noLib: true, noEmit: true, moduleDetection: ts.ModuleDetectionKind.Force })
   const unknown = unknownNames(ts, program.getSourceFile(join(namesDir, "x.ts")), program.getTypeChecker())
   expect("имена не из словаря", unknown.map((u) => `${u.name}>${u.near}`).join(","), "iron-chst>iron-chest,iron-plat>iron-plate")
   // В примерах и документации все имена — из словаря.
@@ -62,7 +64,7 @@ export function checkTsPlugin(root) {
     }
   }
   samples.forEach(([name, code], i) => writeFileSync(join(namesDir, `s${i}.ts`), code))
-  const all = ts.createProgram([...samples.map((_, i) => join(namesDir, `s${i}.ts`)), join(namesDir, "automaton.d.ts")], { strict: true, target: ts.ScriptTarget.ES2020, noEmit: true, moduleDetection: ts.ModuleDetectionKind.Force, noResolve: true })
+  const all = ts.createProgram([...samples.map((_, i) => join(namesDir, `s${i}.ts`)), join(namesDir, "automaton.d.ts")], { strict: true, target: ts.ScriptTarget.ES2020, noLib: true, noEmit: true, moduleDetection: ts.ModuleDetectionKind.Force, noResolve: true })
   samples.forEach(([name], i) => {
     const found = unknownNames(ts, all.getSourceFile(join(namesDir, `s${i}.ts`)), all.getTypeChecker())
     expect(`имена в ${name}`, found.map((u) => u.name).join(","), "")
@@ -95,6 +97,7 @@ export function checkTsPlugin(root) {
   // В языковом сервисе: ошибки — только у файлов src папки программ.
   const dir = mkdtempSync(join(tmpdir(), "automaton-tsplugin-"))
   mkdirSync(join(dir, "src"))
+  mkdirSync(join(dir, ".automaton"))
   const files = { [join(dir, "src", "a.ts")]: "var x = 1\nfor (let i = 0; i < 500; i++) {}\n", [join(dir, "other.ts")]: "var y = 2\n" }
   for (const [file, text] of Object.entries(files)) writeFileSync(file, text)
   const host = {
@@ -115,5 +118,35 @@ export function checkTsPlugin(root) {
   expect("подсказка «…» у цикла", service.getSuggestionDiagnostics(join(dir, "src", "a.ts")).some((d) => String(d.messageText).startsWith("500 витков")), true)
   const info = service.getQuickInfoAtPosition(join(dir, "src", "a.ts"), files[join(dir, "src", "a.ts")].indexOf("for") + 1)
   expect("наведение на for", (info?.documentation ?? []).map((d) => d.text).join("").includes("Цикл: каждый виток — 1 инструкция кванта"), true)
+  // Загрузился — отметка для утилиты синхронизации (окно «VS Code» ставит галочку).
+  expect("отметка «плагин загружен»", existsSync(join(dir, ".automaton", "plugin.json")), true)
+
+  // Путь к плагину в settings.json VS Code: только вставка — комментарии, порядок и прежние пути остаются.
+  const tool = join(root, "mod", "tools", "automaton-sync.mjs")
+  const settings = join(dir, "settings.json")
+  const enable = (text) => {
+    if (text === undefined) spawnSync("rm", ["-f", settings])
+    else writeFileSync(settings, text)
+    const run = spawnSync(process.execPath, [tool, "plugin", "--settings", settings], { encoding: "utf8" })
+    return { code: run.status, out: run.stdout, text: existsSync(settings) ? readFileSync(settings, "utf8") : undefined }
+  }
+  const OLD = '"typescript.tsserver.pluginPaths"'
+  const NEW = '"js/ts.tsserver.pluginPaths"'
+  expect("нет файла", enable(undefined).text, `{\n  ${OLD}: ["./.automaton"]\n}\n`)
+  expect("пустой объект", enable("{}").text, `{\n  ${OLD}: ["./.automaton"]\n}`)
+  const commented = '// мои настройки\n{\n  // шрифт\n  "editor.fontSize": 14, /* { [ */\n  "a": { "b": [1, 2], },\n}\n'
+  const added = enable(commented)
+  expect("с комментариями", added.text, `// мои настройки\n{\n  ${OLD}: ["./.automaton"],\n  // шрифт\n  "editor.fontSize": 14, /* { [ */\n  "a": { "b": [1, 2], },\n}\n`)
+  expect("копия прежних", readFileSync(`${settings}.automaton-backup`, "utf8"), commented)
+  expect("сообщение", added.out.includes("подсветка ошибок языка включена"), true)
+  expect("второй раз — уже есть", enable(added.text).out.includes("уже есть"), true)
+  expect("свой путь в массиве", enable(`{ ${OLD}: ["/x"] }`).text, `{ ${OLD}: ["./.automaton", "/x"] }`)
+  expect("пустой массив", enable(`{ ${OLD}: [] }`).text, `{ ${OLD}: ["./.automaton"] }`)
+  expect("новое имя настройки", enable(`{ ${NEW}: ["/x"], "b": 1 }`).text, `{ ${NEW}: ["./.automaton", "/x"], "b": 1 }`)
+  expect("оба имени", enable(`{ ${NEW}: [], ${OLD}: ["./.automaton"] }`).text, `{ ${NEW}: ["./.automaton"], ${OLD}: ["./.automaton"] }`)
+  expect("ключ внутри объекта — не тот", enable(`{ "x": { ${OLD}: [] } }`).text, `{\n  ${OLD}: ["./.automaton"], "x": { ${OLD}: [] } }`)
+  const broken = enable('{ "a": 1 "b": 2 }')
+  expect("не разобрать — не трогать", `${broken.code} ${broken.text}`, '1 { "a": 1 "b": 2 }')
+  expect("одни комментарии", enable("// пусто\n").text, `// пусто\n{\n  ${OLD}: ["./.automaton"]\n}\n`)
   return problems
 }

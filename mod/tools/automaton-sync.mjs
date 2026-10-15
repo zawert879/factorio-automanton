@@ -7,6 +7,8 @@
 //   node automaton-sync.mjs push файл.ts…     — опубликовать файлы один раз
 //   node automaton-sync.mjs delete файл.ts…   — удалить программы этих файлов в игре
 //   node automaton-sync.mjs pull [папка]      — скачать программы команды из игры в папку
+//   node automaton-sync.mjs plugin            — включить подсветку ошибок языка: дописать путь к плагину TypeScript
+//                                               в настройки VS Code (то же делает кнопка в окне «VS Code» в игре)
 //
 // Программы лежат в папке src (рядом — служебные файлы). Имя программы — путь файла в src без .ts, папки
 // через «/»: src/lib/Помощники.ts → «lib/Помощники» (или первая строка «// @program Имя»). Импорт между
@@ -23,6 +25,7 @@ import { createHash } from "node:crypto"
 import { createSocket } from "node:dgram"
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, watch, writeFileSync } from "node:fs"
 import { createConnection } from "node:net"
+import { homedir } from "node:os"
 import { dirname, join, relative, resolve, sep } from "node:path"
 import { fileURLToPath } from "node:url"
 
@@ -45,7 +48,7 @@ for (let i = 0; i < argv.length; i++) {
   else if (argv[i].startsWith("--")) options[argv[i].slice(2)] = argv[++i]
   else positional.push(argv[i])
 }
-const mode = ["watch", "push", "pull", "delete"].includes(positional[0]) ? positional.shift() : "watch"
+const mode = ["watch", "push", "pull", "delete", "plugin"].includes(positional[0]) ? positional.shift() : "watch"
 const folder = resolve(mode === "push" || mode === "delete" ? "." : (positional[0] ?? "."))
 const configFile = join(folder, ".automaton-sync.json")
 const config = existsSync(configFile) ? JSON.parse(readFileSync(configFile, "utf8")) : {}
@@ -219,6 +222,153 @@ class Udp {
   }
 }
 
+// ---------- Подсветка ошибок языка: плагин TypeScript в настройках VS Code ----------
+// Плагин (.automaton/node_modules/automaton-ts-plugin) подчёркивает то, чего нет в языке машин (async, var, ==, enum…).
+// VS Code загружает плагины только из путей в настройках пользователя: настройка pluginPaths в .vscode папки
+// не действует (у неё область «machine»). Относительный путь VS Code ищет в каждой открытой папке — одна строка
+// подходит папкам всех карт. Новые VS Code читают js/ts.tsserver.pluginPaths, а без неё — прежнюю
+// typescript.tsserver.pluginPaths, старые — только прежнюю: дописываем путь в те, что уже есть, а нет ни одной —
+// добавляем прежнюю.
+
+const PLUGIN_PATH = "./.automaton"
+const PLUGIN_KEYS = ["typescript.tsserver.pluginPaths", "js/ts.tsserver.pluginPaths"]
+/** Отметка, которую пишет плагин, когда VS Code его загрузил. */
+const PLUGIN_MARK = join(".automaton", "plugin.json")
+
+/** settings.json пользователя: VS Code и его сборки (Insiders, VSCodium, Cursor), которые есть на этой машине. */
+function vscodeSettingsFiles() {
+  if (options.settings !== undefined) return [resolve(options.settings)]
+  const base =
+    process.platform === "win32"
+      ? (process.env.APPDATA ?? join(homedir(), "AppData", "Roaming"))
+      : process.platform === "darwin"
+        ? join(homedir(), "Library", "Application Support")
+        : (process.env.XDG_CONFIG_HOME ?? join(homedir(), ".config"))
+  return ["Code", "Code - Insiders", "VSCodium", "Cursor"]
+    .map((app) => join(base, app, "User"))
+    .filter((dir) => existsSync(dir))
+    .map((dir) => join(dir, "settings.json"))
+}
+
+/** Лексемы JSON с комментариями (так пишут settings.json): строки, знаки, прочие значения; at, end — позиции в тексте. */
+function jsoncTokens(text) {
+  const list = []
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i]
+    if (c === '"') {
+      let j = i + 1
+      while (j < text.length && text[j] !== '"') j += text[j] === "\\" ? 2 : 1
+      list.push({ kind: "string", at: i, end: j + 1, text: text.slice(i, j + 1) })
+      i = j
+    } else if (c === "/" && text[i + 1] === "/") {
+      while (i + 1 < text.length && text[i + 1] !== "\n") i++
+    } else if (c === "/" && text[i + 1] === "*") {
+      const close = text.indexOf("*/", i + 2)
+      i = close < 0 ? text.length : close + 1
+    } else if ("{}[]:,".includes(c)) list.push({ kind: c, at: i, end: i + 1, text: c })
+    else if (!/\s/.test(c)) {
+      let j = i
+      while (j + 1 < text.length && !/[\s{}[\]:,"/]/.test(text[j + 1])) j++
+      list.push({ kind: "value", at: i, end: j + 1, text: text.slice(i, j + 1) })
+      i = j
+    }
+  }
+  return list
+}
+
+/** Разобрать settings.json: без комментариев и запятых в конце; не объект — undefined. */
+function parseSettings(tokens) {
+  const json = tokens.filter((t, i) => !(t.kind === "," && ["}", "]"].includes(tokens[i + 1]?.kind))).map((t) => t.text).join(" ")
+  try {
+    const value = JSON.parse(json === "" ? "{}" : json)
+    return typeof value === "object" && value !== null && !Array.isArray(value) ? value : undefined
+  } catch {
+    return undefined
+  }
+}
+
+/**
+ * Дописать путь плагина в текст settings.json — только вставкой, комментарии и порядок остаются.
+ * Ответ: { text } — новый текст, { already: true } — путь уже есть, { error } — не разобрать.
+ */
+function withPluginPath(text) {
+  const tokens = jsoncTokens(text)
+  const settings = parseSettings(tokens)
+  if (settings === undefined) return { error: "parse" }
+  const present = PLUGIN_KEYS.filter((key) => key in settings)
+  if (present.some((key) => !Array.isArray(settings[key]))) return { error: "parse" }
+  const missing = present.filter((key) => !settings[key].includes(PLUGIN_PATH))
+  if (present.length > 0 && missing.length === 0) return { already: true }
+  // Пустой файл (или одни комментарии — их оставляем).
+  if (tokens.length === 0) return { text: `${text.trim() === "" ? "" : `${text.trimEnd()}\n`}{\n  "${PLUGIN_KEYS[0]}": ["${PLUGIN_PATH}"]\n}\n` }
+  const inserts = []
+  if (present.length === 0) {
+    // Первой строкой в объекте настроек.
+    const empty = tokens[1]?.kind === "}"
+    inserts.push({ at: tokens[0].end, text: `\n  "${PLUGIN_KEYS[0]}": ["${PLUGIN_PATH}"]${empty ? "\n" : ","}` })
+  }
+  // Ключ верхнего уровня, за ним «:» и «[» — путь первым в массив.
+  let depth = 0
+  tokens.forEach((t, i) => {
+    if (t.kind === "{" || t.kind === "[") depth++
+    else if (t.kind === "}" || t.kind === "]") depth--
+    else if (depth === 1 && t.kind === "string" && tokens[i + 1]?.kind === ":" && tokens[i + 2]?.kind === "[" && missing.includes(JSON.parse(t.text))) {
+      inserts.push({ at: tokens[i + 2].end, text: `"${PLUGIN_PATH}"${tokens[i + 3]?.kind === "]" ? "" : ", "}` })
+    }
+  })
+  let result = text
+  for (const insert of inserts.sort((a, b) => b.at - a.at)) result = result.slice(0, insert.at) + insert.text + result.slice(insert.at)
+  // Проверка: разбирается, и путь во всех нужных ключах.
+  const check = parseSettings(jsoncTokens(result))
+  const keys = present.length > 0 ? present : [PLUGIN_KEYS[0]]
+  if (check === undefined || !keys.every((key) => Array.isArray(check[key]) && check[key].includes(PLUGIN_PATH))) return { error: "parse" }
+  return { text: result }
+}
+
+/**
+ * Включить подсветку: дописать путь плагина в настройки пользователя VS Code (рядом — копия прежних настроек).
+ * Ответ для игры: result — added (дописали), already (уже был), failed (error: no-vscode, parse, write); file — файл.
+ */
+function setupPlugin() {
+  const files = vscodeSettingsFiles()
+  if (files.length === 0) return { result: "failed", error: "no-vscode" }
+  let outcome = { result: "already", file: files[0] }
+  for (const file of files) {
+    const text = existsSync(file) ? readFileSync(file, "utf8") : ""
+    const edit = withPluginPath(text)
+    if (edit.error !== undefined) return { result: "failed", error: edit.error, file }
+    if (edit.already) continue
+    try {
+      if (text !== "") writeFileSync(`${file}.automaton-backup`, text)
+      writeFileSync(file, edit.text)
+    } catch {
+      return { result: "failed", error: "write", file }
+    }
+    outcome = { result: "added", file }
+  }
+  return outcome
+}
+
+/** Плагин для игры (окно «VS Code»): loaded — VS Code его загрузил в этой папке, set — путь в настройках есть, none. */
+function pluginState() {
+  if (existsSync(join(folder, PLUGIN_MARK))) return "loaded"
+  const set = vscodeSettingsFiles().some((file) => {
+    if (!existsSync(file)) return false
+    const settings = parseSettings(jsoncTokens(readFileSync(file, "utf8")))
+    return settings !== undefined && PLUGIN_KEYS.some((key) => Array.isArray(settings[key]) && settings[key].includes(PLUGIN_PATH))
+  })
+  return set ? "set" : "none"
+}
+
+/** Итог setupPlugin — в консоль. */
+function printPluginSetup(setup) {
+  const where = setup.file === undefined ? "" : ` (${setup.file})`
+  if (setup.result === "added") console.log(`automaton: подсветка ошибок языка включена — путь к плагину в настройках VS Code${where}. Если VS Code не подхватил: Cmd/Ctrl+Shift+P → TypeScript: Restart TS Server`)
+  else if (setup.result === "already") console.log(`automaton: путь к плагину уже есть в настройках VS Code${where}`)
+  else if (setup.error === "no-vscode") console.log(`automaton: настройки VS Code не найдены — добавьте вручную в settings.json пользователя: "${PLUGIN_KEYS[0]}": ["${PLUGIN_PATH}"]`)
+  else console.log(`automaton: не удалось дописать настройки VS Code${where}: ${setup.error === "write" ? "нет доступа к файлу" : "файл не разобрать"} — добавьте вручную: "${PLUGIN_KEYS[0]}": ["${PLUGIN_PATH}"]`)
+}
+
 // ---------- Публикация и загрузка ----------
 
 /** Корень папки: в watch и pull — папка; у push и delete — ближайшая выше с tsconfig.json или automaton.d.ts. */
@@ -365,7 +515,7 @@ async function refresh(link) {
   if (missing.length > 0) console.log(`automaton: в игре без файлов (игра спросит, удалить ли): ${missing.join(", ")}`)
 }
 
-/** Слушать сигналы игры: кнопка «Обновить из папки». */
+/** Слушать сигналы игры: кнопки «Обновить из папки» и «Включить подсветку». */
 function listen(link, run) {
   const socket = createSocket("udp4")
   socket.on("message", (data) => {
@@ -373,6 +523,13 @@ function listen(link, run) {
     try {
       message = JSON.parse(data.toString("utf8"))
     } catch {
+      return
+    }
+    // «Включить подсветку» в окне «VS Code»: настройки — на этой машине, карта не важна.
+    if (message.cmd === "setup-plugin") {
+      const setup = setupPlugin()
+      printPluginSetup(setup)
+      link.request({ cmd: "plugin-setup", ...setup, plugin: pluginState(), map: mapOf(folder) }).catch(() => {})
       return
     }
     if (message.cmd !== "refresh") return
@@ -529,6 +686,12 @@ function supervise() {
 }
 
 async function main() {
+  if (mode === "plugin") {
+    const setup = setupPlugin()
+    printPluginSetup(setup)
+    process.exitCode = setup.result === "failed" ? 1 : 0
+    return
+  }
   if (mode === "watch" && !process.argv.includes("--worker")) {
     supervise()
     return
@@ -573,10 +736,11 @@ async function main() {
     })
   }
   listen(rcon, (job) => run(job))
-  // Раз в 10 с — отметиться в игре: окно «VS Code» показывает, что утилита на связи. Пропала связь — сказать один раз.
+  // Раз в 10 с — отметиться в игре: окно «VS Code» показывает, что утилита на связи и работает ли плагин.
+  // Пропала связь — сказать один раз.
   let answering = true
   setInterval(() => {
-    rcon.request({ cmd: "ping", map: mapOf(folder) }).then(
+    rcon.request({ cmd: "ping", map: mapOf(folder), plugin: pluginState() }).then(
       () => {
         if (!answering) console.log("automaton: связь с игрой есть")
         answering = true

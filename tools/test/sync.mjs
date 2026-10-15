@@ -174,7 +174,10 @@ watcher.kill()
 // (игра шлёт утилите пакет на порт 27154) публикует его.
 await new Promise((r) => setTimeout(r, 1000))
 writeFileSync(join(project, "src", "Офлайн.ts"), 'print("написана без слежения")\n')
-const watcher2 = spawn("node", [tool, "watch", project, ...rconArgs], { stdio: ["ignore", "pipe", "pipe"] })
+// Настройки VS Code — тестовый файл, а не настоящие (для «Включить подсветку»).
+const vscodeSettings = join(env.work, "vscode-settings.json")
+writeFileSync(vscodeSettings, '{\n  // мои\n  "editor.fontSize": 14\n}\n')
+const watcher2 = spawn("node", [tool, "watch", project, ...rconArgs, "--settings", vscodeSettings], { stdio: ["ignore", "pipe", "pipe"] })
 children.push(watcher2)
 watchOut = ""
 watcher2.stdout.on("data", (chunk) => (watchOut += chunk))
@@ -184,6 +187,11 @@ const button = createSocket("udp4")
 button.send(JSON.stringify({ cmd: "refresh", map: mapName, force: "player" }), 27154, "127.0.0.1")
 await waitFor(() => watchOut.includes("из папки опубликовано") && watchOut.includes("Офлайн"), "публикации по кнопке «Обновить из папки»")
 await waitFor(() => existsSync(exportedOf("Офлайн.ts")), "выгрузки опубликованного по кнопке")
+// «Включить подсветку» (25.3): сигнал на тот же порт — утилита дописывает путь к плагину в настройки VS Code.
+button.send(JSON.stringify({ cmd: "setup-plugin", map: mapName, force: "player" }), 27154, "127.0.0.1")
+await waitFor(() => watchOut.includes("подсветка ошибок языка включена"), "пути к плагину по кнопке «Включить подсветку»")
+const withPlugin = readFileSync(vscodeSettings, "utf8")
+if (!withPlugin.includes('"typescript.tsserver.pluginPaths": ["./.automaton"]') || !withPlugin.includes("// мои")) fail(`настройки VS Code после «Включить подсветку»:\n${withPlugin}`)
 button.close()
 watcher2.kill()
 
@@ -196,7 +204,7 @@ if (!(oldPush.stdout + oldPush.stderr).includes("утилита синхрони
 
 // Временную папку не удаляем: сервер ещё дописывает файлы после остановки (её чистит следующий запуск).
 server.kill()
-console.log("RCON (выделенный сервер): публикация частями, ошибки, pull, выгрузка, модули в папках, папка своей карты, зеркало src в обе стороны — ок")
+console.log("RCON (выделенный сервер): публикация частями, ошибки, pull, выгрузка, модули в папках, папка своей карты, зеркало src в обе стороны, «Включить подсветку» — ок")
 
 // ---------- UDP: игра с окном ----------
 const gui = prepareWork("automaton-sync-udp", "automaton-sync-udp")

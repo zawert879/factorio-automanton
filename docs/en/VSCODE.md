@@ -24,7 +24,7 @@ says what to check.
    - `automaton-sync.mjs` — the sync tool,
    - `.vscode/tasks.json` — a task that starts the tool when the folder is opened,
    - `.automaton-map.json` — which map this folder belongs to,
-   - a TypeScript plugin (`.automaton/`) and `.vscode/settings.json`, which enables it.
+   - a TypeScript plugin (`.automaton/`); `.vscode/settings.json` hides it from the file list.
 
    The game's data folder: Windows — `%APPDATA%\Factorio`, macOS — `~/Library/Application Support/factorio`,
    Linux — `~/.factorio` (the zip version of the game keeps its data in its own folder). The full path is in the
@@ -32,6 +32,14 @@ says what to check.
 4. Open this folder in VS Code: File → Open Folder and paste the path — on Windows into the address bar at the
    top, on macOS after Cmd+Shift+G, on Linux after Ctrl+L. VS Code asks whether you trust the authors of the
    folder — "Yes"; allow the automatic task "Automaton: publish on save".
+5. **Language error highlighting:** in the VS Code window — **"Turn on highlighting"** (or
+   `node automaton-sync.mjs plugin` in the VS Code terminal). VS Code loads TypeScript plugins only from paths in the
+   user settings (folder settings do not work for this), so the tool adds the line
+   `"typescript.tsserver.pluginPaths": ["./.automaton"]` to your `settings.json` — it changes nothing else there and
+   keeps the previous file next to it (`settings.json.automaton-backup`). The path is relative: VS Code looks for it
+   in the open folder, so one line serves the folders of all maps. By hand: Cmd/Ctrl+Shift+P → "Preferences: Open User
+   Settings (JSON)" → the same line after the first `{`. Once VS Code loads the plugin, the step in the window gets
+   a check mark.
 
 ## Every day
 
@@ -52,8 +60,11 @@ says what to check.
   names in different files do not clash — `moduleDetection: "force"` in `tsconfig.json`).
 - **A folder belongs to one map.** If a different map is open in the game, the tool publishes nothing and says
   that this folder is for map …, but the game has … open: open that map's folder ("VS Code…" → "Write the folder" in that map).
-- **Plugin hints and errors** (only for files in `src` of this folder): things the machine language lacks
-  (`async`/`await`, `var`, `enum`, regular expressions, `==` …) are underlined as errors before you publish.
+- **What the game lacks is an error before you publish.** The folder has its own standard library — what the game
+  has (`tsconfig.json`: `noLib`): `Promise`, `setTimeout`, `Date`, string and array methods the game lacks are
+  TypeScript errors even without the plugin.
+- **Plugin hints and errors** (only for files in `src` of this folder; setup step 5): things the machine language lacks
+  (`async`/`await`, generators, `var`, `enum`, regular expressions, `==` …) are underlined as errors before you publish.
   Hover over `for` / `while` to see the cost of one iteration and how many ticks the loop takes (if the number
   of iterations is visible from the code); such loops show a suggestion ("…"). On `publish`, `sort`, `map`,
   `JSON.parse` — their cost. If the plugin does not work right away — "TypeScript: Restart TS Server" in the

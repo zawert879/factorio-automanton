@@ -20,7 +20,7 @@ import { CustomCommandData, LuaPlayer, PlayerIndex } from "factorio:runtime"
 import { onEvent, onTick } from "../events"
 import { Diagnostic } from "../lang/lexer"
 import { publishing } from "../workshop/publish"
-import { VsCodeState } from "./vscodeState"
+import { PluginReport, PluginSetup, VsCodeState } from "./vscodeState"
 import { DTS, DTS_EN, SYNC_TOOL, SYNC_TOOL_HASH, TS_PLUGIN, TSCONFIG } from "../gui/dts.generated"
 import {
   deleteProgram,
@@ -94,7 +94,10 @@ const README = `Папка программ автоматонов для VS Cod
    Новые программы из игры: «node automaton-sync.mjs pull». Меняли файлы без задачи синхронизации —
    кнопка «Обновить из папки» в окне программ.
 4. Плагин TypeScript подчёркивает то, чего нет в языке машин (async/await, var, enum…), и подсказывает,
-   сколько тиков займёт цикл (наведите на for / while). Не заработал — «TypeScript: Restart TS Server».
+   сколько тиков займёт цикл (наведите на for / while). VS Code находит его, только если путь к нему есть
+   в настройках пользователя: кнопка «Включить подсветку» в окне «VS Code» в игре (или
+   «node automaton-sync.mjs plugin») допишет в settings.json строку
+   "typescript.tsserver.pluginPaths": ["./.automaton"]. Не заработал — «TypeScript: Restart TS Server».
 Выделенный сервер: RCON — «node automaton-sync.mjs watch . --rcon --port … --password …».
 `
 
@@ -113,7 +116,10 @@ This folder belongs to one map: programs from it are published only to that map 
    New programs from the game: "node automaton-sync.mjs pull". Changed files without the sync task —
    the "Refresh from folder" button in the programs window.
 4. The TypeScript plugin underlines what the machine language does not have (async/await, var, enum…) and shows
-   how many ticks a loop takes (hover over for / while). Not working — "TypeScript: Restart TS Server".
+   how many ticks a loop takes (hover over for / while). VS Code finds it only if its path is in your user
+   settings: the "Turn on highlighting" button in the in-game VS Code window (or "node automaton-sync.mjs plugin")
+   adds the line "typescript.tsserver.pluginPaths": ["./.automaton"] to settings.json. Not working —
+   "TypeScript: Restart TS Server".
 Dedicated server: RCON — "node automaton-sync.mjs watch . --rcon --port … --password …".
 The sync tool prints its messages in Russian for now.
 `
@@ -147,6 +153,12 @@ interface Request {
   text?: string
   parts?: number
   from?: number
+  /** ping, plugin-setup: плагин TypeScript в VS Code (25.3). */
+  plugin?: string
+  /** plugin-setup: что сделала утилита с настройками VS Code. */
+  result?: string
+  error?: string
+  file?: string
 }
 
 function buffers(): Record<string, SyncBuffer | undefined> {
@@ -237,12 +249,31 @@ export function onRefreshResult(listener: RefreshListener): void {
   refreshListeners.push(listener)
 }
 
-/** Настройки VS Code для папки: где искать плагин TypeScript (.automaton/node_modules), скрыть служебное. */
+/**
+ * Настройки VS Code для папки: скрыть служебное. Путь к плагину TypeScript (.automaton) отсюда VS Code не берёт —
+ * только из настроек пользователя (кнопка «Включить подсветку», requestPluginSetup).
+ */
 const VSCODE_SETTINGS = `{
-  "typescript.tsserver.pluginPaths": ["./.automaton"],
   "files.exclude": { ".automaton": true }
 }
 `
+
+/**
+ * «Включить подсветку» (25.3): попросить утилиту дописать путь к плагину TypeScript в настройки VS Code этого игрока.
+ * Как requestRefresh — пакет уходит только с экземпляра игры игрока; ответ — plugin-setup.
+ */
+export function requestPluginSetup(player: LuaPlayer): void {
+  vscodeState(player.index).pluginSetup = { tick: game.tick }
+  pcall(() => helpers.send_udp(TOOL_PORT, helpers.table_to_json({ cmd: "setup-plugin", map: mapName(), force: player.force.name }), player.index))
+}
+
+const PLUGIN_REPORTS = ["loaded", "set", "none"]
+const SETUP_RESULTS = ["added", "already", "failed"]
+
+/** Что утилита знает о плагине (ping и plugin-setup): только известные значения. */
+function notePlugin(player: LuaPlayer | undefined, report: string | undefined): void {
+  if (player !== undefined && report !== undefined && PLUGIN_REPORTS.includes(report)) vscodeState(player.index).plugin = report as PluginReport
+}
 
 /** Утилита другой версии, чем мод (её запустили до обновления): что сделать — текстом (старая утилита его покажет). */
 const OUTDATED_TOOL =
@@ -299,6 +330,17 @@ function handle(request: Request, sender: string, player: LuaPlayer | undefined)
   }
   switch (request.cmd) {
     case "ping":
+      notePlugin(player, request.plugin)
+      return { ok: true }
+    case "plugin-setup":
+      // Ответ на «Включить подсветку» — тому, кто нажал (пакет пришёл с его экземпляра игры).
+      notePlugin(player, request.plugin)
+      if (player !== undefined && request.result !== undefined && SETUP_RESULTS.includes(request.result)) {
+        const setup: PluginSetup = { tick: game.tick, result: request.result as PluginSetup["result"] }
+        if (typeof request.error === "string") setup.error = request.error
+        if (typeof request.file === "string") setup.file = request.file
+        vscodeState(player.index).pluginSetup = setup
+      }
       return { ok: true }
     case "begin":
       if (typeof request.name !== "string") return { ok: false, error: "bad request" }

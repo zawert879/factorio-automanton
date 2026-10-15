@@ -3,17 +3,22 @@
 // предлагается само (строка в окне программ). Строки для копирования — поля: клик выделяет всё, дальше Ctrl+C.
 // Связь (25.2): утилита раз в 10 с стучится в игру — шаг «Открыть в VS Code» показывает, на связи ли она; окно
 // пересобирается, только когда меняется состояние связи (иначе выделение в поле сбрасывалось бы каждую секунду).
+// Подсветка ошибок языка (25.3): кнопка просит утилиту дописать путь к плагину TypeScript в настройки VS Code;
+// галочка — когда утилита сообщила, что VS Code плагин загрузил.
 import { Color, LocalisedString, LuaGuiElement, LuaPlayer, TextFieldGuiElement } from "factorio:runtime"
 import { onTick } from "../events"
 import { onGuiChange, onGuiClick, titlebar } from "./common"
 import { FOLDER_OS, FolderOs, folderPath } from "../program/folderPath"
-import { mapName, syncFolder, vscodeState, writeVsCodeFolder } from "../program/sync"
-import { LinkStatus, linkStatus } from "../program/vscodeState"
+import { mapName, requestPluginSetup, syncFolder, vscodeState, writeVsCodeFolder } from "../program/sync"
+import { LinkStatus, linkStatus, PluginStatus, pluginStatus } from "../program/vscodeState"
 
 const FRAME = "automaton-vscode"
 const WIDTH = 600
 const NODE_URL = "https://nodejs.org"
 const LAUNCH_OPTION = "--enable-lua-udp 27155"
+/** Строка для settings.json пользователя VS Code — вручную, если кнопка не помогла. */
+const PLUGIN_SETTING = '"typescript.tsserver.pluginPaths": ["./.automaton"],'
+const PLUGIN_ERRORS = ["no-vscode", "parse", "write"]
 
 /** Игрок уже ответил на предложение VS Code в окне программ. */
 export function vscodeOffered(player: LuaPlayer): boolean {
@@ -36,6 +41,15 @@ const LINK_COLORS: Record<LinkStatus, Color> = {
   none: DIM,
 }
 
+const PLUGIN_COLORS: Record<PluginStatus, Color> = {
+  loaded: LINK_COLORS.connected,
+  pending: LINK_COLORS.waiting,
+  set: LINK_COLORS.waiting,
+  silent: LINK_COLORS.silent,
+  failed: LINK_COLORS.silent,
+  none: DIM,
+}
+
 function wrapped(parent: LuaGuiElement, caption: LocalisedString, color?: Color): void {
   const label = parent.add({ type: "label", caption })
   label.style.single_line = false
@@ -45,6 +59,10 @@ function wrapped(parent: LuaGuiElement, caption: LocalisedString, color?: Color)
 
 function linkOf(player: LuaPlayer): LinkStatus {
   return linkStatus(vscodeState(player.index), game.tick, mapName())
+}
+
+function pluginOf(player: LuaPlayer): PluginStatus {
+  return pluginStatus(vscodeState(player.index), game.tick)
 }
 
 /** Поле для Ctrl+C: клик выделяет всё, правка откатывается. */
@@ -80,9 +98,10 @@ export function openVsCode(player: LuaPlayer): void {
   const state = vscodeState(player.index)
   const os = state.os ?? "windows"
   const link = linkOf(player)
+  const plugin = pluginOf(player)
   // Node.js и параметр запуска игра не видит — их подтверждает первый же запрос утилиты.
   const reached = state.contact !== undefined
-  const frame = player.gui.screen.add({ type: "frame", name: FRAME, direction: "vertical", tags: { link } })
+  const frame = player.gui.screen.add({ type: "frame", name: FRAME, direction: "vertical", tags: { link, plugin } })
   titlebar(frame, ["automaton-vscode.title"], "vscode-close")
   const panel = frame.add({ type: "frame", style: "inside_shallow_frame_with_padding", direction: "vertical" })
   panel.style.width = WIDTH
@@ -118,6 +137,23 @@ export function openVsCode(player: LuaPlayer): void {
   wrapped(open, ["automaton-vscode.open-note"], DIM)
   if (link !== "none") wrapped(open, [`automaton-vscode.link-${link}`, state.contactMap ?? ""], LINK_COLORS[link])
 
+  const highlight = step(inside, 5, ["automaton-vscode.plugin"], plugin === "loaded")
+  wrapped(highlight, ["automaton-vscode.plugin-note"], DIM)
+  if (plugin !== "loaded") {
+    const enable = highlight.add({ type: "button", caption: ["automaton-vscode.plugin-enable"], tags: { action: "vscode-plugin" } })
+    // Кнопка — сигнал утилите: без связи с ней нажимать бесполезно.
+    enable.enabled = link === "connected" && plugin !== "pending"
+    if (link !== "connected") enable.tooltip = ["automaton-vscode.plugin-needs-link"]
+  }
+  if (plugin === "failed") {
+    const error = state.pluginSetup?.error
+    wrapped(highlight, [`automaton-vscode.plugin-failed-${error !== undefined && PLUGIN_ERRORS.includes(error) ? error : "parse"}`, state.pluginSetup?.file ?? ""], PLUGIN_COLORS.failed)
+  } else if (plugin !== "none") wrapped(highlight, [`automaton-vscode.plugin-${plugin}`], PLUGIN_COLORS[plugin])
+  if (plugin !== "loaded") {
+    wrapped(highlight, ["automaton-vscode.plugin-manual"], DIM)
+    copyField(highlight, PLUGIN_SETTING, WIDTH - 60)
+  }
+
   wrapped(inside, ["automaton-vscode.copy-hint"], DIM)
   // Только типы — для своей папки без утилиты (раньше — кнопка в окне программ; обработчик там же).
   const types = inside.add({ type: "button", caption: ["automaton-vscode.types"], tags: { action: "programs-types" } })
@@ -134,6 +170,10 @@ export function registerVsCodeWindow(): void {
     vscodeState(player.index).written = game.tick
     openVsCode(player)
   })
+  onGuiClick("vscode-plugin", (player) => {
+    requestPluginSetup(player)
+    openVsCode(player)
+  })
   onGuiClick("vscode-os", (player, element) => {
     vscodeState(player.index).os = (element.tags as { os: FolderOs }).os
     openVsCode(player)
@@ -148,12 +188,15 @@ export function registerVsCodeWindow(): void {
     const text = (field.tags as { text: string }).text
     if (field.text !== text) field.text = text
   })
-  // Состояние связи меняется со временем (ping пришёл, пропал, минута без ответа) — окно пересобирается при смене.
+  // Состояние связи и плагина меняется со временем (ping пришёл, пропал, минута без ответа, утилита ответила на
+  // «Включить подсветку») — окно пересобирается при смене.
   onTick((tick) => {
     if (tick % 60 !== 0) return
     for (const player of game.connected_players) {
       const frame = player.gui.screen[FRAME]
-      if (frame !== undefined && (frame.tags as { link?: string }).link !== linkOf(player)) openVsCode(player)
+      if (frame === undefined) continue
+      const tags = frame.tags as { link?: string; plugin?: string }
+      if (tags.link !== linkOf(player) || tags.plugin !== pluginOf(player)) openVsCode(player)
     }
   })
 }

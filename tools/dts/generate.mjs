@@ -28,7 +28,7 @@ const headerEn = `// Automaton API types (the Automaton mod for Factorio) — fo
 // Easiest: in the game, the "Team programs" window → "Folder for VS Code" — the mod writes a ready folder
 // (programs, this file, tsconfig.json, sync with the game). By hand:
 //   1. Create a folder and put this file and tsconfig.json in it:
-//      { "compilerOptions": { "strict": true, "target": "es2020", "lib": ["es2020"], "noEmit": true, "moduleDetection": "force",
+//      { "compilerOptions": { "strict": true, "target": "es2020", "noLib": true, "noEmit": true, "moduleDetection": "force",
 //        "module": "preserve", "moduleResolution": "bundler" } }
 //   2. Write the program in a .ts file next to it — VS Code suggests functions and finds errors.
 //   3. Copy the program text into the "Team programs" window in the game and press "Publish".
@@ -38,7 +38,7 @@ const header = `// Типы API автоматонов (мод Automaton для 
 // Проще всего: в игре окно «Программы команды» → «Папка для VS Code» — мод запишет готовую папку
 // (программы, этот файл, tsconfig.json, синхронизацию с игрой). Вручную:
 //   1. Создайте папку, положите в неё этот файл и tsconfig.json:
-//      { "compilerOptions": { "strict": true, "target": "es2020", "lib": ["es2020"], "noEmit": true, "moduleDetection": "force",
+//      { "compilerOptions": { "strict": true, "target": "es2020", "noLib": true, "noEmit": true, "moduleDetection": "force",
 //        "module": "preserve", "moduleResolution": "bundler" } }
 //   2. Пишите программу в файле .ts рядом — VS Code подскажет функции и найдёт ошибки.
 //   3. Скопируйте текст программы в окно «Программы команды» в игре и нажмите «Опубликовать».
@@ -50,7 +50,8 @@ const tsconfig = JSON.stringify(
     compilerOptions: {
       strict: true,
       target: "es2020",
-      lib: ["es2020"],
+      // Стандартная библиотека — своя, в automaton.d.ts (что есть в игре): Promise, async, setTimeout… — ошибка сразу.
+      noLib: true,
       noEmit: true,
       moduleDetection: "force",
       module: "preserve",
@@ -126,9 +127,79 @@ function withNames(text, lang) {
   }
   return result
 }
+/**
+ * Стандартная библиотека для VS Code (25.3) — ровно то, что есть в игре: объявления src/lang/stdlib.ts (их же читает
+ * проверка типов в игре) и минимум, без которого TypeScript не работает (Object, Function, итераторы для for…of,
+ * конструкторы Map и Set, служебные типы, которые понимает игра). Вместо lib.es2020 (tsconfig: noLib): Promise, async,
+ * генераторы, setTimeout, Date, console, методы, которых нет в игре, — ошибка в VS Code, как при публикации.
+ */
+const stdlibSource = readFileSync(join(root, "src", "lang", "stdlib.ts"), "utf8")
+const stdlib = stdlibSource
+  .slice(stdlibSource.indexOf("`") + 1, stdlibSource.lastIndexOf("`"))
+  // undefined в TypeScript — встроенное имя, объявлять его нельзя.
+  .replace(/^declare const undefined: undefined;\n/m, "")
+function vscodeLib(lang) {
+  const intro =
+    lang === "ru"
+      ? "// ---------- Стандартная библиотека: только то, что есть в игре. Promise, async, генераторов, setTimeout, Date,\n// console и прочего здесь нет — VS Code подчеркнёт их сразу, как и игра при публикации. ----------\n"
+      : "// ---------- The standard library: only what the game has. There is no Promise, async, generators, setTimeout,\n// Date, console and the like — VS Code underlines them right away, as the game does on publishing. ----------\n"
+  const readonlyArray = [
+    "interface ReadonlyArray<T> {",
+    "  readonly length: number;",
+    "  readonly [index: number]: T;",
+    "  [Symbol.iterator](): IterableIterator<T>;",
+    "  slice(start?: number, end?: number): T[];",
+    "  concat(...items: (T | readonly T[])[]): T[];",
+    "  join(separator?: string): string;",
+    "  indexOf(value: T, fromIndex?: number): number;",
+    "  lastIndexOf(value: T, fromIndex?: number): number;",
+    "  includes(value: T, fromIndex?: number): boolean;",
+    "  at(index: number): T | undefined;",
+    "  forEach(fn: (value: T, index: number, array: readonly T[]) => void): void;",
+    "  map<U>(fn: (value: T, index: number, array: readonly T[]) => U): U[];",
+    "  filter(fn: (value: T, index: number, array: readonly T[]) => unknown): T[];",
+    "  find(fn: (value: T, index: number, array: readonly T[]) => unknown): T | undefined;",
+    "  findIndex(fn: (value: T, index: number, array: readonly T[]) => unknown): number;",
+    "  some(fn: (value: T, index: number, array: readonly T[]) => unknown): boolean;",
+    "  every(fn: (value: T, index: number, array: readonly T[]) => unknown): boolean;",
+    "  reduce<U>(fn: (acc: U, value: T, index: number, array: readonly T[]) => U, initial: U): U;",
+    "  flatMap<U>(fn: (value: T, index: number, array: readonly T[]) => U | U[]): U[];",
+    "}",
+  ].join("\n")
+  return `${intro}
+interface Object {}
+interface Function {}
+interface CallableFunction extends Function {}
+interface NewableFunction extends Function {}
+interface IArguments { length: number; [index: number]: any }
+interface RegExp {}
+interface SymbolConstructor { readonly iterator: unique symbol }
+declare var Symbol: SymbolConstructor;
+interface IteratorYieldResult<T> { done?: false; value: T }
+interface IteratorReturnResult<T> { done: true; value: T }
+type IteratorResult<T, TReturn = any> = IteratorYieldResult<T> | IteratorReturnResult<TReturn>;
+interface Iterator<T, TReturn = any, TNext = any> { next(...args: [] | [TNext]): IteratorResult<T, TReturn> }
+interface Iterable<T, TReturn = any, TNext = any> { [Symbol.iterator](): Iterator<T, TReturn, TNext> }
+interface IterableIterator<T, TReturn = any, TNext = any> extends Iterator<T, TReturn, TNext> { [Symbol.iterator](): IterableIterator<T, TReturn, TNext> }
+interface Array<T> { [Symbol.iterator](): IterableIterator<T> }
+interface String { [Symbol.iterator](): IterableIterator<string> }
+interface Map<K, V> { [Symbol.iterator](): IterableIterator<[K, V]> }
+interface Set<T> { [Symbol.iterator](): IterableIterator<T> }
+declare var Map: { new <K, V>(entries?: readonly (readonly [K, V])[] | null): Map<K, V> };
+declare var Set: { new <T>(values?: readonly T[] | null): Set<T> };
+${readonlyArray}
+type Partial<T> = { [P in keyof T]?: T[P] };
+type Required<T> = { [P in keyof T]-?: T[P] };
+type Readonly<T> = { readonly [P in keyof T]: T[P] };
+type Record<K extends keyof any, T> = { [P in K]: T };
+type NonNullable<T> = T & {};
+${stdlib}
+// ---------- ${lang === "ru" ? "API автоматонов" : "The automaton API"} ----------
+`
+}
 const plainDts = header + "\n" + localize(declarations.join("\n"), "ru")
-const dts = withNames(plainDts, "ru")
-const dtsEn = withNames(headerEn + "\n" + localize(declarations.join("\n"), "en"), "en")
+const dts = withNames(header + "\n" + vscodeLib("ru") + localize(declarations.join("\n"), "ru"), "ru")
+const dtsEn = withNames(headerEn + "\n" + vscodeLib("en") + localize(declarations.join("\n"), "en"), "en")
 writeFileSync(join(root, "mod", "automaton.d.ts"), dts)
 writeFileSync(join(root, "mod", "automaton.en.d.ts"), dtsEn)
 // Справка в игре (18.5): разделы docs/API.md с объявлениями → записи (объявление верхнего уровня: имя, текст,

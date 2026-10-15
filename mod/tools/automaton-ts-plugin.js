@@ -1,5 +1,7 @@
 // Плагин TypeScript для программ автоматонов (VS Code). Подключается tsconfig.json папки программ
 // ("plugins": [{ "name": "automaton-ts-plugin" }]) и проверяет только файлы в её src — другие проекты не трогает.
+// VS Code находит его, только если в настройках пользователя есть путь "./.automaton" (pluginPaths) — его дописывает
+// кнопка «Включить подсветку» в окне «VS Code» в игре или «node automaton-sync.mjs plugin».
 // - Ошибки на возможностях TypeScript, которых нет в языке машин (async/await, var, enum, регулярные
 //   выражения, == …) — те же, что даст игра при публикации (docs/LANGUAGE.md, «Не поддерживается»).
 // - Подсказки о времени (docs/API.md, «Время программы»): наведите на for / while — цена витка и сколько
@@ -420,6 +422,12 @@ function init(modules) {
     /** Только программы: файлы в src папки, где лежит tsconfig.json с этим плагином. */
     const ours = (fileName) => fileName.replace(/\\/g, "/").startsWith(`${root}/src/`) && !fileName.endsWith(".d.ts")
     const source = (fileName) => ls.getProgram()?.getSourceFile(fileName)
+    // Отметка «VS Code загрузил плагин» (25.3): её видит утилита синхронизации, и окно «VS Code» в игре ставит галочку.
+    try {
+      require("fs").writeFileSync(`${root}/.automaton/plugin.json`, JSON.stringify({ loaded: new Date().toISOString() }) + "\n")
+    } catch {
+      // Нет папки .automaton (папка без игры) или нет файловой системы (VS Code в браузере).
+    }
 
     const proxy = Object.create(null)
     for (const key of Object.keys(ls)) proxy[key] = (...args) => ls[key](...args)
